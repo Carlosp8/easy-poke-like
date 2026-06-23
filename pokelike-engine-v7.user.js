@@ -106,6 +106,8 @@
         RUN_HISTORY_STORAGE_KEY: 'engine7_run_history_v1',
         RUN_HISTORY_MAX_ENTRIES: 80,
         RUN_EVENT_LOG_MAX_ENTRIES: 160,
+        BOT_CONTROL_STORAGE_KEY: 'engine7_bot_controls_v1',
+        BOT_CONTROL_LOCK_KEEP_BONUS: 10000,
 
         // --- Main carry strategy ---
         // These are the sweepers we want to protect as slot 1 unless a matchup is clearly unsafe.
@@ -829,6 +831,24 @@
     let lastTeamReorderSignature = '';
     let lastTeamReorderAt = 0;
     let teamReorderAttemptsBySignature = {};
+    const BOT_CONTROL_TACTICS = {
+        auto: 'Auto',
+        boss: 'Boss prep',
+        capture: 'Captura',
+        xp: 'XP',
+        duplicate: 'Duplicados'
+    };
+    const BOT_CONTROL_DEFAULT_STATE = {
+        paused: false,
+        tactic: 'auto',
+        mainCarryKey: '',
+        lockedKeys: [],
+        panel: { x: 16, y: 128 },
+        collapsed: false
+    };
+    let botControlState = null;
+    let botControlPanel = null;
+    let botControlLastRenderSignature = '';
     let engineStats = { loops: 0, screens: {}, catches: 0, items: 0, swaps: 0, rerolls: 0 };
 
     // ╔══════════════════════════════════════════════════════════════╗
@@ -846,6 +866,266 @@
     // ╔══════════════════════════════════════════════════════════════╗
     // ║    🎛️ PHYSICS ENGINE (Click Simulation & Drag/Drop)         ║
     // ╚══════════════════════════════════════════════════════════════╝
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function normalizeBotControlState(raw = {}) {
+        raw = raw && typeof raw === 'object' ? raw : {};
+        return {
+            ...BOT_CONTROL_DEFAULT_STATE,
+            ...raw,
+            tactic: BOT_CONTROL_TACTICS[raw.tactic] ? raw.tactic : BOT_CONTROL_DEFAULT_STATE.tactic,
+            mainCarryKey: raw.mainCarryKey || '',
+            lockedKeys: Array.isArray(raw.lockedKeys) ? [...new Set(raw.lockedKeys.filter(Boolean))] : [],
+            panel: {
+                x: Number.isFinite(raw?.panel?.x) ? raw.panel.x : BOT_CONTROL_DEFAULT_STATE.panel.x,
+                y: Number.isFinite(raw?.panel?.y) ? raw.panel.y : BOT_CONTROL_DEFAULT_STATE.panel.y
+            },
+            collapsed: Boolean(raw.collapsed),
+            paused: Boolean(raw.paused)
+        };
+    }
+
+    function getBotControlState() {
+        if (botControlState) return botControlState;
+        try {
+            botControlState = normalizeBotControlState(JSON.parse(localStorage.getItem(CONFIG.BOT_CONTROL_STORAGE_KEY) || '{}'));
+        } catch (e) {
+            botControlState = normalizeBotControlState();
+        }
+        return botControlState;
+    }
+
+    function saveBotControlState() {
+        try {
+            localStorage.setItem(CONFIG.BOT_CONTROL_STORAGE_KEY, JSON.stringify(getBotControlState()));
+        } catch (e) {
+            log('warn', 'controls', `Could not save controls: ${e.message}`);
+        }
+    }
+
+    function updateBotControlState(patch = {}) {
+        botControlState = normalizeBotControlState({ ...getBotControlState(), ...patch });
+        saveBotControlState();
+        botControlLastRenderSignature = '';
+    }
+
+    function getBotControlTactic() {
+        return getBotControlState().tactic || 'auto';
+    }
+
+    function isBotPaused() {
+        return Boolean(getBotControlState().paused);
+    }
+
+    function getBotControlSelectedMainKey() {
+        return getBotControlState().mainCarryKey || '';
+    }
+
+    function isBotControlLockedKey(key) {
+        return Boolean(key && getBotControlState().lockedKeys.includes(key));
+    }
+
+    function isBotControlLockedUnit(unit) {
+        return Boolean(unit && isBotControlLockedKey(getPokemonIdentityKey(unit.name)));
+    }
+
+    function toggleBotControlLockedKey(key) {
+        if (!key) return;
+        const state = getBotControlState();
+        const locked = new Set(state.lockedKeys || []);
+        if (locked.has(key)) locked.delete(key);
+        else locked.add(key);
+        updateBotControlState({ lockedKeys: [...locked] });
+    }
+
+    function getBotControlTeamSignature(team) {
+        return (team || []).map(unit => [
+            unit.index,
+            getPokemonIdentityKey(unit.name),
+            unit.name,
+            unit.hp || 0,
+            unit.level || 0,
+            unit.isFainted ? 'F' : 'A',
+            unit.heldItem || ''
+        ].join(':')).join('|');
+    }
+
+    function getPokemonSpriteSrcFromUnit(unit) {
+        const img = unit?.element?.querySelector('img.poke-sprite, .poke-sprite-wrap img, img');
+        return img ? (img.src || img.getAttribute('src') || '') : '';
+    }
+
+    function getBotControlPanelHtml(team) {
+        const state = getBotControlState();
+        const mainKey = state.mainCarryKey || '';
+        const locked = new Set(state.lockedKeys || []);
+        const tacticOptions = Object.entries(BOT_CONTROL_TACTICS).map(([key, label]) => {
+            return `<option value="${escapeHtml(key)}"${state.tactic === key ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+        }).join('');
+        const mainOptions = [
+            `<option value=""${!mainKey ? ' selected' : ''}>Auto</option>`,
+            ...(team || []).map(unit => {
+                const key = getPokemonIdentityKey(unit.name);
+                const label = `${unit.name || 'slot'} Lv${unit.level || 0}`;
+                return `<option value="${escapeHtml(key)}"${mainKey === key ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+            })
+        ].join('');
+        const slots = (team || []).map(unit => {
+            const key = getPokemonIdentityKey(unit.name);
+            const sprite = getPokemonSpriteSrcFromUnit(unit);
+            const isMain = mainKey ? mainKey === key : isMainCarryUnit(unit);
+            const isLocked = locked.has(key);
+            const hp = Math.max(0, Math.min(100, unit.hp || 0));
+            const spriteHtml = sprite
+                ? `<img class="e7c-slot-img" src="${escapeHtml(sprite)}" alt="">`
+                : `<span class="e7c-slot-fallback">${escapeHtml((unit.name || '?').slice(0, 2).toUpperCase())}</span>`;
+            return `
+                <div class="e7c-slot${isMain ? ' is-main' : ''}${isLocked ? ' is-locked' : ''}" data-key="${escapeHtml(key)}">
+                    <button class="e7c-icon-btn e7c-main-btn" data-action="main" data-key="${escapeHtml(key)}" title="Principal">${isMain ? 'M' : '+'}</button>
+                    <div class="e7c-avatar">${spriteHtml}</div>
+                    <div class="e7c-slot-meta">
+                        <div class="e7c-name">${escapeHtml(unit.name || 'unknown')}</div>
+                        <div class="e7c-sub">Lv${unit.level || 0} / ${hp}%</div>
+                        <div class="e7c-hp"><span style="width:${hp}%"></span></div>
+                    </div>
+                    <button class="e7c-icon-btn e7c-lock-btn" data-action="lock" data-key="${escapeHtml(key)}" title="No reemplazar">${isLocked ? 'Lock' : 'Free'}</button>
+                </div>
+            `;
+        }).join('') || '<div class="e7c-empty">Sin equipo visible</div>';
+
+        return `
+            <div class="e7c-head" data-drag-handle="true">
+                <button class="e7c-icon-btn e7c-play" data-action="pause" title="${state.paused ? 'Reanudar' : 'Pausar'}">${state.paused ? 'Play' : 'Pause'}</button>
+                <strong>Engine 7</strong>
+                <button class="e7c-icon-btn" data-action="collapse" title="Plegar">${state.collapsed ? '+' : '-'}</button>
+            </div>
+            <div class="e7c-body"${state.collapsed ? ' hidden' : ''}>
+                <label class="e7c-field">Tactica
+                    <select data-action="tactic">${tacticOptions}</select>
+                </label>
+                <label class="e7c-field">Principal
+                    <select data-action="main-select">${mainOptions}</select>
+                </label>
+                <div class="e7c-team">${slots}</div>
+            </div>
+        `;
+    }
+
+    function injectBotControlStyles() {
+        if (document.getElementById('engine7-control-style')) return;
+        const style = document.createElement('style');
+        style.id = 'engine7-control-style';
+        style.textContent = `
+            #engine7-control-panel { position: fixed; z-index: 2147483647; width: min(330px, calc(100vw - 24px)); max-height: min(620px, calc(100vh - 24px)); overflow: hidden; background: rgba(18,24,31,.94); color: #f7fafc; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 14px 36px rgba(0,0,0,.35); border-radius: 8px; font: 12px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+            #engine7-control-panel * { box-sizing: border-box; }
+            .e7c-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 8px; cursor: move; background: rgba(255,255,255,.08); user-select: none; }
+            .e7c-head strong { font-size: 13px; letter-spacing: 0; }
+            .e7c-body { display: grid; gap: 8px; padding: 8px; overflow: auto; max-height: 560px; }
+            .e7c-field { display: grid; gap: 4px; color: #cbd5e1; }
+            .e7c-field select { width: 100%; min-height: 30px; color: #f8fafc; background: #111827; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 4px 8px; }
+            .e7c-team { display: grid; gap: 6px; }
+            .e7c-slot { display: grid; grid-template-columns: 32px 38px minmax(0,1fr) 50px; gap: 6px; align-items: center; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: rgba(255,255,255,.05); }
+            .e7c-slot.is-main { border-color: #74d680; background: rgba(43,138,62,.18); }
+            .e7c-slot.is-locked { box-shadow: inset 3px 0 0 #facc15; }
+            .e7c-avatar { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 6px; background: rgba(255,255,255,.08); overflow: hidden; }
+            .e7c-slot-img { max-width: 36px; max-height: 36px; object-fit: contain; }
+            .e7c-slot-fallback { font-weight: 700; color: #e2e8f0; }
+            .e7c-slot-meta { min-width: 0; }
+            .e7c-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; }
+            .e7c-sub { color: #a7b4c4; font-size: 11px; }
+            .e7c-hp { height: 4px; margin-top: 4px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
+            .e7c-hp span { display: block; height: 100%; background: #4ade80; }
+            .e7c-icon-btn { min-width: 30px; min-height: 28px; border: 1px solid rgba(255,255,255,.18); border-radius: 6px; color: #f8fafc; background: rgba(255,255,255,.08); cursor: pointer; font: inherit; }
+            .e7c-icon-btn:hover { background: rgba(255,255,255,.16); }
+            .e7c-lock-btn { width: 50px; }
+            .e7c-empty { color: #a7b4c4; padding: 10px; text-align: center; }
+        `;
+        document.head?.appendChild(style);
+    }
+
+    function attachBotControlHandlers(panel) {
+        panel.onclick = event => {
+            const button = event.target.closest('[data-action]');
+            if (!button || !panel.contains(button)) return;
+            const action = button.getAttribute('data-action');
+            if (action === 'pause') {
+                updateBotControlState({ paused: !getBotControlState().paused });
+            } else if (action === 'collapse') {
+                updateBotControlState({ collapsed: !getBotControlState().collapsed });
+            } else if (action === 'lock') {
+                toggleBotControlLockedKey(button.getAttribute('data-key'));
+            } else if (action === 'main') {
+                const key = button.getAttribute('data-key') || '';
+                updateBotControlState({ mainCarryKey: getBotControlState().mainCarryKey === key ? '' : key });
+            }
+            renderBotControlPanel(true);
+        };
+        panel.onchange = event => {
+            const target = event.target;
+            const action = target.getAttribute('data-action');
+            if (action === 'tactic') updateBotControlState({ tactic: target.value });
+            else if (action === 'main-select') updateBotControlState({ mainCarryKey: target.value || '' });
+            renderBotControlPanel(true);
+        };
+
+        const handle = panel.querySelector('[data-drag-handle]');
+        if (!handle) return;
+        handle.onpointerdown = event => {
+            if (event.target.closest('button, select')) return;
+            const state = getBotControlState();
+            const startX = event.clientX;
+            const startY = event.clientY;
+            const startLeft = state.panel.x;
+            const startTop = state.panel.y;
+            handle.setPointerCapture?.(event.pointerId);
+            const move = moveEvent => {
+                const nextX = Math.max(4, Math.min(window.innerWidth - panel.offsetWidth - 4, startLeft + moveEvent.clientX - startX));
+                const nextY = Math.max(4, Math.min(window.innerHeight - panel.offsetHeight - 4, startTop + moveEvent.clientY - startY));
+                panel.style.left = `${nextX}px`;
+                panel.style.top = `${nextY}px`;
+                state.panel = { x: nextX, y: nextY };
+            };
+            const up = () => {
+                window.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', up);
+                saveBotControlState();
+            };
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', up);
+        };
+    }
+
+    function renderBotControlPanel(force = false) {
+        if (!botControlPanel || !document.body) return;
+        const team = parseTeamStatus();
+        const state = getBotControlState();
+        const signature = JSON.stringify({ state, team: getBotControlTeamSignature(team) });
+        if (!force && signature === botControlLastRenderSignature) return;
+        botControlLastRenderSignature = signature;
+        botControlPanel.style.left = `${state.panel.x}px`;
+        botControlPanel.style.top = `${state.panel.y}px`;
+        botControlPanel.innerHTML = getBotControlPanelHtml(team);
+        attachBotControlHandlers(botControlPanel);
+    }
+
+    function ensureBotControlPanel() {
+        if (!document.body) return;
+        injectBotControlStyles();
+        if (!botControlPanel) {
+            botControlPanel = document.createElement('div');
+            botControlPanel.id = 'engine7-control-panel';
+            document.body.appendChild(botControlPanel);
+        }
+        renderBotControlPanel();
+    }
 
     function triggerRealClick(element) {
         if (!element) return false;
@@ -1767,7 +2047,8 @@
     }
 
     function getConfiguredMainCarryKeys() {
-        return [...new Set((CONFIG.MAIN_CARRY_NAMES || []).flatMap(name => getPokemonLookupKeys(name)))];
+        const configuredKeys = (CONFIG.MAIN_CARRY_NAMES || []).flatMap(name => getPokemonLookupKeys(name));
+        return [...new Set([...configuredKeys, getBotControlSelectedMainKey()].filter(Boolean))];
     }
 
     function isMainCarryName(name) {
@@ -3957,6 +4238,54 @@
         return score;
     }
 
+    function getBotControlTacticNodeBonus(type, context = {}) {
+        const tactic = getBotControlTactic();
+        if (tactic === 'auto') return 0;
+
+        const team = context.team || [];
+        const centerNeed = context.centerNeed || getCenterNeedStatus(team);
+        const earlyExpansionClosed = Boolean(context.earlyExpansionClosed);
+        const openTeamSlot = hasOpenTeamSlot(team);
+
+        if (tactic === 'xp') {
+            if (type === 'trainer') return 900;
+            if (type === 'buff') return 180;
+            if (type === 'catch' || type === 'grass') return -500;
+            if (type === 'item') return -120;
+            if (type === 'center' && centerNeed.canSkipCenter) return -300;
+            return 0;
+        }
+
+        if (tactic === 'capture') {
+            if (type === 'catch') return 850;
+            if (type === 'grass') return 350;
+            if (type === 'trade') return 120;
+            if (type === 'trainer') return -180;
+            return 0;
+        }
+
+        if (tactic === 'boss') {
+            if (type === 'item') return 420;
+            if (type === 'buff') return 300;
+            if (type === 'trainer') return 220;
+            if (type === 'legendary') return 260;
+            if (type === 'boss') return 180;
+            if (type === 'center') return centerNeed.canSkipCenter ? -100 : 400;
+            if ((type === 'catch' || type === 'grass') && earlyExpansionClosed) return -200;
+            return 0;
+        }
+
+        if (tactic === 'duplicate') {
+            if (type === 'catch') return openTeamSlot ? 600 : 180;
+            if (type === 'grass') return 260;
+            if (type === 'trainer') return 120;
+            if (type === 'trade') return 80;
+            return 0;
+        }
+
+        return 0;
+    }
+
     function scoreMapNodeImmediate(mapNode, context) {
         let score = 0;
         const {
@@ -4051,6 +4380,7 @@
                 break;
         }
 
+        score += getBotControlTacticNodeBonus(mapNode.type, context);
         score += (mapNode.x % 17);
         return score;
     }
@@ -4578,6 +4908,38 @@
                (attackScore > 0 && defensiveScore > 0);
     }
 
+    function getBotControlCatchScoreBonus(candidate, team, bossTypes) {
+        const tactic = getBotControlTactic();
+        if (tactic === 'auto' || !candidate) return 0;
+
+        if (tactic === 'capture') {
+            return 18;
+        }
+
+        if (tactic === 'xp') {
+            const protectedValue = candidate.isShiny ||
+                candidate.isLegendary ||
+                (candidate.duplicatePairScore || 0) >= CONFIG.DUPLICATE_PAIR_PROTECT_SCORE ||
+                isBossRelevantCatchCandidate(candidate, bossTypes);
+            return protectedValue ? 0 : -16;
+        }
+
+        if (tactic === 'boss') {
+            const matchupBonus = Math.min(28, (candidate.bossMatchupScore || 0) * 1.4);
+            return isDirectBossCounterCandidate(candidate, bossTypes)
+                ? Math.max(10, matchupBonus)
+                : matchupBonus;
+        }
+
+        if (tactic === 'duplicate') {
+            const duplicateScore = candidate.duplicatePairScore || 0;
+            if (duplicateScore > 0) return Math.max(18, duplicateScore);
+            return hasOpenTeamSlot(team) ? 6 : 0;
+        }
+
+        return 0;
+    }
+
     function isProtectedCatchCandidate(candidate, bossTypes) {
         if (!candidate) return false;
         return isPremiumCatchCandidate(candidate.score, candidate.isShiny, candidate.name) ||
@@ -4751,6 +5113,18 @@
             const grassSupportScore = getGrassSupportCatchScore(types, team);
             const duplicatePairScore = getDuplicatePairCatchScore(name, types, team, attackTypes, bossTypes, { expectedCatchCopies });
             let score = scoreCatchCandidate(name, types, team, isShiny, attackTypes, bossTypes, { expectedCatchCopies });
+            const tacticScore = getBotControlCatchScoreBonus({
+                name,
+                score,
+                isShiny,
+                isLegendary,
+                types,
+                attackTypes,
+                bossMatchupScore,
+                grassSupportScore,
+                duplicatePairScore
+            }, team, bossTypes);
+            score += tacticScore;
             score += scoreTraitPreviewFromCard(card);
             score += scorePokemonStats(learnedInfo?.currentStats || parseCardStats(card));
             const candidateLevel = learnedInfo?.level || parseLevelText(card.querySelector('.poke-level, .team-slot-lv, [class*="level"]')?.innerText || card.innerText || '');
@@ -4771,6 +5145,7 @@
                 bossMatchupScore,
                 grassSupportScore,
                 duplicatePairScore,
+                tacticScore,
                 level: candidateLevel || 0,
                 projectedAvgLevel: projectedAvgLevel === null ? null : Number(projectedAvgLevel.toFixed(1)),
                 avgLevelDrop: Number(avgLevelDrop.toFixed(1))
@@ -4815,6 +5190,7 @@
                 bestAttackTypes: bestCandidate?.attackTypes || [],
                 bestGrassSupportScore: bestCandidate?.grassSupportScore || 0,
                 bestDuplicatePairScore: bestCandidate?.duplicatePairScore || 0,
+                bestTacticScore: bestCandidate?.tacticScore || 0,
                 expectedCatchCopies,
                 bossTypes,
                 earlyExpansionClosed,
@@ -4924,6 +5300,7 @@
                 bossTypes,
                 grassSupportScore: bestCandidate?.grassSupportScore || 0,
                 duplicatePairScore: bestCandidate?.duplicatePairScore || 0,
+                tacticScore: bestCandidate?.tacticScore || 0,
                 expectedCatchCopies,
                 level: bestCandidate?.level || 0,
                 projectedAvgLevel: bestCandidate?.projectedAvgLevel ?? null,
@@ -5316,8 +5693,10 @@
                 const types = getKnownPokemonTypes(name);
                 const attackTypes = getAttackTypesFromElement(choice, types);
                 const teamUnit = team[idx] || { index: idx, name, types, attackTypes, isFainted: false };
+                const lockBonus = isBotControlLockedUnit(teamUnit) ? CONFIG.BOT_CONTROL_LOCK_KEEP_BONUS : 0;
                 const score = scoreCatchCandidate(name, types, team, false, attackTypes) +
-                              getDuplicatePairReplacementProtectionScore(teamUnit, team, incomingName);
+                              getDuplicatePairReplacementProtectionScore(teamUnit, team, incomingName) +
+                              lockBonus;
                 if (score < weakestScore) {
                     weakestScore = score;
                     weakestIdx = idx;
@@ -6029,7 +6408,13 @@
         engineStats.loops++;
         const currentState = getActiveScreen();
         refreshVisiblePokemonInfoCache();
+        ensureBotControlPanel();
         syncCatchScreenSession(currentState);
+
+        if (isBotPaused()) {
+            return;
+        }
+
         const shouldTrackRunState = ![
             'title-screen',
             'challenge-select',
