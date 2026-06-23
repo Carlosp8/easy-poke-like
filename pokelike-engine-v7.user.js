@@ -1116,15 +1116,36 @@
 
     function renderBotControlPanel(force = false) {
         if (!botControlPanel || !document.body) return;
+
+        const isInteracting = botControlPanel.contains(document.activeElement) &&
+                              ['INPUT', 'SELECT'].includes(document.activeElement?.tagName);
+
+        if (!force && isInteracting) return;
+
         const team = parseTeamStatus();
         const state = getBotControlState();
         const signature = JSON.stringify({ state, team: getBotControlTeamSignature(team) });
         if (!force && signature === botControlLastRenderSignature) return;
+
+        const activeAction = isInteracting ? document.activeElement.getAttribute('data-action') : null;
+        const activeSelStart = activeAction && document.activeElement.tagName === 'INPUT' ? document.activeElement.selectionStart : null;
+        const activeSelEnd = activeAction && document.activeElement.tagName === 'INPUT' ? document.activeElement.selectionEnd : null;
+
         botControlLastRenderSignature = signature;
         botControlPanel.style.left = `${state.panel.x}px`;
         botControlPanel.style.top = `${state.panel.y}px`;
         botControlPanel.innerHTML = getBotControlPanelHtml(team);
         attachBotControlHandlers(botControlPanel);
+
+        if (force && activeAction) {
+            const toFocus = botControlPanel.querySelector(`[data-action="${activeAction}"]`);
+            if (toFocus) {
+                toFocus.focus();
+                if (toFocus.tagName === 'INPUT' && activeSelStart !== null) {
+                    toFocus.setSelectionRange(activeSelStart, activeSelEnd);
+                }
+            }
+        }
     }
 
     function ensureBotControlPanel() {
