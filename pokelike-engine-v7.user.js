@@ -146,7 +146,7 @@
 
         // --- Starter Preference ---
         // Set to a Pokemon name to force that starter when visible. Empty/null keeps current auto scoring.
-        STARTER_PREFERENCE: 'Dialga',
+        //STARTER_PREFERENCE: 'Dialga',
 
         // --- Auto-Restart ---
         AUTO_RESTART: true,
