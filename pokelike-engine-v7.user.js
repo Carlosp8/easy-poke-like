@@ -151,22 +151,22 @@
         // --- Auto-Restart ---
         AUTO_RESTART: true,
         AUTO_START_MODES: {
-            resumeChallenge: true,
-            weeklyChallenges: true,
-            challengeMode: true,
-            resumeBattleTower: false,
-            battleTower: false
+            resumeChallenge: false,
+            weeklyChallenges: false,
+            challengeMode: false,
+            resumeBattleTower: true,
+            battleTower: true
         },
         AUTO_START_PRIORITY: [
+            'resumeBattleTower',
+            'battleTower',
             'resumeChallenge',
             'weeklyChallenges',
-            'challengeMode',
-            'resumeBattleTower',
-            'battleTower'
+            'challengeMode'
         ],
         WEEKLY_CHALLENGE_ORDER: ['lorelei', 'bruno', 'agatha', 'lance'],
         // Legacy alias for users who still toggle Battle Tower with the old flag.
-        AUTO_START_BATTLE_TOWER: false,
+        AUTO_START_BATTLE_TOWER: true,
 
         // --- Logging ---
         LOG_LEVEL: 'info', // 'debug', 'info', 'warn', 'error'

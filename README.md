@@ -82,7 +82,21 @@ const CONFIG = {
 
     // --- Auto-Restart ---
     AUTO_RESTART: true,             // Reiniciar automáticamente al perder/ganar
-    AUTO_START_BATTLE_TOWER: true,  // Iniciar Battle Tower desde el menú principal
+    AUTO_START_MODES: {
+        resumeChallenge: false,
+        weeklyChallenges: false,
+        challengeMode: false,
+        resumeBattleTower: true,    // Reanudar Battle Tower si hay run activa
+        battleTower: true           // Iniciar Battle Tower desde el menú principal
+    },
+    AUTO_START_PRIORITY: [
+        'resumeBattleTower',
+        'battleTower',
+        'resumeChallenge',
+        'weeklyChallenges',
+        'challengeMode'
+    ],
+    AUTO_START_BATTLE_TOWER: true,  // Alias legacy para Battle Tower
 
     // --- Logging ---
     LOG_LEVEL: 'info',              // 'debug' = verboso, 'info' = normal,
