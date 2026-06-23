@@ -844,7 +844,8 @@
         mainCarryKey: '',
         lockedKeys: [],
         panel: { x: 16, y: 128 },
-        collapsed: false
+        collapsed: false,
+        starterPreference: ''
     };
     let botControlState = null;
     let botControlPanel = null;
@@ -889,7 +890,8 @@
                 y: Number.isFinite(raw?.panel?.y) ? raw.panel.y : BOT_CONTROL_DEFAULT_STATE.panel.y
             },
             collapsed: Boolean(raw.collapsed),
-            paused: Boolean(raw.paused)
+            paused: Boolean(raw.paused),
+            starterPreference: raw.starterPreference || ''
         };
     }
 
@@ -1014,6 +1016,9 @@
                 <label class="e7c-field">Principal
                     <select data-action="main-select">${mainOptions}</select>
                 </label>
+                <label class="e7c-field">Starter Preferido
+                    <input type="text" data-action="starter-input" value="${escapeHtml(state.starterPreference || '')}" placeholder="Nombre (ej: Dialga)" style="width:100%;min-height:30px;color:#f8fafc;background:#111827;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:4px 8px;">
+                </label>
                 <div class="e7c-team">${slots}</div>
             </div>
         `;
@@ -1073,8 +1078,14 @@
             const action = target.getAttribute('data-action');
             if (action === 'tactic') updateBotControlState({ tactic: target.value });
             else if (action === 'main-select') updateBotControlState({ mainCarryKey: target.value || '' });
+            else if (action === 'starter-input') updateBotControlState({ starterPreference: target.value });
             renderBotControlPanel(true);
         };
+        panel.addEventListener('input', event => {
+            const target = event.target;
+            const action = target.getAttribute('data-action');
+            if (action === 'starter-input') updateBotControlState({ starterPreference: target.value });
+        });
 
         const handle = panel.querySelector('[data-drag-handle]');
         if (!handle) return;
@@ -6316,19 +6327,20 @@
         if (choices.length === 0) return;
         choices = getAllowedStarterChoices(choices);
 
-        const starterPreference = foldText(CONFIG.STARTER_PREFERENCE || '');
+        const stateStarter = getBotControlState().starterPreference;
+        const starterPreference = foldText(stateStarter || CONFIG.STARTER_PREFERENCE || '');
         if (starterPreference) {
             for (const choice of choices) {
                 const searchableText = getStarterChoiceSearchableText(choice);
 
                 if (searchableText.includes(starterPreference)) {
-                    log('info', '🐾', `Starter preference matched: ${CONFIG.STARTER_PREFERENCE}`);
+                    log('info', '🐾', `Starter preference matched: ${stateStarter || CONFIG.STARTER_PREFERENCE}`);
                     triggerRealClick(choice);
                     return;
                 }
             }
 
-            log('warn', '🐾', `Starter preference [${CONFIG.STARTER_PREFERENCE}] not visible. Falling back to auto starter scoring.`);
+            log('warn', '🐾', `Starter preference [${stateStarter || CONFIG.STARTER_PREFERENCE}] not visible. Falling back to auto starter scoring.`);
         }
 
         // Prefer Fire starters (strong trait synergy)
