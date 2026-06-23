@@ -664,23 +664,24 @@ Al recibir una oferta de trade (`#trade-screen`):
 - Acepta si `incomingScore > weakestScore + 2`
 - Rechaza en caso contrario
 
-### 4. Map Node Scorer
+### 4. Map Pathing & Node Scorer (Graph AI)
 
-Calcula prioridad dinámica para cada nodo del mapa SVG:
+El motor mapea el árbol de niveles asegurando una navegación perfecta, eliminando "saltos ciegos". Dado que el mapa siempre tiene una topología predecible de 23 nodos en forma de diamante (filas de 1-2-3-4-3-4-3-2-1), la IA utiliza un grafo de adyacencia (Adjacency List) exacto y precalculado que conecta perfectamente el punto de inicio (abajo, nodo 22) con el Jefe Final (arriba, nodo 0). Nunca asume conexiones erróneas: evalúa explícitamente cada ruta posible hacia el jefe y escoge el camino óptimo simulando recursivamente la profundidad configurada en `PATH_LOOKAHEAD_DEPTH`.
 
-| Nodo | Score Base | Modificador HP |
+Calcula una prioridad dinámica para cada nodo que se encuentra en esas rutas seguras:
+
+| Nodo | Score Base | Modificador HP & Táctico |
 |------|-----------|----------------|
-| PokéCenter | -200 ~ +5000 | +5000 si hay muertos, +4000 si HP<30%, -200 si sano |
-| Científico | +500 | — |
-| Item | +450 | — |
-| Pokéball | +400 | — |
-| Entrenador | +100 ~ +300 | +300 si HP>50%, +100 si HP bajo |
-| Trade/NPC | +200 | — |
-| Jefe/Gym | -500 ~ +250 | +250 si HP>50%, -500 si HP bajo |
-| Legendario/Masterball | +3600 + ruta | Penaliza HP bajo y underlevel |
-| Hierba | +150 | — |
+| PokéCenter | -200 ~ +5000 | +5000 si hay muertos, +4000 si HP<30%, -200 si el equipo está sano. |
+| Científico/Buff | +500 | Sinergia alta si el equipo requiere entrenamiento (`earlyLevelingPriority`). |
+| Item | +450 | Bonus masivos (+720) si el Carry principal no tiene objeto equipado. |
+| Pokéball / Grass | +150 ~ +400 | Altísima prioridad si el equipo es pequeño. Penaliza si excede el límite por mapa o la expansión ya cerró. |
+| Entrenador | +100 ~ +300 | +300 si HP>50%, compensa mucho más el XP si el core está underleveled. |
+| Jefe/Gym/Legendario | -500 ~ +3600 | Score masivo (+3600) pero penaliza dramáticamente si falta nivel (`underlevel penalty`) o vida. |
+| Trade/NPC | +200 | Prioridad media-baja, valioso solo si la oferta supera nuestro equipo. |
 
-El scorer mira rutas completas con `PATH_LOOKAHEAD_DEPTH` y usa desempate espacial `xCoord % 17` para evitar sesgo al carril izquierdo.
+**Tácticas y Scoring Lookahead:** 
+En vez de evaluar solo el paso inmediato, el motor simula todas las bifurcaciones a X pisos de profundidad. Por ejemplo, evalúa que ir a la izquierda otorga un Entrenador y un Centro, pero ir a la derecha da Item y Batalla Legendaria. Usa heurísticas de estado general (`context`) para sumar puntos globales a una rama entera si la ruta resuelve carencias del equipo (ej. resta miles de puntos a ramas con capturas si ya llenamos el cupo de `MAX_CATCHES_PER_MAP` en este piso). Finalmente usa un desempate numérico espacial `xCoord % 17` para evitar atascarse en la parte izquierda del mapa cuando las rutas son simétricas.
 
 ### 5. Early Economy Controller
 
