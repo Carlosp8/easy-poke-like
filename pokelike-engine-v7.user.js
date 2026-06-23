@@ -132,6 +132,12 @@
         PASSIVE_UNCOVERED_BOSS_TYPE_BONUS: 22,
         PASSIVE_OFF_TEAM_TYPE_PENALTY: 14,
         PASSIVE_WEAK_CORE_BST_THRESHOLD: 500,
+        CENTER_AVOID_FULL_HP_AVG_THRESHOLD: 92,
+        CENTER_AVOID_ALMOST_FULL_HP_AVG_THRESHOLD: 82,
+        CENTER_AVOID_LOWEST_HP_THRESHOLD: 70,
+        CENTER_HEALTHY_PATH_PENALTY: 1450,
+        CENTER_ALMOST_HEALTHY_PATH_PENALTY: 850,
+        CENTER_REWARD_ALTERNATE_MARGIN: 1100,
 
         // --- Legendary/masterball nodes ---
         LEGENDARY_NODE_BASE_SCORE: 3600,
@@ -1425,6 +1431,33 @@
         const leveled = getAliveTeam(team).filter(p => p.level > 0);
         if (leveled.length === 0) return 0;
         return leveled.reduce((sum, p) => sum + p.level, 0) / leveled.length;
+    }
+
+    function getCenterNeedStatus(team) {
+        const alive = getAliveTeam(team || []);
+        const avgHP = getTeamAverageHP(team || []);
+        const lowestHP = alive.length > 0 ? Math.min(...alive.map(p => p.hp || 0)) : 0;
+        const hasFainted = (team || []).some(p => p.isFainted);
+        const lowHPCount = alive.filter(p => (p.hp || 0) < CONFIG.LOW_HP_THRESHOLD).length;
+        const criticalHPCount = alive.filter(p => (p.hp || 0) < CONFIG.CRITICAL_HP_THRESHOLD).length;
+        const fullEnough = alive.length > 0 &&
+                           avgHP >= CONFIG.CENTER_AVOID_FULL_HP_AVG_THRESHOLD &&
+                           lowestHP >= CONFIG.CENTER_AVOID_LOWEST_HP_THRESHOLD;
+        const almostFull = alive.length > 0 &&
+                           avgHP >= CONFIG.CENTER_AVOID_ALMOST_FULL_HP_AVG_THRESHOLD &&
+                           lowestHP >= CONFIG.CENTER_AVOID_LOWEST_HP_THRESHOLD &&
+                           lowHPCount === 0;
+
+        return {
+            avgHP,
+            lowestHP,
+            hasFainted,
+            lowHPCount,
+            criticalHPCount,
+            fullEnough,
+            almostFull,
+            canSkipCenter: !hasFainted && criticalHPCount === 0 && (fullEnough || almostFull)
+        };
     }
 
     function getLeadLevel(team) {
@@ -3881,6 +3914,7 @@
         const prepPressure = (prepStatus.avgDeficit || 0) + (prepStatus.leadDeficit || 0);
         const primaryCarry = getPrimaryCarry(team);
         const duplicateRouteScore = getDuplicatePairRouteScore(team);
+        const centerNeed = context.centerNeed || getCenterNeedStatus(team);
         const carryNeedsHealingItem = Boolean(
             primaryCarry &&
             isMainCarryUnit(primaryCarry) &&
@@ -3894,6 +3928,8 @@
                 else if (avgHP < CONFIG.CRITICAL_HP_THRESHOLD) score += 4000;
                 else if (avgHP < CONFIG.LOW_HP_THRESHOLD) score += 2000;
                 else if (lowHPCount >= 2) score += 1500;
+                else if (centerNeed.fullEnough) score -= CONFIG.CENTER_HEALTHY_PATH_PENALTY;
+                else if (centerNeed.almostFull) score -= CONFIG.CENTER_ALMOST_HEALTHY_PATH_PENALTY;
                 else score -= 250;
                 break;
             case 'buff':
@@ -3981,6 +4017,10 @@
         const score = immediate + bestFuture * 0.55;
         memo.set(memoKey, score);
         return score;
+    }
+
+    function isRewardMapNodeType(type) {
+        return ['item', 'buff', 'catch', 'grass', 'trainer', 'trade', 'legendary'].includes(type);
     }
 
     function getBestPathSummary(mapNode, tree, context, depth = CONFIG.PATH_LOOKAHEAD_DEPTH) {
@@ -4170,6 +4210,7 @@
         const earlyExpansionClosed = shouldStopEarlyExpansion(team, opponentProfile);
         const captureCapReached = hasReachedMapCaptureCap();
         const mapTree = parseMapTree();
+        const centerNeed = getCenterNeedStatus(team);
         const context = {
             team,
             avgHP,
@@ -4181,7 +4222,8 @@
             earlyLevelingPriority,
             earlyExpansionClosed,
             bossPrepStatus,
-            captureCapReached
+            captureCapReached,
+            centerNeed
         };
 
         let bestNode = null;
@@ -4229,6 +4271,20 @@
             bestMapNode = preferredCandidate.mapNode;
             highestScore = preferredCandidate.score;
             log('warn', '🗺️', `Map click repeated without progress. Trying alternate ${bestMapNode.type} node.`);
+        }
+
+        if (bestMapNode?.type === 'center' && centerNeed.canSkipCenter) {
+            const rewardAlternative = candidates.find(candidate =>
+                candidate.mapNode.type !== 'center' &&
+                isRewardMapNodeType(candidate.mapNode.type) &&
+                candidate.score >= highestScore - CONFIG.CENTER_REWARD_ALTERNATE_MARGIN
+            );
+            if (rewardAlternative) {
+                log('info', '🗺️', `Skipping center at ${centerNeed.avgHP.toFixed(1)}% avg HP (lowest ${centerNeed.lowestHP}%). Taking ${rewardAlternative.mapNode.type} reward instead.`);
+                bestNode = rewardAlternative.node;
+                bestMapNode = rewardAlternative.mapNode;
+                highestScore = rewardAlternative.score;
+            }
         }
 
         if (bestNode) {
@@ -4288,7 +4344,8 @@
                     bossPrepTargets,
                     bossPrepStatus,
                     capturesThisMap,
-                    captureCapReached
+                    captureCapReached,
+                    centerNeed
                 });
                 currentRunTelemetry.best.mapSteps = Math.max(currentRunTelemetry.best.mapSteps, currentRunTelemetry.events.filter(event => event.type === 'map-choice').length);
                 currentRunTelemetry.best.battles = Math.max(currentRunTelemetry.best.battles, getRunBattleCount(currentRunTelemetry));
