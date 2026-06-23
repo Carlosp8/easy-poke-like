@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/pablis.png" alt="Pokelike Tower Engine" width="180">
+</p>
+
 # 🐾 Pokelike Tower Engine v7.0 — Ultimate AI
 
 > Motor de automatización completo para el Battle Tower de [Pokelike.xyz](https://pokelike.xyz).  
