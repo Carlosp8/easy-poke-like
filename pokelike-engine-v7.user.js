@@ -123,6 +123,15 @@
         DUPLICATE_PAIR_PROTECT_SCORE: 18,
         DUPLICATE_LOW_COVERAGE_PENALTY: 12,
         DUPLICATE_MIN_COVERAGE_TYPES_BEFORE_EXTRA_PAIR: 4,
+        PASSIVE_SHINY_CARD_BONUS: 70,
+        PASSIVE_SHINY_TYPE_BONUS: 20,
+        PASSIVE_WEAK_CORE_SCALING_BONUS: 28,
+        PASSIVE_WEAK_CORE_SURVIVAL_BONUS: 20,
+        PASSIVE_STRONG_CARRY_TYPE_BONUS: 18,
+        PASSIVE_BOSS_COUNTER_BONUS: 26,
+        PASSIVE_UNCOVERED_BOSS_TYPE_BONUS: 22,
+        PASSIVE_OFF_TEAM_TYPE_PENALTY: 14,
+        PASSIVE_WEAK_CORE_BST_THRESHOLD: 500,
 
         // --- Legendary/masterball nodes ---
         LEGENDARY_NODE_BASE_SCORE: 3600,
@@ -3123,33 +3132,143 @@
         };
     }
 
-    function scorePassiveCard(card, team) {
+    function isShinyPassiveCard(card, text = '') {
+        const className = typeof card.className === 'string' ? card.className : (card.getAttribute('class') || '');
+        const classText = foldText(className);
+        return Boolean(
+            classText.match(/shiny|variocolor|brillante/) ||
+            text.match(/shiny|variocolor|brillante|sparkle|destell/) ||
+            card.querySelector('.shiny, .shiny-star, [class*="shiny"], [data-shiny="true"]')
+        );
+    }
+
+    function getPassiveTeamProfile(team, opponentProfile = null) {
+        const alive = getAliveTeam(team || []);
+        const primary = getPrimaryCarry(team);
+        const shinyUnits = alive.filter(p => p.isShiny);
+        const bestBst = Math.max(0, ...alive.map(p => getPokemonBaseStatTotal(getPokemonBaseStats(p.name))));
+        const primaryBst = primary ? getPokemonBaseStatTotal(getPokemonBaseStats(primary.name)) : 0;
+        const hasLegendary = alive.some(p => isLegendaryPokemonName(p.name));
+        const hasMainCarry = alive.some(p => isMainCarryUnit(p));
+        const bossTypes = opponentProfile ? getOpponentTeamTypes(opponentProfile) : detectBossTypes();
+        const teamAttackTypes = normalizeTypeList(alive.flatMap(p => getUnitAttackTypes(p)));
+        const uncoveredBossTypes = bossTypes.filter(type => getAttackCoverageScore(teamAttackTypes, [type]) <= 0);
+        const bossAttackScore = bossTypes.length > 0 ? getAttackCoverageScore(teamAttackTypes, bossTypes) : 0;
+        const prepStatus = getBossPrepStatus(team, opponentProfile);
+        const weakCore = alive.length > 0 &&
+                         !hasLegendary &&
+                         !hasMainCarry &&
+                         (!bestBst || bestBst < CONFIG.PASSIVE_WEAK_CORE_BST_THRESHOLD);
+
+        return {
+            alive,
+            primary,
+            primaryBst,
+            bestBst,
+            hasLegendary,
+            hasMainCarry,
+            hasShiny: shinyUnits.length > 0,
+            hasStrongCarry: hasLegendary || hasMainCarry || primaryBst >= CONFIG.LEGENDARY_CATCH_MIN_BST,
+            weakCore,
+            underleveled: shouldPrioritizeEarlyTraining(team, opponentProfile) || (prepStatus.avgDeficit + prepStatus.leadDeficit) > 0,
+            shinyTypes: normalizeTypeList(shinyUnits.flatMap(p => p.types || [])),
+            primaryTypes: normalizeTypeList([...(primary?.types || []), ...getUnitAttackTypes(primary)]),
+            teamAttackTypes,
+            bossTypes,
+            uncoveredBossTypes,
+            bossCoveragePoor: bossTypes.length > 0 && (uncoveredBossTypes.length > 0 || bossAttackScore < bossTypes.length * 2.5),
+            prepStatus
+        };
+    }
+
+    function scorePassiveTypeContext(passiveTypes, team, traitCounts, profile) {
+        let score = 0;
+        const alive = profile.alive || [];
+
+        passiveTypes.forEach(type => {
+            const typeUsers = alive.filter(p => {
+                const unitTypes = normalizeTypeList(p.types || []);
+                const attackTypes = getUnitAttackTypes(p);
+                return unitTypes.includes(type) || attackTypes.includes(type);
+            });
+            const hasTeamUser = typeUsers.length > 0 || (traitCounts[type] || 0) > 0;
+            const typeBossScore = profile.bossTypes.length > 0 ? getAttackCoverageScore([type], profile.bossTypes) : 0;
+            const coversUncoveredBossType = profile.uncoveredBossTypes.some(bossType => getAttackCoverageScore([type], [bossType]) > 0);
+
+            if (profile.shinyTypes.includes(type)) {
+                score += CONFIG.PASSIVE_SHINY_TYPE_BONUS + (traitCounts[type] || 0) * 3;
+            }
+            if (profile.primaryTypes.includes(type) && profile.hasStrongCarry) {
+                score += CONFIG.PASSIVE_STRONG_CARRY_TYPE_BONUS;
+            }
+            if (typeBossScore > 0) {
+                score += Math.min(42, CONFIG.PASSIVE_BOSS_COUNTER_BONUS + typeBossScore * 5);
+                if (coversUncoveredBossType) score += CONFIG.PASSIVE_UNCOVERED_BOSS_TYPE_BONUS;
+                if (!hasTeamUser) score -= CONFIG.PASSIVE_OFF_TEAM_TYPE_PENALTY;
+            } else if (!hasTeamUser) {
+                score -= CONFIG.PASSIVE_OFF_TEAM_TYPE_PENALTY;
+            }
+
+            if (profile.weakCore && hasTeamUser && typeBossScore > 0) {
+                score += 10;
+            }
+        });
+
+        return score;
+    }
+
+    function scorePassiveCard(card, team, opponentProfile = null) {
         const nameEl = card.querySelector('.item-name, .passive-name, [class*="name"]');
         const descEl = card.querySelector('.item-desc, .passive-desc, [class*="desc"]');
         const text = foldText(`${nameEl ? nameEl.innerText : ''} ${descEl ? descEl.innerText : ''} ${card.innerText || ''}`);
         const traitCounts = getTeamTraitCounts(team);
         const avgHP = getTeamAverageHP(team);
         const carry = getPrimaryCarry(team);
+        const profile = getPassiveTeamProfile(team, opponentProfile);
+        const passiveTypes = detectTypesInText(text);
+        const isShinyPassive = isShinyPassiveCard(card, text);
+        const isSustain = Boolean(text.match(/heal|restore|drain|lifesteal|cur|recuper|dren/));
+        const isSurvival = Boolean(text.match(/survive|sturdy|revive|faint|ko|resist|defen|shield|escudo/));
+        const isDamage = Boolean(text.match(/damage|dano|power|move|ataque|golpe|boost|aument/));
+        const isSpeed = Boolean(text.match(/speed|first|lead|priority|velocidad|primero/));
+        const isScaling = Boolean(text.match(/level|lvl|xp|experiencia|nivel|evol|growth|crec/));
+        const isMultiHit = Boolean(text.match(/extra attack|double|twice|ataque extra|doble/));
         let score = 35;
 
-        if (text.match(/heal|restore|drain|lifesteal|cur|recuper|dren/)) score += avgHP < 70 ? 38 : 22;
-        if (text.match(/crit|critical|critico/)) score += 18 + (traitCounts.Dark || 0) * 8;
-        if (text.match(/survive|sturdy|revive|faint|ko|resist/)) score += 26;
-        if (text.match(/damage|dano|power|move|ataque|golpe/)) score += 18;
-        if (text.match(/speed|first|lead|priority|velocidad|primero/)) score += 14;
-        if (text.match(/level|lvl|xp|experiencia|nivel/)) score += 18 + (traitCounts.Bug || 0) * 7;
-        if (text.match(/distinct|different|cada tipo|tipos distintos/)) score += getTeamTypes(team).length * 7;
-        if (text.match(/extra attack|double|twice|ataque extra|doble/)) score += 18 + (traitCounts.Electric || 0) * 7;
-        if (text.match(/execute|remata|ejecut/)) score += 16 + (traitCounts.Ghost || 0) * 8;
-        if (carry && text.match(/heal|restore|drain|lifesteal|cur|recuper|dren/)) score += 18;
-        if (carry && detectTypesInText(text).includes('Grass')) score += 18 + (traitCounts.Grass || 0) * 6;
+        if (isShinyPassive) score += CONFIG.PASSIVE_SHINY_CARD_BONUS + (profile.hasShiny ? 18 : 0);
+        if (profile.hasShiny && text.match(/shiny|variocolor|brillante/)) score += 22;
 
-        detectTypesInText(text).forEach(type => {
+        if (isSustain) score += avgHP < 70 ? 38 : 22;
+        if (text.match(/crit|critical|critico/)) score += 18 + (traitCounts.Dark || 0) * 8;
+        if (isSurvival) score += 26;
+        if (isDamage) score += 18;
+        if (isSpeed) score += 14;
+        if (isScaling) score += 18 + (traitCounts.Bug || 0) * 7;
+        if (text.match(/distinct|different|cada tipo|tipos distintos/)) score += getTeamTypes(team).length * 7;
+        if (isMultiHit) score += 18 + (traitCounts.Electric || 0) * 7;
+        if (text.match(/execute|remata|ejecut/)) score += 16 + (traitCounts.Ghost || 0) * 8;
+        if (carry && isSustain) score += 18;
+        if (carry && passiveTypes.includes('Grass')) score += 18 + (traitCounts.Grass || 0) * 6;
+
+        if (profile.weakCore) {
+            if (isScaling) score += CONFIG.PASSIVE_WEAK_CORE_SCALING_BONUS;
+            if (isSustain || isSurvival) score += CONFIG.PASSIVE_WEAK_CORE_SURVIVAL_BONUS;
+            if (isDamage || isMultiHit || text.match(/crit|critical|critico/)) score += 12;
+            if (passiveTypes.length === 0 && profile.bossCoveragePoor && (isDamage || isSustain || isSurvival || isScaling)) score += 10;
+        } else if (profile.hasStrongCarry) {
+            if (isSustain || isSpeed || isDamage || isMultiHit) score += 8;
+        }
+
+        if (profile.underleveled && isScaling) score += 16;
+        if (profile.bossCoveragePoor && (isSurvival || isSustain)) score += 8;
+
+        passiveTypes.forEach(type => {
             const count = traitCounts[type] || 0;
             const traitInfo = TRAIT_DATA[type];
             const tierValue = traitInfo ? (TRAIT_TIER_VALUE[traitInfo.tier] || 1) : 1;
             score += count > 0 ? count * 12 + tierValue : -6;
         });
+        score += scorePassiveTypeContext(passiveTypes, team, traitCounts, profile);
 
         return score;
     }
@@ -4721,11 +4840,13 @@
         if (cards.length === 0) return;
 
         const team = parseTeamStatus();
+        const opponentProfile = detectNextOpponentProfile();
+        const teamProfile = getPassiveTeamProfile(team, opponentProfile);
         let bestCard = null;
         let bestScore = -1;
 
         cards.forEach(card => {
-            const score = scorePassiveCard(card, team);
+            const score = scorePassiveCard(card, team, opponentProfile);
 
             if (score > bestScore) {
                 bestScore = score;
@@ -4734,6 +4855,18 @@
         });
 
         log('info', '🧩', `Picking passive (score: ${bestScore.toFixed(1)})`);
+        ensureRunTelemetry('passive-screen');
+        recordRunEvent('passive-choice', {
+            choice: (bestCard?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 100),
+            score: Number(bestScore.toFixed(1)),
+            opponent: compactOpponentProfile(opponentProfile),
+            teamTypes: getTeamTypes(team),
+            hasShiny: teamProfile.hasShiny,
+            weakCore: teamProfile.weakCore,
+            bossCoveragePoor: teamProfile.bossCoveragePoor,
+            uncoveredBossTypes: teamProfile.uncoveredBossTypes,
+            bestBst: teamProfile.bestBst
+        });
         triggerRealClick(bestCard || cards[0]);
     }
 
