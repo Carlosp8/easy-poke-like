@@ -98,6 +98,11 @@
         BOSS_TEAM_WEIGHT: 8,
         ITEM_BAG_RETRY_COOLDOWN_MS: 45000,
         TEAM_REORDER_REPEAT_COOLDOWN_MS: 3500,
+        TEAM_REORDER_ATTEMPT_WINDOW_MS: 20000,
+        TEAM_REORDER_STALE_BLOCK_MS: 25000,
+        TEAM_REORDER_MAX_ATTEMPTS_PER_SIGNATURE: 2,
+        TEAM_REORDER_SCORE_TIE_EPSILON: 3,
+        TEAM_REORDER_DUPLICATE_EXTRA_MARGIN: 35,
         RUN_HISTORY_STORAGE_KEY: 'engine7_run_history_v1',
         RUN_HISTORY_MAX_ENTRIES: 80,
         RUN_EVENT_LOG_MAX_ENTRIES: 160,
@@ -823,6 +828,7 @@
     let activeChallengeContext = null;
     let lastTeamReorderSignature = '';
     let lastTeamReorderAt = 0;
+    let teamReorderAttemptsBySignature = {};
     let engineStats = { loops: 0, screens: {}, catches: 0, items: 0, swaps: 0, rerolls: 0 };
 
     // ╔══════════════════════════════════════════════════════════════╗
@@ -955,6 +961,29 @@
         return getTeamUnitStableKey(unit) || getElementUnitStableKey(element);
     }
 
+    function getReorderIdentityKey(unit, element) {
+        const name = unit?.name || getPokemonNameFromCard(element);
+        return getPokemonIdentityKey(name);
+    }
+
+    function areSameReorderIdentity(sourceUnit, targetUnit, sourceElem, targetElem) {
+        const sourceIdentity = getReorderIdentityKey(sourceUnit, sourceElem);
+        const targetIdentity = getReorderIdentityKey(targetUnit, targetElem);
+        return Boolean(sourceIdentity && targetIdentity && sourceIdentity === targetIdentity);
+    }
+
+    function shouldSkipLowValueDuplicateReorder(sourceUnit, targetUnit, sourceElem, targetElem, reason) {
+        if (!areSameReorderIdentity(sourceUnit, targetUnit, sourceElem, targetElem)) return false;
+        if (reason === 'fainted-lead' || reason === 'lead-level-correction' || reason === 'lead-item-holder') return false;
+        if (!sourceUnit || !targetUnit) return false;
+        if (sourceUnit.isFainted !== targetUnit.isFainted) return false;
+
+        const levelGap = Math.abs((sourceUnit.level || 0) - (targetUnit.level || 0));
+        const hpGap = Math.abs((sourceUnit.hp || 0) - (targetUnit.hp || 0));
+        const itemDiffers = normalizeItemName(sourceUnit.heldItem || '') !== normalizeItemName(targetUnit.heldItem || '');
+        return !itemDiffers && levelGap <= 3 && hpGap <= 30;
+    }
+
     function tryTeamReorder(sourceElem, targetElem, sourceUnit = null, targetUnit = null, reason = 'team-order') {
         if (!sourceElem || !targetElem || sourceElem === targetElem) return false;
 
@@ -965,6 +994,11 @@
             return false;
         }
 
+        if (shouldSkipLowValueDuplicateReorder(sourceUnit, targetUnit, sourceElem, targetElem, reason)) {
+            log('debug', 'team-order', `Skipping low-value duplicate reorder [${sourceUnit.name}] (${reason}).`);
+            return false;
+        }
+
         const signature = `${reason}:${sourceKey || sourceElem.className}->${targetKey || targetElem.className}`;
         const now = Date.now();
         if (signature === lastTeamReorderSignature && now - lastTeamReorderAt < CONFIG.TEAM_REORDER_REPEAT_COOLDOWN_MS) {
@@ -972,8 +1006,29 @@
             return false;
         }
 
+        const attempts = teamReorderAttemptsBySignature[signature] || { count: 0, firstAt: now, lastAt: 0, blockedUntil: 0 };
+        if (attempts.blockedUntil > now) {
+            log('warn', 'team-order', `Reorder signature blocked after repeated failed attempts (${reason}); waiting ${Math.ceil((attempts.blockedUntil - now) / 1000)}s.`);
+            return false;
+        }
+        if (now - attempts.firstAt > CONFIG.TEAM_REORDER_ATTEMPT_WINDOW_MS) {
+            attempts.count = 0;
+            attempts.firstAt = now;
+            attempts.blockedUntil = 0;
+        }
+        if (attempts.count >= CONFIG.TEAM_REORDER_MAX_ATTEMPTS_PER_SIGNATURE) {
+            attempts.blockedUntil = now + CONFIG.TEAM_REORDER_STALE_BLOCK_MS;
+            attempts.lastAt = now;
+            teamReorderAttemptsBySignature[signature] = attempts;
+            log('warn', 'team-order', `Blocking stale reorder (${reason}) after ${attempts.count} attempts.`);
+            return false;
+        }
+
         lastTeamReorderSignature = signature;
         lastTeamReorderAt = now;
+        attempts.count++;
+        attempts.lastAt = now;
+        teamReorderAttemptsBySignature[signature] = attempts;
         return simulateDragAndDrop(sourceElem, targetElem);
     }
 
@@ -3540,16 +3595,18 @@
             }
             return score;
         };
+        const compareOrderEntries = (a, b) => {
+            const diff = b.score - a.score;
+            if (Math.abs(diff) > CONFIG.TEAM_REORDER_SCORE_TIE_EPSILON) return diff;
+            return a.unit.index - b.unit.index;
+        };
 
         let leadChoice = aliveUnits
             .map(p => ({
                 unit: p,
                 score: scoreOrderCandidate(p, 0)
             }))
-            .sort((a, b) => {
-                if (b.score !== a.score) return b.score - a.score;
-                return a.unit.index - b.unit.index;
-            })[0];
+            .sort(compareOrderEntries)[0];
 
         const preferredCarry = getMainCarry(teamUnits);
         if (preferredCarry && leadChoice && leadChoice.unit.index !== preferredCarry.index) {
@@ -3580,10 +3637,7 @@
                 unit: p,
                 score: scoreOrderCandidate(p, 1)
             }))
-            .sort((a, b) => {
-                if (b.score !== a.score) return b.score - a.score;
-                return a.unit.index - b.unit.index;
-            });
+            .sort(compareOrderEntries);
 
         const faintedUnits = teamUnits
             .filter(p => p && p.isFainted)
@@ -3601,6 +3655,10 @@
             const currentScore = current.isFainted ? -999 : scoreOrderCandidate(current, targetIndex);
             const improvement = desired.score - currentScore;
             let threshold = targetIndex === 0 ? 10 : 6;
+            const duplicateSlotSwap = getPokemonIdentityKey(current.name) === getPokemonIdentityKey(desired.unit.name);
+            if (duplicateSlotSwap && !current.isFainted && !desired.unit.isFainted) {
+                threshold += CONFIG.TEAM_REORDER_DUPLICATE_EXTRA_MARGIN;
+            }
             if (targetIndex === 0 && isMainCarryUnit(current) && !isMainCarryUnit(desired.unit)) {
                 const currentHp = current.hp || 100;
                 const baseCarryMargin = currentHp < CONFIG.CRITICAL_HP_THRESHOLD ? 0 :
@@ -3669,6 +3727,7 @@
         lastCatchRerollAt = 0;
         lastTeamReorderSignature = '';
         lastTeamReorderAt = 0;
+        teamReorderAttemptsBySignature = {};
         catchRerollAttemptsBySignature = {};
         resetCatchScreenSession();
         log('debug', '🗺️', `Map capture state reset: ${reason}`);
