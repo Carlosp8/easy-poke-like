@@ -48,7 +48,7 @@
 
     const CONFIG = {
         // --- Timing ---
-        LOOP_SPEED_MS: 2000,
+        LOOP_SPEED_MS: 1000,
         DRAG_SETTLE_MS: 300,
 
         // --- HP Thresholds ---
@@ -3212,16 +3212,39 @@
         return null;
     }
 
-    function optimizeTeamOrder(teamUnits, bossType) {
+    function optimizeTeamOrder(teamUnits, bossType, prepStatus = null) {
         if (teamUnits.length <= 1 || !bossType) return false;
 
         const aliveUnits = teamUnits.filter(p => p && !p.isFainted);
         const teamMaxLevel = Math.max(0, ...teamUnits.map(p => p.level || 0));
+        const currentLead = aliveUnits.find(p => p.index === 0) || aliveUnits[0] || null;
+        const targetLeadLevel = prepStatus?.targets?.leadLevel || 0;
+        const leadLevelReason = prepStatus?.targets?.reason || '';
+        const seriousBattle = leadLevelReason.includes('r2') ||
+                              leadLevelReason.includes('r3') ||
+                              leadLevelReason.includes('big-boss') ||
+                              leadLevelReason.includes('final') ||
+                              isBossOpponentProfile(bossType) ||
+                              isFinalBossOpponentProfile(bossType);
+        const leadDeficit = targetLeadLevel - (currentLead?.level || 0);
+        const hasLeadLevelPressure = targetLeadLevel > 0 && leadDeficit > 0 && (seriousBattle || leadDeficit >= 8);
+        const hasTargetReadyLead = aliveUnits.some(p => (p.level || 0) >= targetLeadLevel);
+        const leadLevelFloor = hasLeadLevelPressure
+            ? (hasTargetReadyLead ? targetLeadLevel : Math.max(0, teamMaxLevel - 3))
+            : 0;
+        const scoreOrderCandidate = (p, slotIndex) => {
+            let score = scoreBattleOrderCandidate(p, bossType, slotIndex, teamMaxLevel);
+            if (slotIndex === 0 && leadLevelFloor > 0 && (p.level || 0) < leadLevelFloor) {
+                const levelGap = leadLevelFloor - (p.level || 0);
+                score -= 500 + levelGap * 80;
+            }
+            return score;
+        };
 
         let leadChoice = aliveUnits
             .map(p => ({
                 unit: p,
-                score: scoreBattleOrderCandidate(p, bossType, 0, teamMaxLevel)
+                score: scoreOrderCandidate(p, 0)
             }))
             .sort((a, b) => {
                 if (b.score !== a.score) return b.score - a.score;
@@ -3230,7 +3253,7 @@
 
         const preferredCarry = getMainCarry(teamUnits);
         if (preferredCarry && leadChoice && leadChoice.unit.index !== preferredCarry.index) {
-            const carryLeadScore = scoreBattleOrderCandidate(preferredCarry, bossType, 0, teamMaxLevel);
+            const carryLeadScore = scoreOrderCandidate(preferredCarry, 0);
             const carryHp = preferredCarry.hp || 100;
             const sustainMargin = preferredCarry.heldItem && isHealingItem(preferredCarry.heldItem) ? 35 : 0;
             const lowHpReduction = carryHp < CONFIG.CRITICAL_HP_THRESHOLD ? CONFIG.MAIN_CARRY_REORDER_MARGIN : (carryHp < CONFIG.LOW_HP_THRESHOLD ? 45 : 0);
@@ -3255,7 +3278,7 @@
             .filter(p => !leadChoice || p.index !== leadChoice.unit.index)
             .map(p => ({
                 unit: p,
-                score: scoreBattleOrderCandidate(p, bossType, 1, teamMaxLevel)
+                score: scoreOrderCandidate(p, 1)
             }))
             .sort((a, b) => {
                 if (b.score !== a.score) return b.score - a.score;
@@ -3275,7 +3298,7 @@
             const current = teamUnits[targetIndex];
             if (!desired || !current || desired.unit.index === current.index) continue;
 
-            const currentScore = current.isFainted ? -999 : scoreBattleOrderCandidate(current, bossType, targetIndex, teamMaxLevel);
+            const currentScore = current.isFainted ? -999 : scoreOrderCandidate(current, targetIndex);
             const improvement = desired.score - currentScore;
             let threshold = targetIndex === 0 ? 10 : 6;
             if (targetIndex === 0 && isMainCarryUnit(current) && !isMainCarryUnit(desired.unit)) {
@@ -3945,7 +3968,7 @@
                                          bestMapNode.type === 'legendary' ||
                                          (bestMapNode.type === 'trainer' && (isNodeSpecificOpponentProfile(nextProfile) || isBossOpponentProfile(nextProfile)));
             if (['trainer', 'boss', 'legendary'].includes(bestMapNode.type) && ensureLeadMeetsBattleLevel(team, bossPrepStatus, nextProfile)) return;
-            if (nextProfile && shouldReorderForNode && optimizeTeamOrder(team, nextProfile)) return;
+            if (nextProfile && shouldReorderForNode && optimizeTeamOrder(team, nextProfile, bossPrepStatus)) return;
             if (nextProfile && shouldReorderForNode && ensureLeadHasHeldItem(team, nextProfile)) return;
 
             const pathSummary = getBestPathSummary(bestMapNode, mapTree, context, CONFIG.PATH_LOOKAHEAD_DEPTH);
@@ -4949,7 +4972,9 @@
 
         const team = parseTeamStatus();
         if (team.length > 0) {
-            if (optimizeTeamOrder(team, prepProfile)) return;
+            const prepStatus = getBossPrepStatus(team, prepProfile);
+            if (ensureLeadMeetsBattleLevel(team, prepStatus, prepProfile)) return;
+            if (optimizeTeamOrder(team, prepProfile, prepStatus)) return;
 
             const bagItems = getBagItems();
             const bestBagItem = pickBestBagItemForTeam(bagItems, team, prepProfile);

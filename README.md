@@ -1,7 +1,7 @@
-# 🐾 Pokelike Tower Engine v7.0 — Ultimate AI
+# 🐾 Pokelike Tower Engine v7.4 — Ultimate AI
 
 > Motor de automatización completo para el Battle Tower de [Pokelike.xyz](https://pokelike.xyz).  
-> 22 estados de pantalla · 18 tipos · 250+ Pokémon · IA de drafting por sinergias · Auto-restart infinito.
+> 25 estados de pantalla · 18 tipos · 250+ Pokémon · IA de drafting por sinergias · carry protegido · scouting de legendarios/masterball · Auto-restart infinito.
 
 ---
 
@@ -19,11 +19,11 @@
   - [Tier List de Items](#-tier-list-de-items)
   - [Evoluciones de Eevee](#-evoluciones-de-eevee)
 - [Sistemas de IA](#-sistemas-de-ia)
-- [Pantallas Manejadas](#-pantallas-manejadas-22-estados)
+- [Pantallas Manejadas](#-pantallas-manejadas-25-estados)
 - [Anti-Stuck Watchdog](#️-anti-stuck-watchdog)
 - [Física del Motor](#-física-del-motor)
 - [Selectores DOM Clave](#-selectores-dom-clave)
-- [Changelog v6.0 → v7.0](#-changelog-v60--v70)
+- [Changelog v6.0 → v7.4](#-changelog-v60--v74)
 
 ---
 
@@ -44,11 +44,11 @@
 
 ```
 ╔══════════════════════════════════════════════════╗
-║  🐾 Pokelike Tower Engine v7.0 — Ultimate AI    ║
+║  🐾 Pokelike Tower Engine — Ultimate AI         ║
 ╠══════════════════════════════════════════════════╣
-║  18-type chart • 15+ screen handlers            ║
+║  18-type chart • 25 screen states               ║
 ║  Trait-aware drafting • Smart counter-picks      ║
-║  Trade evaluation • Anti-stuck watchdog          ║
+║  Catch rerolls • Legendary/masterball scouting   ║
 ║  Auto-restart • Configurable Eevee evolution     ║
 ╚══════════════════════════════════════════════════╝
 ```
@@ -57,37 +57,214 @@
 
 ## ⚙️ Configuración
 
-Todas las opciones están en el objeto `CONFIG` al inicio del script:
+Todas las opciones editables están en el objeto `CONFIG`, al inicio de [`pokelike-engine-v7.user.js`](pokelike-engine-v7.user.js). Cambia esos valores en Tampermonkey y guarda el script; no hace falta tocar el resto del motor.
+
+### Referencia rápida
+
+| Grupo | Opción | Default | Para qué sirve |
+|---|---:|---:|---|
+| Timing | `LOOP_SPEED_MS` | `1000` | Frecuencia del loop principal. Más bajo = más rápido, pero más agresivo. |
+| Timing | `DRAG_SETTLE_MS` | `300` | Pausa tras drag & drop antes de la siguiente acción. |
+| HP | `CRITICAL_HP_THRESHOLD` | `30` | HP medio/crítico que dispara prioridad máxima de PokéCenter. |
+| HP | `LOW_HP_THRESHOLD` | `50` | HP bajo que penaliza rutas peligrosas y jefes. |
+| Equipo early | `EARLY_CORE_TEAM_SIZE` | `2` | Núcleo mínimo vivo antes de dejar de buscar capturas urgentes. |
+| Equipo early | `EARLY_OPTIONAL_TEAM_SIZE` | `4` | Tamaño cómodo antes de cerrar expansión temprana. |
+| Equipo | `TEAM_TARGET_SIZE` | `6` | Tamaño final objetivo del equipo. |
+| Capturas | `MAX_CATCHES_PER_MAP` | `2` | Límite normal de capturas por mapa. Premium/shiny/legendarios pueden saltarse la intención del límite. |
+| Pathfinding | `PATH_LOOKAHEAD_DEPTH` | `99` | Profundidad de evaluación de rutas del mapa. |
+| Jefes | `BOSS_LEAD_WEIGHT` | `24` | Peso del matchup contra el lead enemigo. |
+| Jefes | `BOSS_TEAM_WEIGHT` | `8` | Peso de cobertura contra el equipo completo del jefe. |
+| Cooldowns | `ITEM_BAG_RETRY_COOLDOWN_MS` | `45000` | Evita reintentar mandar el mismo item a la bolsa demasiado seguido. |
+| Cooldowns | `TEAM_REORDER_REPEAT_COOLDOWN_MS` | `3500` | Evita repetir el mismo reordenamiento de equipo en bucle. |
+| Historial | `RUN_HISTORY_STORAGE_KEY` | `engine7_run_history_v1` | Clave de `localStorage` para guardar telemetría de runs. |
+| Historial | `RUN_HISTORY_MAX_ENTRIES` | `80` | Máximo de runs guardadas. |
+| Historial | `RUN_EVENT_LOG_MAX_ENTRIES` | `160` | Máximo de eventos detallados por run. |
+| Anti-stuck | `STUCK_WARN_THRESHOLD` | `5` | Loops iguales antes del warning. |
+| Anti-stuck | `STUCK_FORCE_THRESHOLD` | `10` | Loops iguales antes de forzar navegación. |
+| Anti-stuck | `STUCK_PANIC_THRESHOLD` | `30` | Loops iguales antes de pulsar cualquier control visible. |
+| Eevee | `EEVEE_EVOLUTION_PREFERENCE` | `'auto'` | Evolución automática o nombre fijo de evolución. |
+| Starter | `STARTER_PREFERENCE` | comentado | Si lo descomentas, fuerza un starter cuando esté visible. |
+| Auto-start | `AUTO_RESTART` | `true` | Reinicia automáticamente al perder o ganar. |
+| Auto-start | `AUTO_START_MODES` | ver abajo | Decide qué modos puede arrancar o reanudar el bot. |
+| Auto-start | `AUTO_START_PRIORITY` | ver abajo | Orden de preferencia al estar en title screen. |
+| Challenges | `WEEKLY_CHALLENGE_ORDER` | `['lorelei','bruno','agatha','lance']` | Orden de subretos semanales. |
+| Logging | `LOG_LEVEL` | `'info'` | `debug`, `info`, `warn` o `error`. |
+
+### Niveles mínimos de preparación
+
+El motor usa estos umbrales para decidir si conviene entrenar, curar, capturar o entrar a un jefe. Cada par representa `nivel medio / nivel del lead`.
+
+| Momento | Config | Default |
+|---|---|---:|
+| Primer boss temprano | `EARLY_BOSS_MIN_AVG_LEVEL` / `EARLY_BOSS_MIN_LEAD_LEVEL` | `13 / 15` |
+| Mapa 2 temprano | `EARLY_MAP2_MIN_AVG_LEVEL` / `EARLY_MAP2_MIN_LEAD_LEVEL` | `20 / 22` |
+| Región 1, mapa 2 | `R1_MAP2_MIN_AVG_LEVEL` / `R1_MAP2_MIN_LEAD_LEVEL` | `28 / 32` |
+| Big boss temprano | `EARLY_BIG_BOSS_MIN_AVG_LEVEL` / `EARLY_BIG_BOSS_MIN_LEAD_LEVEL` | `36 / 40` |
+| Región 2, mapa 1 | `R2_MAP1_MIN_AVG_LEVEL` / `R2_MAP1_MIN_LEAD_LEVEL` | `42 / 46` |
+| Región 2, mapa 2 | `R2_MAP2_MIN_AVG_LEVEL` / `R2_MAP2_MIN_LEAD_LEVEL` | `52 / 56` |
+| Región 2, big boss | `R2_BIG_BOSS_MIN_AVG_LEVEL` / `R2_BIG_BOSS_MIN_LEAD_LEVEL` | `60 / 65` |
+| Región 3, mapa 1 | `R3_MAP1_MIN_AVG_LEVEL` / `R3_MAP1_MIN_LEAD_LEVEL` | `66 / 70` |
+| Región 3, mapa 2 | `R3_MAP2_MIN_AVG_LEVEL` / `R3_MAP2_MIN_LEAD_LEVEL` | `76 / 82` |
+| Región 3, final/big boss | `R3_BIG_BOSS_MIN_AVG_LEVEL` / `R3_BIG_BOSS_MIN_LEAD_LEVEL` | `84 / 90` |
+
+### Capturas y rerolls
+
+| Opción | Default | Efecto |
+|---|---:|---|
+| `EARLY_EXCEPTIONAL_CATCH_SCORE` | `42` | Score a partir del cual una captura se considera excepcional. |
+| `EARLY_EXPANSION_COUNTER_SCORE` | `12` | Score de counter que permite expandir equipo temprano. |
+| `EARLY_MAX_CATCH_AVG_LEVEL_DROP` | `2.5` | Evita aceptar capturas que bajen demasiado el nivel medio. |
+| `EARLY_LOW_LEVEL_SWAP_GAP` | `5` | Diferencia máxima aceptable contra el nivel alto del equipo para swaps tempranos. |
+| `CATCH_REROLL_MIN_ACCEPT_SCORE` | `18` | Score mínimo razonable antes de aceptar cartas normales. |
+| `CATCH_REROLL_ALWAYS_BELOW_SCORE` | `22` | Si una carta rerolleable queda por debajo, se intenta mejorar. |
+| `CATCH_REROLL_MAX_ATTEMPTS_PER_STATE` | `1` | Intentos por estado visual idéntico. |
+| `CATCH_REROLL_MIN_ATTEMPTS_PER_ENCOUNTER` | `2` | Mínimo de intentos por encuentro si el bot sigue viendo malas opciones. |
+| `CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER` | `4` | Límite duro de rerolls por encuentro. |
+| `CATCH_REROLL_PROTECT_SCORE` | `34` | Score que protege una carta buena de ser rerolleada. |
+| `CATCH_REROLL_XP_FOCUS_SCORE` | `24` | Umbral especial cuando el bot prioriza levear el core. |
+| `CATCH_REROLL_COOLDOWN_MS` | `900` | Pausa mínima entre rerolls. |
+
+### Carry principal
+
+Esta estrategia protege sweepers concretos y evita sacarlos del lead salvo que el matchup sea claramente malo.
+
+| Opción | Default | Efecto |
+|---|---:|---|
+| `MAIN_CARRY_NAMES` | `['Thundurus','Lapras','Genesect','Dialga']` | Pokémon tratados como carry principal. |
+| `MAIN_CARRY_LEAD_STICKINESS` | `170` | Bonus para mantener el carry como lead. |
+| `MAIN_CARRY_REORDER_MARGIN` | `130` | Margen que debe superar otro Pokémon para desplazar al carry. |
+| `MAIN_CARRY_HEAL_ITEM_BONUS` | `210` | Bonus para equipar curación al carry. |
+| `MAIN_CARRY_OFFENSE_ITEM_BONUS` | `55` | Bonus para items ofensivos en carry. |
+| `MAIN_CARRY_CONSUMABLE_BONUS` | `70` | Bonus para consumibles útiles en carry. |
+| `MAIN_CARRY_HEAL_KEEP_MARGIN` | `90` | Resistencia a reemplazar un item curativo ya bueno. |
+| `GRASS_SUPPORT_CATCH_BONUS` | `18` | Bonus por soporte Grass/sustain. |
+| `GRASS_SUPPORT_THRESHOLD_BONUS` | `24` | Bonus extra si ayuda a completar trait threshold. |
+
+### Legendarios y nodos masterball
+
+El motor detecta nodos con textos como `masterball`, `legendary`, `legendario`, `mythical` o similares. Los prioriza si la run está preparada y penaliza si el equipo llega bajo de HP o nivel.
+
+| Opción | Default | Efecto |
+|---|---:|---|
+| `LEGENDARY_NODE_BASE_SCORE` | `3600` | Prioridad base del nodo legendario/masterball. |
+| `LEGENDARY_NODE_ROUTE_BONUS` | `2400` | Bonus por ruta hacia recompensa legendaria. |
+| `LEGENDARY_NODE_READY_BONUS` | `900` | Bonus si el equipo está preparado. |
+| `LEGENDARY_NODE_LOW_HP_PENALTY` | `2600` | Penalización por entrar con HP bajo. |
+| `LEGENDARY_NODE_MAX_UNDERLEVEL_PENALTY` | `1400` | Tope de penalización por falta de nivel. |
+| `LEGENDARY_NODE_UNDERLEVEL_PENALTY` | `850` | Penalización incremental por underlevel. |
+| `LEGENDARY_CATCH_SCORE_BONUS` | `120` | Bonus al evaluar una captura legendaria. |
+| `LEGENDARY_CATCH_MIN_BST` | `540` | BST mínimo para tratar una captura como legendaria si se conoce su stat base total. |
+| `LEGENDARY_POKEMON_NAMES` | lista Gen 1-5 | Nombres reconocidos como legendarios/míticos. |
+
+### Bloque base actual
 
 ```javascript
 const CONFIG = {
     // --- Timing ---
-    LOOP_SPEED_MS: 1500,            // Milisegundos entre cada acción del motor
-    DRAG_SETTLE_MS: 300,            // Pausa después de un drag & drop
+    LOOP_SPEED_MS: 1000,
+    DRAG_SETTLE_MS: 300,
 
-    // --- Umbrales de HP ---
-    CRITICAL_HP_THRESHOLD: 30,      // HP% para prioridad máxima de PokéCenter
-    LOW_HP_THRESHOLD: 50,           // HP% para prioridad alta de PokéCenter
+    // --- HP Thresholds ---
+    CRITICAL_HP_THRESHOLD: 30,
+    LOW_HP_THRESHOLD: 50,
+
+    // --- Early Battle Tower economy ---
+    EARLY_CORE_TEAM_SIZE: 2,
+    EARLY_OPTIONAL_TEAM_SIZE: 4,
+    EARLY_BOSS_MIN_AVG_LEVEL: 13,
+    EARLY_BOSS_MIN_LEAD_LEVEL: 15,
+    R1_MAP2_MIN_AVG_LEVEL: 28,
+    R1_MAP2_MIN_LEAD_LEVEL: 32,
+    EARLY_MAP2_MIN_AVG_LEVEL: 20,
+    EARLY_MAP2_MIN_LEAD_LEVEL: 22,
+    EARLY_BIG_BOSS_MIN_AVG_LEVEL: 36,
+    EARLY_BIG_BOSS_MIN_LEAD_LEVEL: 40,
+    R2_MAP1_MIN_AVG_LEVEL: 42,
+    R2_MAP1_MIN_LEAD_LEVEL: 46,
+    R2_MAP2_MIN_AVG_LEVEL: 52,
+    R2_MAP2_MIN_LEAD_LEVEL: 56,
+    R2_BIG_BOSS_MIN_AVG_LEVEL: 60,
+    R2_BIG_BOSS_MIN_LEAD_LEVEL: 65,
+    R3_MAP1_MIN_AVG_LEVEL: 66,
+    R3_MAP1_MIN_LEAD_LEVEL: 70,
+    R3_MAP2_MIN_AVG_LEVEL: 76,
+    R3_MAP2_MIN_LEAD_LEVEL: 82,
+    R3_BIG_BOSS_MIN_AVG_LEVEL: 84,
+    R3_BIG_BOSS_MIN_LEAD_LEVEL: 90,
+    EARLY_EXCEPTIONAL_CATCH_SCORE: 42,
+    EARLY_EXPANSION_COUNTER_SCORE: 12,
+    EARLY_MAX_CATCH_AVG_LEVEL_DROP: 2.5,
+    EARLY_LOW_LEVEL_SWAP_GAP: 5,
+    CATCH_REROLL_MIN_ACCEPT_SCORE: 18,
+    CATCH_REROLL_ALWAYS_BELOW_SCORE: 22,
+    CATCH_REROLL_MAX_ATTEMPTS_PER_STATE: 1,
+    CATCH_REROLL_MIN_ATTEMPTS_PER_ENCOUNTER: 2,
+    CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER: 4,
+    CATCH_REROLL_PROTECT_SCORE: 34,
+    CATCH_REROLL_XP_FOCUS_SCORE: 24,
+    CATCH_REROLL_COOLDOWN_MS: 900,
+    TEAM_TARGET_SIZE: 6,
+    MAX_CATCHES_PER_MAP: 2,
+    PATH_LOOKAHEAD_DEPTH: 99,
+    BOSS_LEAD_WEIGHT: 24,
+    BOSS_TEAM_WEIGHT: 8,
+    ITEM_BAG_RETRY_COOLDOWN_MS: 45000,
+    TEAM_REORDER_REPEAT_COOLDOWN_MS: 3500,
+    RUN_HISTORY_STORAGE_KEY: 'engine7_run_history_v1',
+    RUN_HISTORY_MAX_ENTRIES: 80,
+    RUN_EVENT_LOG_MAX_ENTRIES: 160,
+
+    // --- Main carry strategy ---
+    MAIN_CARRY_NAMES: ['Thundurus', 'Lapras', 'Genesect', 'Dialga'],
+    MAIN_CARRY_LEAD_STICKINESS: 170,
+    MAIN_CARRY_REORDER_MARGIN: 130,
+    MAIN_CARRY_HEAL_ITEM_BONUS: 210,
+    MAIN_CARRY_OFFENSE_ITEM_BONUS: 55,
+    MAIN_CARRY_CONSUMABLE_BONUS: 70,
+    MAIN_CARRY_HEAL_KEEP_MARGIN: 90,
+    GRASS_SUPPORT_CATCH_BONUS: 18,
+    GRASS_SUPPORT_THRESHOLD_BONUS: 24,
+
+    // --- Legendary/masterball nodes ---
+    LEGENDARY_NODE_BASE_SCORE: 3600,
+    LEGENDARY_NODE_ROUTE_BONUS: 2400,
+    LEGENDARY_NODE_READY_BONUS: 900,
+    LEGENDARY_NODE_LOW_HP_PENALTY: 2600,
+    LEGENDARY_NODE_MAX_UNDERLEVEL_PENALTY: 1400,
+    LEGENDARY_NODE_UNDERLEVEL_PENALTY: 850,
+    LEGENDARY_CATCH_SCORE_BONUS: 120,
+    LEGENDARY_CATCH_MIN_BST: 540,
+    LEGENDARY_POKEMON_NAMES: [
+        'Articuno','Zapdos','Moltres','Mewtwo','Mew',
+        'Raikou','Entei','Suicune','Lugia','Ho-Oh','Celebi',
+        'Regirock','Regice','Registeel','Kyogre','Groudon','Rayquaza',
+        'Latias','Latios','Jirachi','Deoxys',
+        'Uxie','Mesprit','Azelf','Dialga','Palkia','Giratina','Heatran',
+        'Regigigas','Cresselia','Darkrai','Shaymin','Arceus',
+        'Victini','Cobalion','Terrakion','Virizion','Tornadus','Thundurus',
+        'Landorus','Reshiram','Zekrom','Kyurem','Keldeo','Meloetta','Genesect'
+    ],
 
     // --- Anti-Stuck ---
-    STUCK_WARN_THRESHOLD: 5,        // Loops idénticos para advertencia
-    STUCK_FORCE_THRESHOLD: 10,      // Loops para forzar click de navegación
-    STUCK_PANIC_THRESHOLD: 15,      // Loops para pánico (click cualquier botón)
+    STUCK_WARN_THRESHOLD: 5,
+    STUCK_FORCE_THRESHOLD: 10,
+    STUCK_PANIC_THRESHOLD: 30,
 
     // --- Evolución de Eevee ---
     // 'auto' = elige según necesidades del equipo
-    // O un nombre específico: 'Vaporeon','Jolteon','Flareon','Espeon',
-    //                         'Umbreon','Leafeon','Glaceon','Sylveon'
     EEVEE_EVOLUTION_PREFERENCE: 'auto',
 
+    // --- Starter Preference ---
+    // STARTER_PREFERENCE: 'Dialga',
+
     // --- Auto-Restart ---
-    AUTO_RESTART: true,             // Reiniciar automáticamente al perder/ganar
+    AUTO_RESTART: true,
     AUTO_START_MODES: {
         resumeChallenge: false,
         weeklyChallenges: false,
         challengeMode: false,
-        resumeBattleTower: true,    // Reanudar Battle Tower si hay run activa
-        battleTower: true           // Iniciar Battle Tower desde el menú principal
+        resumeBattleTower: true,
+        battleTower: true
     },
     AUTO_START_PRIORITY: [
         'resumeBattleTower',
@@ -96,12 +273,48 @@ const CONFIG = {
         'weeklyChallenges',
         'challengeMode'
     ],
-    AUTO_START_BATTLE_TOWER: true,  // Alias legacy para Battle Tower
+    WEEKLY_CHALLENGE_ORDER: ['lorelei', 'bruno', 'agatha', 'lance'],
+    AUTO_START_BATTLE_TOWER: true,
 
     // --- Logging ---
-    LOG_LEVEL: 'info',              // 'debug' = verboso, 'info' = normal,
-                                    // 'warn' = mínimo, 'error' = solo errores
+    LOG_LEVEL: 'info',
 };
+```
+
+### Ejemplos de ajuste
+
+Arranque solo Battle Tower, sin retos:
+
+```javascript
+AUTO_START_MODES: {
+    resumeChallenge: false,
+    weeklyChallenges: false,
+    challengeMode: false,
+    resumeBattleTower: true,
+    battleTower: true
+}
+```
+
+Forzar starter o evolución de Eevee:
+
+```javascript
+STARTER_PREFERENCE: 'Dialga',
+EEVEE_EVOLUTION_PREFERENCE: 'Umbreon',
+```
+
+Jugar más conservador:
+
+```javascript
+LOOP_SPEED_MS: 1400,
+MAX_CATCHES_PER_MAP: 3,
+CRITICAL_HP_THRESHOLD: 40,
+LOW_HP_THRESHOLD: 60,
+```
+
+Depurar decisiones del bot:
+
+```javascript
+LOG_LEVEL: 'debug',
 ```
 
 ---
@@ -110,18 +323,24 @@ const CONFIG = {
 
 | Característica | Descripción |
 |---|---|
-| **22 estados de pantalla** | Maneja cada pantalla del juego sin quedarse atascado |
+| **25 estados de pantalla** | Maneja Battle Tower, retos, overlays, menús y transiciones sin quedarse atascado |
 | **18 tipos completos** | Tabla de efectividad ofensiva y defensiva completa |
 | **250+ Pokémon** | Base de datos Gen 1 + Gen 2 + Gen 3 con tipos |
 | **60+ jefes** | Kanto, Johto, Hoenn, Sinnoh + todos los E4 y campeones |
 | **Drafting por sinergias** | IA que evalúa candidatos de captura por progreso de traits |
+| **Reroll de capturas** | Reintenta cartas débiles sin gastar rerolls en opciones premium |
+| **Economía early game** | Controla tamaño de equipo, nivel medio y capturas por mapa |
 | **Counter-picking dinámico** | Reordena el equipo antes de cada jefe por ventaja de tipo |
+| **Carry principal protegido** | Mantiene sweepers clave como lead salvo matchup claramente inseguro |
 | **Evaluación de trades** | Analiza si el intercambio mejora el equipo en lugar de rechazar |
 | **Asignación inteligente de items** | Prioriza items S-Tier y equipa al carry del equipo |
+| **Scouting legendario/masterball** | Detecta rutas y recompensas legendarias con scoring propio |
+| **Challenges semanales** | Puede abrir retos semanales y seguir un orden configurable |
 | **Evolución de Eevee configurable** | Automática por necesidades o forzada a una evolución |
 | **Anti-stuck de 3 niveles** | Escalamiento: advertencia → forzar navegación → pánico |
 | **Auto-restart infinito** | Game over → retry, victoria → escalar torre |
-| **Estadísticas en consola** | Reporte cada 60s de loops, capturas, items y swaps |
+| **Historial de runs** | Guarda telemetría resumida en `localStorage` |
+| **Estadísticas en consola** | Reporte cada 60s de loops, capturas, capturas por mapa, rerolls, items y swaps |
 
 ---
 
@@ -130,7 +349,7 @@ const CONFIG = {
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    ENGINE LOOP                       │
-│                  (cada 1500ms)                       │
+│                  (cada 1000ms)                       │
 ├─────────────────────────────────────────────────────┤
 │                                                     │
 │  1. getActiveScreen()      ← Detección de estado    │
@@ -152,9 +371,10 @@ const CONFIG = {
 │                                                     │
 │  4. AI subsystems          ← Decisiones             │
 │     ├── Counter-Pick Optimizer                      │
-│     ├── Catch Candidate Scorer                      │
+│     ├── Catch Candidate Scorer + Rerolls            │
 │     ├── Trade Evaluator                             │
-│     └── Map Node Scorer                             │
+│     ├── Map Node / Legendary Route Scorer           │
+│     └── Run Telemetry                               │
 │                                                     │
 └─────────────────────────────────────────────────────┘
 ```
@@ -457,13 +677,32 @@ Calcula prioridad dinámica para cada nodo del mapa SVG:
 | Entrenador | +100 ~ +300 | +300 si HP>50%, +100 si HP bajo |
 | Trade/NPC | +200 | — |
 | Jefe/Gym | -500 ~ +250 | +250 si HP>50%, -500 si HP bajo |
+| Legendario/Masterball | +3600 + ruta | Penaliza HP bajo y underlevel |
 | Hierba | +150 | — |
 
-Desempate espacial: `xCoord % 17` para evitar sesgo al carril izquierdo.
+El scorer mira rutas completas con `PATH_LOOKAHEAD_DEPTH` y usa desempate espacial `xCoord % 17` para evitar sesgo al carril izquierdo.
+
+### 5. Early Economy Controller
+
+En los primeros mapas no intenta llenar 6 huecos a cualquier precio. Mantiene un core mínimo (`EARLY_CORE_TEAM_SIZE`), permite una banca cómoda (`EARLY_OPTIONAL_TEAM_SIZE`) y compara el nivel medio/lead contra los umbrales de preparación antes de entrar a jefes.
+
+Si una captura baja demasiado el nivel medio (`EARLY_MAX_CATCH_AVG_LEVEL_DROP`) o no supera el score mínimo, el motor prefiere entrenar, curar o rerollear.
+
+### 6. Catch Reroll Controller
+
+En `catch-screen`, además de puntuar candidatos, detecta controles de reroll por carta o globales. Protege cartas buenas (`CATCH_REROLL_PROTECT_SCORE`), shiny, premium o legendarias, y gasta rerolls en cartas débiles hasta los límites configurados por encuentro.
+
+### 7. Main Carry Protector
+
+Los nombres de `MAIN_CARRY_NAMES` reciben stickiness para seguir como lead. Otro Pokémon solo desplaza al carry si supera el margen configurado o si el matchup del carry es peligroso. La misma idea se usa para items: curaciones y upgrades importantes reciben bonus si van al carry.
+
+### 8. Run Telemetry
+
+El motor guarda historial local de runs en `localStorage` con capturas, rerolls, pantallas visitadas, nodos legendarios, decisiones de mapa y resultado. El límite se controla con `RUN_HISTORY_MAX_ENTRIES` y `RUN_EVENT_LOG_MAX_ENTRIES`.
 
 ---
 
-## 📺 Pantallas Manejadas (22 estados)
+## 📺 Pantallas Manejadas (25 estados)
 
 ### Overlays (Prioridad Máxima)
 
@@ -498,9 +737,12 @@ Desempate espacial: `xCoord % 17` para evitar sesgo al carril izquierdo.
 | `win-screen` | `handleWinScreen()` | Escalar torre o jugar de nuevo |
 | `endless-stage-complete` | `handleStageComplete()` | Continuar a siguiente stage |
 | `title-screen` | `handleTitleScreen()` | Auto-start Battle Tower |
+| `challenge-select` | `handleChallengeSelectScreen()` | Abrir challenges o weekly según configuración |
+| `weekly-select` | `handleWeeklySelectScreen()` | Elegir el siguiente subreto semanal |
 | `trainer-screen` | `handleTrainerScreen()` | Selección automática |
 | `starter-screen` | `handleStarterScreen()` | Starter por mejor trait tier |
 | `endless-stage-select` | `handleEndlessStageSelect()` | Último stage desbloqueado |
+| `history-region-select` | — | Story/history detectado, pero no automatizado |
 
 ---
 
@@ -512,14 +754,17 @@ El motor rastrea loops consecutivos en el mismo estado:
 |-------|-------|--------|
 | ⚠️ Warning | 5 | Log de advertencia en consola |
 | 🔧 Force | 10 | Intenta clickear botones de navegación genéricos |
-| 🚨 Panic | 15 | Click en CUALQUIER botón visible en la página |
+| 🚨 Panic | 30 | Click en CUALQUIER botón visible en la página |
 
 Selectores de navegación genéricos:
 ```css
 .btn-next, #btn-stage-continue, .choice-skip-btn,
 #btn-skip-catch, #btn-skip-trade, #btn-cancel-swap,
-#btn-equip-to-bag, #btn-equip-cancel, #btn-next-map,
-#btn-continue-battle, #btn-auto-battle, #btn-retry, #btn-play-again
+#btn-equip-to-bag, #btn-equip-cancel, #btn-cancel-use, #btn-next-map,
+#btn-continue-battle, #btn-auto-battle, #btn-elite-prep-continue,
+.elite-prep-fight-btn, #btn-retry, #btn-play-again,
+#btn-challenges-run, #btn-continue-challenge, #chal-intro,
+#chal-weekly, #weekly-back, .weekly-sub
 ```
 
 ---
@@ -563,6 +808,7 @@ El reordenamiento del equipo usa gesture-gating. El motor simula arrastre físic
 | Items pasivos | `#passive-choices` |
 | Equip modal rows | `#item-equip-modal .equip-pokemon-row` |
 | Catch candidates | `#catch-choices .poke-card` |
+| Catch reroll | `[data-reroll]`, `[class*="reroll"]`, `[id*="reroll"]` |
 | Swap choices | `#swap-choices` |
 | Evo overlay | `#evo-overlay` |
 | Eevee overlay | `#eevee-choice-overlay` |
@@ -573,21 +819,28 @@ El reordenamiento del equipo usa gesture-gating. El motor simula arrastre físic
 | Game over retry | `#btn-retry` |
 | Win play again | `#btn-play-again` |
 | Badge next map | `#btn-next-map` |
+| Challenge run | `#btn-challenges-run`, `#btn-continue-challenge` |
+| Weekly challenge | `#chal-weekly`, `#weekly-back`, `.weekly-sub` |
 
 ---
 
-## 📝 Changelog v6.0 → v7.0
+## 📝 Changelog v6.0 → v7.4
 
-| Área | v6.0 | v7.0 |
+| Área | v6.0 | v7.4 |
 |------|------|------|
-| **Pantallas** | 6 | **22** |
+| **Pantallas** | 6 | **25** |
 | **Tipo chart** | 4 tipos parciales | **18 tipos completos** |
 | **Pokémon DB** | 11 hardcoded | **250+** (Gen 1-3) |
 | **Jefes** | 5 entries | **60+** (4 regiones + E4) |
 | **Traits** | No implementado | **18 × 3 tiers** con S/A/B/C ranking |
 | **Items** | Tomar el primero | **30+ items** rankeados S→F |
-| **Catch AI** | Tomar el primero | **Drafting por sinergias** |
+| **Catch AI** | Tomar el primero | **Drafting por sinergias + rerolls controlados** |
+| **Early game** | Sin economía | **Core mínimo, capturas por mapa y umbrales de nivel** |
 | **Trades** | No manejado | **Evaluación** vs equipo actual |
+| **Carry** | No protegido | **Lead stickiness + prioridad de items** |
+| **Legendarios** | No detectados | **Scoring de nodos masterball/legendary** |
+| **Challenges** | No manejados | **Challenge mode y weekly challenge select** |
+| **Run history** | No | **Telemetría en localStorage** |
 | **Anti-stuck** | Ninguno | **3 niveles** de escalamiento |
 | **Eevee** | No manejado | **Configurable** (auto o manual) |
 | **Auto-restart** | No | **Sí** (game over + win) |
