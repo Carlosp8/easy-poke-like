@@ -3,6 +3,7 @@
 # Local extracted/generated artifacts
 pokelike-bundle.*.js
 pokelike-*-extracted.json
+notes.md
 
 # OS/editor noise
 .DS_Store

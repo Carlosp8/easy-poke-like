@@ -113,6 +113,16 @@
         MAIN_CARRY_HEAL_KEEP_MARGIN: 90,
         GRASS_SUPPORT_CATCH_BONUS: 18,
         GRASS_SUPPORT_THRESHOLD_BONUS: 24,
+        DUPLICATE_FIRST_PAIR_CATCH_BONUS: 28,
+        DUPLICATE_EXTRA_PAIR_CATCH_BONUS: 12,
+        DUPLICATE_EXISTING_PAIR_CATCH_BONUS: 10,
+        DUPLICATE_PAIR_ROUTE_BONUS: 260,
+        DUPLICATE_PAIR_KEEP_BONUS: 34,
+        DUPLICATE_PAIR_REVIVE_BONUS: 18,
+        DUPLICATE_PAIR_CREATE_SWAP_BONUS: 26,
+        DUPLICATE_PAIR_PROTECT_SCORE: 18,
+        DUPLICATE_LOW_COVERAGE_PENALTY: 12,
+        DUPLICATE_MIN_COVERAGE_TYPES_BEFORE_EXTRA_PAIR: 4,
 
         // --- Legendary/masterball nodes ---
         LEGENDARY_NODE_BASE_SCORE: 3600,
@@ -1684,6 +1694,144 @@
                getMainCarry(alive) ||
                alive[0] ||
                null;
+    }
+
+    function getPokemonIdentityKey(name) {
+        return getPokemonLookupKeys(name)[0] || foldText(name || '');
+    }
+
+    function getSameNameTeamGroup(team, name) {
+        const key = getPokemonIdentityKey(name);
+        const units = (team || []).filter(p => p && getPokemonIdentityKey(p.name) === key);
+        return {
+            key,
+            name: units[0]?.name || name || '',
+            units,
+            alive: units.filter(p => !p.isFainted),
+            fainted: units.filter(p => p.isFainted)
+        };
+    }
+
+    function getDuplicateGroups(team) {
+        const groups = new Map();
+        (team || []).forEach(unit => {
+            if (!unit?.name) return;
+            const key = getPokemonIdentityKey(unit.name);
+            if (!key) return;
+            if (!groups.has(key)) {
+                groups.set(key, { key, name: unit.name, units: [], alive: [], fainted: [] });
+            }
+            const group = groups.get(key);
+            group.units.push(unit);
+            if (unit.isFainted) group.fainted.push(unit);
+            else group.alive.push(unit);
+        });
+
+        return [...groups.values()].filter(group => group.units.length >= 2);
+    }
+
+    function getDuplicatePairCount(team) {
+        return getDuplicateGroups(team).length;
+    }
+
+    function hasDuplicatePair(team) {
+        return getDuplicatePairCount(team) > 0;
+    }
+
+    function getExpectedCatchCopiesFromOpenSlots(team) {
+        const freeSlots = Math.max(0, CONFIG.TEAM_TARGET_SIZE - (team || []).length);
+        return Math.min(2, freeSlots);
+    }
+
+    function getDuplicatePairCatchScore(candidateName, candidateTypes, team, attackTypes = null, bossTypes = null, options = {}) {
+        if (!candidateName) return 0;
+
+        const expectedCopies = Number.isFinite(options.expectedCatchCopies)
+            ? Math.max(0, options.expectedCatchCopies)
+            : 0;
+        const group = getSameNameTeamGroup(team, candidateName);
+        const existingCount = group.units.length;
+        const alreadyHasThisPair = existingCount >= 2;
+        const createsPair = expectedCopies >= 2 || (existingCount > 0 && existingCount + expectedCopies >= 2);
+        if (!createsPair && !alreadyHasThisPair) return 0;
+
+        const types = normalizeTypeList(candidateTypes);
+        const targetTypes = normalizeTypeList(bossTypes);
+        const teamTypes = getTeamTypes(team);
+        const addsNewType = types.some(type => !teamTypes.includes(type));
+        const bossCounterScore = targetTypes.length > 0
+            ? scoreCatchBossCounter(types, attackTypes || types, targetTypes)
+            : 0;
+        const teamAlreadyHasPair = hasDuplicatePair(team);
+
+        let score = 0;
+        if (createsPair && !alreadyHasThisPair) {
+            score += teamAlreadyHasPair
+                ? CONFIG.DUPLICATE_EXTRA_PAIR_CATCH_BONUS
+                : CONFIG.DUPLICATE_FIRST_PAIR_CATCH_BONUS;
+            if (existingCount === 1) score += Math.round(CONFIG.DUPLICATE_PAIR_CREATE_SWAP_BONUS * 0.5);
+            if (expectedCopies >= 2) score += 6;
+        } else {
+            score += CONFIG.DUPLICATE_EXISTING_PAIR_CATCH_BONUS;
+        }
+
+        if (addsNewType) score += 8;
+        if (bossCounterScore > 0) score += Math.min(20, bossCounterScore);
+
+        const bst = getPokemonBaseStatTotal(getPokemonBaseStats(candidateName));
+        if (bst >= CONFIG.LEGENDARY_CATCH_MIN_BST) score += 10;
+        else if (bst >= 480) score += 5;
+
+        if (!addsNewType && bossCounterScore <= 0 && teamTypes.length < CONFIG.DUPLICATE_MIN_COVERAGE_TYPES_BEFORE_EXTRA_PAIR) {
+            score -= CONFIG.DUPLICATE_LOW_COVERAGE_PENALTY;
+        }
+        if (teamAlreadyHasPair && !addsNewType && bossCounterScore <= 0 && !isLegendaryPokemonName(candidateName)) {
+            score -= Math.round(CONFIG.DUPLICATE_LOW_COVERAGE_PENALTY * 0.7);
+        }
+
+        return Math.max(0, score);
+    }
+
+    function getDuplicatePairRouteScore(team) {
+        if (getExpectedCatchCopiesFromOpenSlots(team) < 2) return 0;
+        return hasDuplicatePair(team)
+            ? Math.round(CONFIG.DUPLICATE_PAIR_ROUTE_BONUS * 0.3)
+            : CONFIG.DUPLICATE_PAIR_ROUTE_BONUS;
+    }
+
+    function getDuplicateIncomingSwapScore(candidateName, team) {
+        const group = getSameNameTeamGroup(team, candidateName);
+        if (group.units.length === 1) return CONFIG.DUPLICATE_PAIR_CREATE_SWAP_BONUS;
+        if (group.units.length >= 2) return Math.round(CONFIG.DUPLICATE_EXTRA_PAIR_CATCH_BONUS * 0.8);
+        return 0;
+    }
+
+    function getDuplicatePairReplacementProtectionScore(unit, team, incomingName = '') {
+        if (!unit?.name) return 0;
+
+        const group = getSameNameTeamGroup(team, unit.name);
+        const incomingKeepsSingleton = group.units.length === 1 &&
+            incomingName &&
+            getPokemonIdentityKey(incomingName) === group.key;
+        if (incomingKeepsSingleton) {
+            return CONFIG.DUPLICATE_PAIR_CREATE_SWAP_BONUS + 10;
+        }
+        if (group.units.length < 2) return 0;
+
+        let score = CONFIG.DUPLICATE_PAIR_KEEP_BONUS;
+        if (group.units.length === 2) score += 12;
+        else if (group.units.length >= 3) score -= 12;
+        if (group.alive.length > 0 && group.fainted.length > 0) score += CONFIG.DUPLICATE_PAIR_REVIVE_BONUS;
+        if (group.alive.length >= 2) score += 8;
+        if (isMainCarryUnit(unit)) score += 18;
+        if (isLegendaryPokemonName(unit.name)) score += 12;
+
+        const extraPairPenalty = Math.max(0, getDuplicatePairCount(team) - 1) * 8;
+        if (extraPairPenalty && !isMainCarryUnit(unit) && !isLegendaryPokemonName(unit.name)) {
+            score -= Math.min(18, extraPairPenalty);
+        }
+
+        return Math.max(8, score);
     }
 
     function isHealingItem(itemName) {
@@ -3613,6 +3761,7 @@
         const prepStatus = context.bossPrepStatus || getBossPrepStatus(team);
         const prepPressure = (prepStatus.avgDeficit || 0) + (prepStatus.leadDeficit || 0);
         const primaryCarry = getPrimaryCarry(team);
+        const duplicateRouteScore = getDuplicatePairRouteScore(team);
         const carryNeedsHealingItem = Boolean(
             primaryCarry &&
             isMainCarryUnit(primaryCarry) &&
@@ -3644,6 +3793,7 @@
                 else if (openTeamSlot) score += 120;
                 else if (getAliveTeam(team).length < CONFIG.EARLY_OPTIONAL_TEAM_SIZE) score += 180;
                 else score -= 450;
+                score += duplicateRouteScore;
                 break;
             case 'grass':
                 if (earlyExpansionClosed && !hasLowLevelForSwap) score -= 1400 + prepPressure * 60;
@@ -3654,6 +3804,7 @@
                 else if (earlyLevelingPriority) score -= 650 + prepPressure * 40;
                 else if (openTeamSlot) score += 40;
                 else score -= 250;
+                score += Math.round(duplicateRouteScore * 0.55);
                 break;
             case 'item':
                 if (earlyLevelingPriority) {
@@ -3739,10 +3890,11 @@
     // ║     🐾 AI: CATCH CANDIDATE SCORER (Trait-Aware Drafting)    ║
     // ╚══════════════════════════════════════════════════════════════╝
 
-    function scoreCatchCandidate(candidateName, candidateTypes, team, isShiny = false, attackTypes = null, bossTypesOverride = null) {
+    function scoreCatchCandidate(candidateName, candidateTypes, team, isShiny = false, attackTypes = null, bossTypesOverride = null, options = {}) {
         let score = 0;
         const traitCounts = getTeamTraitCounts(team);
         const teamTypes = getTeamTypes(team);
+        const bossTypes = bossTypesOverride || getCurrentCatchBossTypes();
         score += getTraitCompletionScore(candidateTypes, team);
         score += scorePokemonStats(getPokemonBaseStats(candidateName)) * 0.6;
 
@@ -3771,7 +3923,6 @@
         });
 
         // 3. Boss counter-pick
-        const bossTypes = bossTypesOverride || getCurrentCatchBossTypes();
         if (bossTypes.length > 0) {
             score += scoreCatchBossCounter(candidateTypes, attackTypes, bossTypes);
         }
@@ -3779,12 +3930,15 @@
         // 4. Grass support: sustain scales well when a protected carry keeps sweeping.
         score += getGrassSupportCatchScore(candidateTypes, team);
 
-        // 5. Legendary/masterball rewards can decide late floors.
+        // 5. Duplicate-pair strategy: early catches often enter twice while slots are open.
+        score += getDuplicatePairCatchScore(candidateName, candidateTypes, team, attackTypes, bossTypes, options);
+
+        // 6. Legendary/masterball rewards can decide late floors.
         if (isLegendaryPokemonName(candidateName)) {
             score += CONFIG.LEGENDARY_CATCH_SCORE_BONUS;
         }
 
-        // 6. Shiny bonus
+        // 7. Shiny bonus
         if (isShiny) {
             score += 15; // Massive flat bonus for shiny rarity and 2x trait value
         }
@@ -3973,11 +4127,12 @@
 
             const pathSummary = getBestPathSummary(bestMapNode, mapTree, context, CONFIG.PATH_LOOKAHEAD_DEPTH);
             const edgeMode = mapTree.hasRealEdges ? `real graph ${mapTree.edges.length} edges` : 'layer fallback';
-            const clickableMapNodes = mapTree.nodes.filter(node => node.clickable);
+            const allMapNodes = mapTree.nodes;
+            const clickableMapNodes = allMapNodes.filter(node => node.clickable);
             const visibleLegendaryNodes = mapTree.nodes.filter(node => node.type === 'legendary').length;
             const shouldStoreUnknownHints = bestMapNode.type === 'unknown' || bestMapNode.type === 'legendary';
             const unknownNodeHints = shouldStoreUnknownHints
-                ? clickableMapNodes
+                ? allMapNodes
                     .filter(node => node.type === 'unknown')
                     .slice(0, 4)
                     .map(node => ({
@@ -3993,7 +4148,10 @@
                     nodeType: bestMapNode.type,
                     nodeIndex: bestMapNode.index,
                     nodeDebug: getMapNodeDebugInfo(bestMapNode.element),
-                    nodeTypeCounts: summarizeMapNodeTypes(clickableMapNodes),
+                    nodeTypeCounts: summarizeMapNodeTypes(allMapNodes),
+                    clickableNodeTypeCounts: summarizeMapNodeTypes(clickableMapNodes),
+                    totalMapNodes: allMapNodes.length,
+                    clickableMapNodes: clickableMapNodes.length,
                     visibleLegendaryNodes,
                     unknownNodeHints,
                     score: Number(highestScore.toFixed(1)),
@@ -4016,7 +4174,7 @@
                 currentRunTelemetry.best.mapSteps = Math.max(currentRunTelemetry.best.mapSteps, currentRunTelemetry.events.filter(event => event.type === 'map-choice').length);
                 currentRunTelemetry.best.battles = Math.max(currentRunTelemetry.best.battles, getRunBattleCount(currentRunTelemetry));
             }
-            log('debug', '🗺️', `Map reevaluated ${clickableNodes.length} options (${mapChangedSinceLastDecision ? 'fresh state' : 'repeat'}). ${edgeMode}. Path=${pathSummary}. Captures=${capturesThisMap}/${CONFIG.MAX_CATCHES_PER_MAP} target=${bossPrepTargets.reason}:${bossPrepTargets.avgLevel}/${bossPrepTargets.leadLevel} training=${trainingCore} earlyExpansionClosed=${earlyExpansionClosed} avgLv=${avgLevel.toFixed(1)} leadLv=${leadLevel}. Score=${highestScore.toFixed(1)}`);
+            log('debug', '🗺️', `Map reevaluated ${clickableNodes.length} clickable options over ${allMapNodes.length} total nodes (${mapChangedSinceLastDecision ? 'fresh state' : 'repeat'}). ${edgeMode}. Path=${pathSummary}. Captures=${capturesThisMap}/${CONFIG.MAX_CATCHES_PER_MAP} target=${bossPrepTargets.reason}:${bossPrepTargets.avgLevel}/${bossPrepTargets.leadLevel} training=${trainingCore} earlyExpansionClosed=${earlyExpansionClosed} avgLv=${avgLevel.toFixed(1)} leadLv=${leadLevel}. Score=${highestScore.toFixed(1)}`);
             const clickSignature = `${currentMapKey || '-'}:${bestMapNode.index}:${bestMapNode.type}:${Math.round(bestMapNode.x)}:${Math.round(bestMapNode.y)}`;
             if (clickSignature === lastMapClickSignature) repeatedMapClickCount++;
             else {
@@ -4154,6 +4312,7 @@
     function isProtectedCatchCandidate(candidate, bossTypes) {
         if (!candidate) return false;
         return isPremiumCatchCandidate(candidate.score, candidate.isShiny, candidate.name) ||
+               (candidate.duplicatePairScore || 0) >= CONFIG.DUPLICATE_PAIR_PROTECT_SCORE ||
                isBossRelevantCatchCandidate(candidate, bossTypes);
     }
 
@@ -4264,6 +4423,7 @@
         const earlyExpansionClosed = shouldStopEarlyExpansion(team, opponentProfile);
         const bossPrepStatus = getBossPrepStatus(team, opponentProfile);
         const teamAvgLevelBeforeCatch = getTeamAverageLevel(team);
+        const expectedCatchCopies = getExpectedCatchCopiesFromOpenSlots(team);
 
         if (cards.length === 0) {
             const skipBtn = document.getElementById('btn-skip-catch');
@@ -4312,7 +4472,8 @@
             const attackTypes = learnedInfo?.attackTypes?.length ? learnedInfo.attackTypes : getAttackTypesFromElement(card, types);
             const bossMatchupScore = scoreCatchBossCounter(types, attackTypes, bossTypes);
             const grassSupportScore = getGrassSupportCatchScore(types, team);
-            let score = scoreCatchCandidate(name, types, team, isShiny, attackTypes, bossTypes);
+            const duplicatePairScore = getDuplicatePairCatchScore(name, types, team, attackTypes, bossTypes, { expectedCatchCopies });
+            let score = scoreCatchCandidate(name, types, team, isShiny, attackTypes, bossTypes, { expectedCatchCopies });
             score += scoreTraitPreviewFromCard(card);
             score += scorePokemonStats(learnedInfo?.currentStats || parseCardStats(card));
             const candidateLevel = learnedInfo?.level || parseLevelText(card.querySelector('.poke-level, .team-slot-lv, [class*="level"]')?.innerText || card.innerText || '');
@@ -4332,6 +4493,7 @@
                 attackTypes,
                 bossMatchupScore,
                 grassSupportScore,
+                duplicatePairScore,
                 level: candidateLevel || 0,
                 projectedAvgLevel: projectedAvgLevel === null ? null : Number(projectedAvgLevel.toFixed(1)),
                 avgLevelDrop: Number(avgLevelDrop.toFixed(1))
@@ -4351,6 +4513,7 @@
         const teamMaxLevel = Math.max(0, ...team.map(p => p.level || 0));
         const hasLowLevelForSwap = !openTeamSlot && team.some(p => (p.level || 0) < teamMaxLevel - 3);
         const bestIsLegendary = Boolean(bestCandidate?.isLegendary);
+        const bestIsDuplicatePlan = Boolean(bestCandidate && bestCandidate.duplicatePairScore >= CONFIG.DUPLICATE_PAIR_PROTECT_SCORE);
         const bestIsPremiumCatch = Boolean(bestCandidate && isPremiumCatchCandidate(bestCandidate.score, bestCandidate.isShiny, bestCandidate.name));
         const bestIsExceptional = Boolean(bestCandidate && (bestCandidate.isShiny || bestIsLegendary || bestScore >= CONFIG.EARLY_EXCEPTIONAL_CATCH_SCORE));
         const bestIsDirectCounter = isDirectBossCounterCandidate(bestCandidate, bossTypes);
@@ -4374,6 +4537,8 @@
                 bestTypes: bestCandidate?.types || [],
                 bestAttackTypes: bestCandidate?.attackTypes || [],
                 bestGrassSupportScore: bestCandidate?.grassSupportScore || 0,
+                bestDuplicatePairScore: bestCandidate?.duplicatePairScore || 0,
+                expectedCatchCopies,
                 bossTypes,
                 earlyExpansionClosed,
                 bossPrepStatus,
@@ -4383,6 +4548,7 @@
                 isExceptional: bestIsExceptional,
                 isLegendary: bestIsLegendary,
                 isPremium: bestIsPremiumCatch,
+                isDuplicatePlan: bestIsDuplicatePlan,
                 isDirectCounter: bestIsDirectCounter
             });
             const skipBtn = document.getElementById('btn-skip-catch');
@@ -4414,6 +4580,7 @@
         if (openTeamSlot && bestCandidate && !shouldBuildCoreTeam(team)) {
             const isExceptional = bestIsExceptional;
             const isPremium = bestIsPremiumCatch;
+            const isDuplicatePlan = bestIsDuplicatePlan;
             const isBossRelevant = isBossRelevantCatchCandidate(bestCandidate, bossTypes);
             const isDirectCounter = bestIsDirectCounter;
             const fillingEarlyRoster = getAliveTeam(team).length < CONFIG.EARLY_OPTIONAL_TEAM_SIZE &&
@@ -4423,12 +4590,12 @@
                                      !hasReachedMapCaptureCap() &&
                                      bestScore >= CONFIG.CATCH_REROLL_MIN_ACCEPT_SCORE;
             const shouldAcceptRosterFill = fillingEarlyRoster && (!hasReachedMapCaptureCap() || isPremium || bestScore >= CONFIG.EARLY_EXCEPTIONAL_CATCH_SCORE);
-            const canBreakEarlyRosterCap = !earlyExpansionClosed || isExceptional || isPremium || isDirectCounter;
+            const canBreakEarlyRosterCap = !earlyExpansionClosed || isExceptional || isPremium || isDirectCounter || isDuplicatePlan;
 
-            if (bestWouldDiluteLevels || !canBreakEarlyRosterCap || (!isPremium && !isBossRelevant && !goodGeneralValue && !shouldAcceptRosterFill && !isExceptional && !isDirectCounter)) {
+            if (bestWouldDiluteLevels || !canBreakEarlyRosterCap || (!isPremium && !isBossRelevant && !goodGeneralValue && !shouldAcceptRosterFill && !isExceptional && !isDirectCounter && !isDuplicatePlan)) {
                 const skipReason = bestWouldDiluteLevels
                     ? 'would dilute levels'
-                    : earlyExpansionClosed && !isExceptional && !isPremium && !isDirectCounter
+                    : earlyExpansionClosed && !isExceptional && !isPremium && !isDirectCounter && !isDuplicatePlan
                     ? 'early roster closed'
                     : hasReachedMapCaptureCap()
                     ? 'already caught this map'
@@ -4464,7 +4631,11 @@
         }
 
         if (bestCard) {
-            const catchReason = bestIsLegendary ? 'Catching legendary/masterball reward' : (openTeamSlot ? 'Catching useful open-slot target' : 'Catching Pokémon');
+            const catchReason = bestIsLegendary
+                ? 'Catching legendary/masterball reward'
+                : bestIsDuplicatePlan
+                ? 'Catching duplicate-pair target'
+                : (openTeamSlot ? 'Catching useful open-slot target' : 'Catching Pokemon');
             ensureRunTelemetry('catch-screen');
             recordRunEvent('catch-decision', {
                 action: 'catch',
@@ -4475,6 +4646,8 @@
                 attackTypes: bestCandidate?.attackTypes || [],
                 bossTypes,
                 grassSupportScore: bestCandidate?.grassSupportScore || 0,
+                duplicatePairScore: bestCandidate?.duplicatePairScore || 0,
+                expectedCatchCopies,
                 level: bestCandidate?.level || 0,
                 projectedAvgLevel: bestCandidate?.projectedAvgLevel ?? null,
                 avgLevelDrop: bestCandidate?.avgLevelDrop || 0,
@@ -4483,6 +4656,7 @@
                 isExceptional: bestIsExceptional,
                 isLegendary: bestIsLegendary,
                 isPremium: bestIsPremiumCatch,
+                isDuplicatePlan: bestIsDuplicatePlan,
                 isDirectCounter: bestIsDirectCounter,
                 teamAvgLevelBeforeCatch: Number(teamAvgLevelBeforeCatch.toFixed(1)),
                 openTeamSlot,
@@ -4836,7 +5010,8 @@
         const incomingName = incomingNameEl ? incomingNameEl.innerText.toLowerCase().trim() : '';
         const incomingTypes = getKnownPokemonTypes(incomingName);
         const incomingAttackTypes = getAttackTypesFromElement(incoming, incomingTypes);
-        const incomingScore = scoreCatchCandidate(incomingName, incomingTypes, team, false, incomingAttackTypes);
+        const incomingScore = scoreCatchCandidate(incomingName, incomingTypes, team, false, incomingAttackTypes) +
+                              getDuplicateIncomingSwapScore(incomingName, team);
 
         // Find the weakest team member
         let weakestIdx = -1;
@@ -4849,7 +5024,9 @@
                 const name = nameEl.innerText.toLowerCase().trim();
                 const types = getKnownPokemonTypes(name);
                 const attackTypes = getAttackTypesFromElement(choice, types);
-                const score = scoreCatchCandidate(name, types, team, false, attackTypes);
+                const teamUnit = team[idx] || { index: idx, name, types, attackTypes, isFainted: false };
+                const score = scoreCatchCandidate(name, types, team, false, attackTypes) +
+                              getDuplicatePairReplacementProtectionScore(teamUnit, team, incomingName);
                 if (score < weakestScore) {
                     weakestScore = score;
                     weakestIdx = idx;
