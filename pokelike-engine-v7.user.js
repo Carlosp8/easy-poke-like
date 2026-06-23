@@ -4383,6 +4383,40 @@
         return findRerollControlInScope(wrapper || card);
     }
 
+    function getRerollCardSignature(item) {
+        const card = item?.card;
+        if (!card) {
+            return `${item?.name || '?'}:${item?.score?.toFixed?.(1) || '?'}:${item?.isShiny ? 'S' : '-'}`;
+        }
+
+        const assets = Array.from(card.querySelectorAll('img, image')).slice(0, 4).map(asset => [
+            asset.getAttribute('src') || '',
+            asset.getAttribute('href') || '',
+            asset.getAttribute('xlink:href') || '',
+            asset.getAttribute('alt') || '',
+            asset.getAttribute('title') || '',
+            asset.getAttribute('class') || ''
+        ].join('|')).join('~');
+        const dataAttrs = Array.from(card.attributes || [])
+            .filter(attr => attr.name.startsWith('data-'))
+            .map(attr => `${attr.name}=${attr.value}`)
+            .join('|');
+        const text = foldText(card.innerText || '').slice(0, 280);
+        const classText = foldText(card.getAttribute('class') || '').slice(0, 120);
+
+        return [
+            item.name || '?',
+            Number.isFinite(item.score) ? item.score.toFixed(1) : '?',
+            item.isShiny ? 'S' : '-',
+            item.level || 0,
+            (item.types || []).join('/'),
+            classText,
+            dataAttrs,
+            assets,
+            text
+        ].join('::');
+    }
+
     function getPokemonBaseStatTotal(stats) {
         if (!stats) return 0;
         return getPokemonStat(stats, 'hp') +
@@ -4483,7 +4517,7 @@
         return '';
     }
 
-    function tryRerollCatchOptions(scoredCards, reason) {
+    function tryRerollCatchOptions(scoredCards, reason, options = {}) {
         if (catchRerollsThisEncounter >= CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER) {
             return false;
         }
@@ -4492,7 +4526,7 @@
         if (!reroll) return false;
 
         const catchScreen = document.getElementById('catch-screen') || document.getElementById('catch-choices');
-        const cardsSnapshot = scoredCards.map(item => `${item.name || '?'}:${item.score.toFixed(1)}:${item.isShiny ? 'S' : '-'}`).join('|');
+        const cardsSnapshot = scoredCards.map(item => getRerollCardSignature(item)).join('|');
         const buttonSnapshot = foldText([
             reroll.button.id || '',
             reroll.button.getAttribute('class') || '',
@@ -4503,11 +4537,17 @@
         const signature = `${cardsSnapshot}::${buttonSnapshot}`;
         const now = Date.now();
         const signatureAttempts = catchRerollAttemptsBySignature[signature] || 0;
+        const scoutTarget = options.scoutTarget || CONFIG.CATCH_REROLL_MIN_ATTEMPTS_PER_ENCOUNTER;
+        const canUseScoutStaleRetry = Boolean(options.allowStaleScoutRetry) &&
+                                      catchRerollsThisEncounter < scoutTarget;
+        const maxAttemptsForSignature = canUseScoutStaleRetry
+            ? Math.max(CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_STATE, scoutTarget)
+            : CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_STATE;
 
         if (signature === lastCatchRerollSignature && now - lastCatchRerollAt < CONFIG.CATCH_REROLL_COOLDOWN_MS) {
             return false;
         }
-        if (signatureAttempts >= CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_STATE) {
+        if (signatureAttempts >= maxAttemptsForSignature) {
             log('warn', '🔄', `Reroll state did not change after ${signatureAttempts} attempt(s). Falling back to catch/skip.`);
             return false;
         }
@@ -4524,7 +4564,9 @@
             reason,
             target: reroll.name,
             score: reroll.score === null ? null : Number(reroll.score.toFixed(1)),
-            attemptsThisEncounter: catchRerollsThisEncounter
+            attemptsThisEncounter: catchRerollsThisEncounter,
+            stateAttempts: signatureAttempts + 1,
+            staleScoutRetry: signatureAttempts > 0 && canUseScoutStaleRetry
         });
         log('info', '🔄', `${reason}${weakestLabel}`);
         triggerRealClick(reroll.button);
@@ -4686,7 +4728,7 @@
         );
         if (openTeamSlot && catchRerollsThisEncounter < scoutTarget) {
             const scoutReason = `Reroll scout ${catchRerollsThisEncounter + 1}/${scoutTarget}`;
-            if (tryRerollCatchOptions(scoredCards, scoutReason)) {
+            if (tryRerollCatchOptions(scoredCards, scoutReason, { allowStaleScoutRetry: true, scoutTarget })) {
                 return; // Scout the refreshed choices before committing a team slot.
             }
         }
