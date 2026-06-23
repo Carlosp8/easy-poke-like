@@ -4123,14 +4123,13 @@
         const mapSvg = document.getElementById('map-svg') || document.querySelector('#map-container svg');
         const rawNodes = Array.from(document.querySelectorAll('.map-node, [class*="map-node"]'));
         const seen = new Set();
-        const nodes = rawNodes.filter(node => {
+        let nodes = rawNodes.filter(node => {
             if (!node || seen.has(node)) return false;
             seen.add(node);
             return getNodeImageSrc(node) || (node.getAttribute('class') || '').includes('map-node');
-        }).map((node, index) => {
+        }).map((node) => {
             const pos = getMapNodePosition(node);
             return {
-                index,
                 element: node,
                 type: classifyMapNode(node),
                 src: getNodeImageSrc(node),
@@ -4140,10 +4139,58 @@
             };
         });
 
+        // Sort from top to bottom, left to right
         nodes.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+        
+        // Re-assign index so that 0 is top-most (Boss) and 22 is bottom-most (Start)
+        nodes.forEach((node, idx) => {
+            node.index = idx;
+        });
 
-        const adjacency = new Map(nodes.map(node => [node.index, []]));
+        const adjacency = new Map();
         const edges = [];
+
+        // Exact known 23-node map structure
+        if (nodes.length === 23) {
+            const HARDCODED_MAP_ADJACENCY = {
+                22: [20, 21],
+                20: [17, 18],
+                21: [18, 19],
+                17: [13, 14],
+                18: [14, 15],
+                19: [15, 16],
+                13: [10],
+                14: [10, 11],
+                15: [11, 12],
+                16: [12],
+                10: [6, 7],
+                11: [7, 8],
+                12: [8, 9],
+                6: [3],
+                7: [3, 4],
+                8: [4, 5],
+                9: [5],
+                3: [1],
+                4: [1, 2],
+                5: [2],
+                1: [0],
+                2: [0],
+                0: []
+            };
+
+            nodes.forEach(node => {
+                const nextNodes = HARDCODED_MAP_ADJACENCY[node.index] || [];
+                adjacency.set(node.index, nextNodes);
+                nextNodes.forEach(to => {
+                    edges.push({ from: node.index, to });
+                });
+            });
+
+            return { nodes, edges, adjacency, hasRealEdges: true };
+        }
+
+        // Fallback for maps of different sizes
+        nodes.forEach(node => adjacency.set(node.index, []));
         const findNodeAt = (x, y) => {
             let best = null;
             let bestDist = Infinity;
