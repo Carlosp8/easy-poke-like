@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Pokelike.xyz Tower Engine 7.4 (Ultimate AI)
+// @name         Pokelike.xyz Tower Engine 8.7 (Sinnoh Run AI)
 // @namespace    http://tampermonkey.net/
-// @version      7.4
+// @version      8.7
 // @description  Motor de automatización completo para Battle Tower: carry protegido, counters anti-Metagross, final boss prep, masterball scouting, traits, items, y auto-restart.
 // @match        *://*.pokelike.xyz/*
 // @grant        none
@@ -87,15 +87,25 @@
         CATCH_REROLL_ALWAYS_BELOW_SCORE: 22,
         CATCH_REROLL_MAX_ATTEMPTS_PER_STATE: 1,
         CATCH_REROLL_MIN_ATTEMPTS_PER_ENCOUNTER: 2,
-        CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER: 4,
+        CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER: 5,
         CATCH_REROLL_PROTECT_SCORE: 34,
         CATCH_REROLL_XP_FOCUS_SCORE: 24,
         CATCH_REROLL_COOLDOWN_MS: 900,
+        EARLY_SHINY_REROLL_MAP_COUNT: 3,
+        EARLY_SHINY_REROLL_ATTEMPTS: 5,
+        EARLY_NON_SHINY_MIN_ACCEPT_SCORE: 38,
+        SETTLED_CATCH_MIN_ACCEPT_SCORE: 32,
         TEAM_TARGET_SIZE: 6,
         MAX_CATCHES_PER_MAP: 2,
         PATH_LOOKAHEAD_DEPTH: 99,
         BOSS_LEAD_WEIGHT: 24,
         BOSS_TEAM_WEIGHT: 8,
+        TRAINER_LEAD_OFFENSE_WEIGHT: 44,
+        TRAINER_TEAM_OFFENSE_WEIGHT: 18,
+        TRAINER_DEFENSE_WEIGHT: 16,
+        TRAINER_SUPER_EFFECTIVE_LEAD_BONUS: 95,
+        TRAINER_LOW_DAMAGE_LEAD_PENALTY: 80,
+        TRAINER_CARRY_MATCHUP_MARGIN_REDUCTION: 38,
         ITEM_BAG_RETRY_COOLDOWN_MS: 45000,
         TEAM_REORDER_REPEAT_COOLDOWN_MS: 3500,
         TEAM_REORDER_ATTEMPT_WINDOW_MS: 20000,
@@ -115,11 +125,19 @@
         MAIN_CARRY_LEAD_STICKINESS: 170,
         MAIN_CARRY_REORDER_MARGIN: 130,
         MAIN_CARRY_HEAL_ITEM_BONUS: 210,
-        MAIN_CARRY_OFFENSE_ITEM_BONUS: 55,
+        MAIN_CARRY_OFFENSE_ITEM_BONUS: 120,
         MAIN_CARRY_CONSUMABLE_BONUS: 70,
         MAIN_CARRY_HEAL_KEEP_MARGIN: 90,
+        MAIN_CARRY_ITEM_RESERVE_BONUS: 360,
+        MAIN_CARRY_ITEM_RESERVE_PENALTY: 260,
         GRASS_SUPPORT_CATCH_BONUS: 18,
         GRASS_SUPPORT_THRESHOLD_BONUS: 24,
+        EARLY_SHINY_CATCH_BONUS: 48,
+        SHINY_CATCH_BONUS: 30,
+        SHINY_REPLACEMENT_KEEP_BONUS: 72,
+        SHINY_TOP_TYPE_BONUS: 18,
+        EARLY_NEW_TYPE_COVERAGE_WEIGHT: 2,
+        SETTLED_NEW_TYPE_COVERAGE_WEIGHT: 5,
         DUPLICATE_FIRST_PAIR_CATCH_BONUS: 28,
         DUPLICATE_EXTRA_PAIR_CATCH_BONUS: 12,
         DUPLICATE_EXISTING_PAIR_CATCH_BONUS: 10,
@@ -142,9 +160,68 @@
         CENTER_AVOID_FULL_HP_AVG_THRESHOLD: 92,
         CENTER_AVOID_ALMOST_FULL_HP_AVG_THRESHOLD: 82,
         CENTER_AVOID_LOWEST_HP_THRESHOLD: 70,
+        CENTER_CARRY_SAFE_HP_THRESHOLD: 72,
+        CENTER_CARRY_SKIP_AVG_HP_THRESHOLD: 78,
+        CENTER_CARRY_SKIP_LOWEST_HP_THRESHOLD: 55,
+        CENTER_STRONG_CARRY_SCORE_THRESHOLD: 260,
         CENTER_HEALTHY_PATH_PENALTY: 1450,
         CENTER_ALMOST_HEALTHY_PATH_PENALTY: 850,
+        CENTER_STRONG_CARRY_PATH_PENALTY: 1250,
         CENTER_REWARD_ALTERNATE_MARGIN: 1100,
+        BOSS_LEVEL_PRESSURE_TRAINER_BONUS: 150,
+        BOSS_LEVEL_PRESSURE_BUFF_BONUS: 52,
+        BOSS_LEVEL_PRESSURE_ITEM_PENALTY: 170,
+        BOSS_LEVEL_PRESSURE_CATCH_PENALTY: 120,
+
+        // --- Sinnoh Battle Tower early carry training ---
+        SINNOH_TOWER_EARLY_TRAINING: true,
+        SINNOH_ASSUME_TOWER_WHEN_STAGE_UNKNOWN: true,
+        SINNOH_TRAINING_MAP_COUNT: 3,
+        SINNOH_TRAINING_CORE_TEAM_SIZE: 2,
+        SINNOH_TRAINING_MAX_REWARD: 250,
+        SINNOH_MAP1_MIN_AVG_LEVEL: 18,
+        SINNOH_MAP1_MIN_LEAD_LEVEL: 24,
+        SINNOH_MAP2_MIN_AVG_LEVEL: 32,
+        SINNOH_MAP2_MIN_LEAD_LEVEL: 40,
+        SINNOH_MAP3_MIN_AVG_LEVEL: 48,
+        SINNOH_MAP3_MIN_LEAD_LEVEL: 56,
+        SINNOH_TM_MAX_MOVE_TIER: 2,
+        SINNOH_OFFENSE_TARGET: 145,
+        SINNOH_SPEED_TARGET: 105,
+        SINNOH_TRAINER_NODE_BONUS: 3600,
+        SINNOH_ITEM_NODE_BONUS: 2600,
+        SINNOH_TM_NODE_BONUS: 3200,
+        SINNOH_BUFF_NODE_BONUS: 1050,
+        SINNOH_OFFENSE_BUFF_NODE_BONUS: 1200,
+        SINNOH_TM_ITEM_BONUS: 6000,
+        SINNOH_TM_TARGET_BONUS: 15000,
+        SINNOH_NON_CARRY_TM_TARGET_PENALTY: 900,
+        SINNOH_CATCH_NODE_PENALTY: 1150,
+        SINNOH_GRASS_NODE_PENALTY: 900,
+        SINNOH_CATCH_SCOUT_ATTEMPTS: 3,
+        SINNOH_PASSIVE_CATCH_PROTECT_SCORE: 18,
+        SINNOH_PASSIVE_PLAN_STRONG_SCORE: 28,
+        SINNOH_POWER_CATCH_PROTECT_SCORE: 34,
+        SINNOH_PASSIVE_TARGETS: {
+            Fire:     { target: 4, stretch: 6, priority: 98, role: 'start-offense' },
+            Rock:     { target: 4, stretch: 6, priority: 98, role: 'defense' },
+            Dragon:   { target: 4, stretch: 6, priority: 92, role: 'snowball-offense' },
+            Water:    { target: 4, stretch: 6, priority: 88, role: 'attack-down' },
+            Dark:     { target: 4, stretch: 6, priority: 84, role: 'crit' },
+            Ghost:    { target: 4, stretch: 6, priority: 80, role: 'execute' },
+            Fairy:    { target: 4, stretch: 6, priority: 94, role: 'attack-control' },
+            Grass:    { target: 4, stretch: 4, priority: 72, role: 'sustain' },
+            Steel:    { target: 4, stretch: 4, priority: 70, role: 'damage-reduction' },
+            Electric: { target: 2, stretch: 4, priority: 62, role: 'extra-hit' },
+            Flying:   { target: 2, stretch: 2, priority: 56, role: 'speed' },
+            Ground:   { target: 2, stretch: 2, priority: 52, role: 'speed-control' },
+            Fighting: { target: 2, stretch: 4, priority: 48, role: 'backup-offense' },
+            Normal:   { target: 0, stretch: 2, priority: 34, role: 'bulk' },
+            Ice:      { target: 0, stretch: 2, priority: 34, role: 'control' },
+            Psychic:  { target: 0, stretch: 2, priority: 32, role: 'splash' },
+            Bug:      { target: 0, stretch: 2, priority: 28, role: 'leveling' },
+            Poison:   { target: 0, stretch: 0, priority: 14, role: 'low-priority-dot' }
+        },
 
         // --- Legendary/masterball nodes ---
         LEGENDARY_NODE_BASE_SCORE: 3600,
@@ -266,7 +343,7 @@
         Dark:     { tier: 'S', desc: ['+25% crit','+50% crit','+75% crit'] },
         Dragon:   { tier: 'S', desc: ['+1 Atk/SpA on KO','+2 Atk/SpA','+3 Atk/SpA'] },
         Electric: { tier: 'B', desc: ['+20% extra attack','+40%','+60%'] },
-        Fairy:    { tier: 'B', desc: ['+1 Atk/SpA start','-2 enemy Atk/SpA','-3 enemy Atk/SpA'] },
+        Fairy:    { tier: 'S', desc: ['+1 Atk/SpA start','-2 enemy Atk/SpA','-3 enemy Atk/SpA'] },
         Flying:   { tier: 'B', desc: ['+1 Speed start','+2 Speed','+3 Speed'] },
         Fire:     { tier: 'S', desc: ['+1 Atk/SpA start','+2 Atk/SpA','+3 Atk/SpA'] },
         Fighting: { tier: 'A', desc: ['+1 Atk/SpA ally KO','+2 Atk/SpA','+3 Atk/SpA'] },
@@ -315,7 +392,7 @@
         'candice': 'Ice', 'volkner': 'Electric',
         // Sinnoh E4
         'aaron': 'Bug', 'bertha': 'Ground', 'flint': 'Fire', 'lucian': 'Psychic',
-        'cynthia': 'Dragon',
+        'cynthia': 'Dragon', 'arceus': 'Normal',
         // Generic fallbacks
         'blue': 'Normal', 'gary': 'Normal', 'red': 'Fire',
     };
@@ -365,7 +442,175 @@
                 { name: 'armaldo', types: ['Rock','Bug'] },
             ]
         },
+        roark: {
+            name: 'Roark',
+            types: ['Rock'],
+            team: [
+                { name: 'geodude', types: ['Rock','Ground'] },
+                { name: 'onix', types: ['Rock','Ground'] },
+                { name: 'cranidos', types: ['Rock'] },
+            ]
+        },
+        gardenia: {
+            name: 'Gardenia',
+            types: ['Grass'],
+            team: [
+                { name: 'cherubi', types: ['Grass'] },
+                { name: 'turtwig', types: ['Grass'] },
+                { name: 'roserade', types: ['Grass','Poison'] },
+            ]
+        },
+        maylene: {
+            name: 'Maylene',
+            types: ['Fighting'],
+            team: [
+                { name: 'meditite', types: ['Fighting','Psychic'] },
+                { name: 'machoke', types: ['Fighting'] },
+                { name: 'lucario', types: ['Fighting','Steel'] },
+            ]
+        },
+        'crasher wake': {
+            name: 'Crasher Wake',
+            types: ['Water'],
+            team: [
+                { name: 'gyarados', types: ['Water','Flying'] },
+                { name: 'quagsire', types: ['Water','Ground'] },
+                { name: 'floatzel', types: ['Water'] },
+            ]
+        },
+        fantina: {
+            name: 'Fantina',
+            types: ['Ghost'],
+            team: [
+                { name: 'drifblim', types: ['Ghost','Flying'] },
+                { name: 'gengar', types: ['Ghost','Poison'] },
+                { name: 'mismagius', types: ['Ghost'] },
+            ]
+        },
+        byron: {
+            name: 'Byron',
+            types: ['Steel'],
+            team: [
+                { name: 'bronzor', types: ['Steel','Psychic'] },
+                { name: 'steelix', types: ['Steel','Ground'] },
+                { name: 'bastiodon', types: ['Rock','Steel'] },
+            ]
+        },
+        candice: {
+            name: 'Candice',
+            types: ['Ice'],
+            team: [
+                { name: 'sneasel', types: ['Dark','Ice'] },
+                { name: 'piloswine', types: ['Ice','Ground'] },
+                { name: 'abomasnow', types: ['Grass','Ice'] },
+                { name: 'froslass', types: ['Ice','Ghost'] },
+            ]
+        },
+        volkner: {
+            name: 'Volkner',
+            types: ['Electric'],
+            team: [
+                { name: 'raichu', types: ['Electric'] },
+                { name: 'ambipom', types: ['Normal'] },
+                { name: 'octillery', types: ['Water'] },
+                { name: 'luxray', types: ['Electric'] },
+            ]
+        },
+        aaron: {
+            name: 'Aaron',
+            types: ['Bug'],
+            team: [
+                { name: 'dustox', types: ['Bug','Poison'] },
+                { name: 'heracross', types: ['Bug','Fighting'] },
+                { name: 'vespiquen', types: ['Bug','Flying'] },
+                { name: 'drapion', types: ['Poison','Dark'] },
+                { name: 'yanmega', types: ['Bug','Flying'] },
+            ]
+        },
+        bertha: {
+            name: 'Bertha',
+            types: ['Ground'],
+            team: [
+                { name: 'quagsire', types: ['Water','Ground'] },
+                { name: 'sudowoodo', types: ['Rock'] },
+                { name: 'golem', types: ['Rock','Ground'] },
+                { name: 'whiscash', types: ['Water','Ground'] },
+                { name: 'hippowdon', types: ['Ground'] },
+            ]
+        },
+        flint: {
+            name: 'Flint',
+            types: ['Fire'],
+            team: [
+                { name: 'rapidash', types: ['Fire'] },
+                { name: 'infernape', types: ['Fire','Fighting'] },
+                { name: 'steelix', types: ['Steel','Ground'] },
+                { name: 'drifblim', types: ['Ghost','Flying'] },
+                { name: 'lopunny', types: ['Normal'] },
+            ]
+        },
+        lucian: {
+            name: 'Lucian',
+            types: ['Psychic'],
+            team: [
+                { name: 'mr. mime', types: ['Psychic','Fairy'] },
+                { name: 'girafarig', types: ['Normal','Psychic'] },
+                { name: 'medicham', types: ['Fighting','Psychic'] },
+                { name: 'alakazam', types: ['Psychic'] },
+                { name: 'bronzong', types: ['Steel','Psychic'] },
+            ]
+        },
+        cynthia: {
+            name: 'Cynthia',
+            types: ['Dragon'],
+            team: [
+                { name: 'spiritomb', types: ['Ghost','Dark'] },
+                { name: 'roserade', types: ['Grass','Poison'] },
+                { name: 'gastrodon', types: ['Water','Ground'] },
+                { name: 'lucario', types: ['Fighting','Steel'] },
+                { name: 'milotic', types: ['Water'] },
+                { name: 'garchomp', types: ['Dragon','Ground'] },
+            ]
+        },
+        arceus: {
+            name: 'Arceus',
+            types: ['Normal'],
+            team: [
+                { name: 'arceus', types: ['Normal'], passiveTier: 1, passives: TYPES },
+            ]
+        },
     };
+
+    const SINNOH_BOSS_RUN_PLAN = {
+        roark:          { attackTypes: ['Water','Grass','Fighting','Ground','Steel'], passiveTypes: ['Water','Grass','Fighting','Steel','Rock'], pressure: 'bulk-break' },
+        gardenia:      { attackTypes: ['Fire','Flying','Ice','Bug','Poison'], passiveTypes: ['Fire','Flying','Dark','Dragon','Grass'], pressure: 'early-offense' },
+        maylene:       { attackTypes: ['Flying','Psychic','Fairy'], passiveTypes: ['Flying','Fairy','Water','Rock','Steel'], pressure: 'speed-offense' },
+        'crasher wake': { attackTypes: ['Electric','Grass'], passiveTypes: ['Water','Grass','Electric','Rock','Steel'], pressure: 'water-bulk' },
+        fantina:       { attackTypes: ['Dark','Ghost'], passiveTypes: ['Dark','Ghost','Normal','Water'], pressure: 'ghost-burst' },
+        byron:         { attackTypes: ['Fire','Fighting','Ground'], passiveTypes: ['Fire','Fighting','Ground','Steel','Water'], pressure: 'steel-wall' },
+        candice:       { attackTypes: ['Fire','Fighting','Rock','Steel'], passiveTypes: ['Fire','Fighting','Rock','Steel','Water'], pressure: 'ice-burst' },
+        volkner:       { attackTypes: ['Ground'], passiveTypes: ['Ground','Water','Rock','Steel','Dragon'], pressure: 'speed-control' },
+        aaron:         { attackTypes: ['Fire','Flying','Rock'], passiveTypes: ['Fire','Flying','Rock','Dark','Dragon'], pressure: 'elite-offense' },
+        bertha:        { attackTypes: ['Water','Grass','Ice'], passiveTypes: ['Water','Grass','Ice','Rock','Steel'], pressure: 'ground-bulk' },
+        flint:         { attackTypes: ['Water','Ground','Rock'], passiveTypes: ['Water','Ground','Rock','Dragon','Steel'], pressure: 'fire-burst' },
+        lucian:        { attackTypes: ['Dark','Ghost','Bug'], passiveTypes: ['Dark','Ghost','Bug','Water','Steel'], pressure: 'psychic-burst' },
+        cynthia:       { attackTypes: ['Ice','Fairy','Dragon','Fighting','Electric','Grass'], passiveTypes: ['Dragon','Fairy','Water','Rock','Steel','Fire','Dark','Ghost'], pressure: 'post-arceus-final-trainer' },
+        arceus:        { attackTypes: ['Fighting'], passiveTypes: ['Fire','Dragon','Dark','Ghost','Water','Fairy','Rock','Steel','Grass','Flying','Ground'], pressure: 'arceus-checkpoint' }
+    };
+
+    const SINNOH_BOSS_ORDER = [
+        'roark',
+        'gardenia',
+        'maylene',
+        'crasher wake',
+        'fantina',
+        'byron',
+        'candice',
+        'arceus',
+        'cynthia'
+    ];
+    const SINNOH_ARCEUS_BATTLE_INDEX = SINNOH_BOSS_ORDER.indexOf('arceus') + 1;
+    const SINNOH_POST_ARCEUS_BOSS_KEY = 'cynthia';
 
     // Estima el tipo dominante de los entrenadores por el nombre de su clase/sprite
     const TRAINER_TYPE_ESTIMATION = {
@@ -592,6 +837,10 @@
         'keldeo':['Water','Fighting'],'meloetta':['Normal','Psychic'],
         'thundurus':['Electric','Flying'],'thundurus-incarnate':['Electric','Flying'],'thundurus-therian':['Electric','Flying'],
         'genesect':['Bug','Steel'],
+        // --- Gen 4 Starters ---
+        'turtwig':['Grass'],'grotle':['Grass'],'torterra':['Grass','Ground'],
+        'chimchar':['Fire'],'monferno':['Fire','Fighting'],'infernape':['Fire','Fighting'],
+        'piplup':['Water'],'prinplup':['Water'],'empoleon':['Water','Steel'],
     };
 
     // ╔══════════════════════════════════════════════════════════════╗
@@ -609,8 +858,8 @@
         'razor claw': 'A', 'life orb': 'A', 'power bracer': 'A',
         'tm normal': 'A',
         // B-Tier
-        'wide lens': 'B', 'choice scarf': 'B', 'lagging tail': 'B',
-        'kings rock': 'B', "king's rock": 'B', 'metronome': 'B',
+        'wide lens': 'B', 'choice scarf': 'B',
+        'metronome': 'B',
         'spa specs': 'B', 'atk band': 'B',
         'charcoal': 'B', 'mystic water': 'B', 'magnet': 'B',
         'miracle seed': 'B', 'never melt ice': 'B', 'never-melt ice': 'B', 'black belt': 'B',
@@ -619,10 +868,13 @@
         'spell tag': 'B', 'dragon fang': 'B', 'black glasses': 'B',
         'metal coat': 'B', 'silk scarf': 'B', 'pixie plate': 'B',
         // C-Tier
-        'eviolite': 'C', 'focus band': 'C', 'moon stone': 'C',
+        'moon stone': 'C',
         // D-Tier
-        'focus sash': 'D', 'muscle band': 'D', 'wise glasses': 'D',
-        'air balloon': 'D',
+        'muscle band': 'D', 'wise glasses': 'D',
+        'air balloon': 'D', 'focus sash': 'D',
+        // F-Tier
+        'lagging tail': 'F', 'kings rock': 'F', "king's rock": 'F',
+        'eviolite': 'F', 'focus band': 'F',
     };
 
     const TIER_SCORE = { 'S': 100, 'A': 80, 'B': 60, 'C': 40, 'D': 20, 'F': 5 };
@@ -638,11 +890,11 @@
         'power bracer': 'power bracer', 'brazal firme': 'power bracer',
         'spa specs': 'spa specs', 'gafas esp': 'spa specs',
         'atk band': 'atk band', 'banda atk': 'atk band',
-        'tm normal': 'tm normal', 'mt normal': 'tm normal', 'tm': 'tm normal', 'mt': 'tm normal',
+        'tm normal': 'tm normal', 'tmnormal': 'tm normal', 'mt normal': 'tm normal', 'mtnormal': 'tm normal', 'tm': 'tm normal', 'mt': 'tm normal',
         // S-Tier
         'concha cascabel': 'shell bell', 'conchacascabel': 'shell bell',
         'huevo suerte': 'lucky egg', 'huevosuerte': 'lucky egg',
-        'restos': 'leftovers',
+        'restos': 'leftovers', 'leftlovers': 'leftovers', 'left over': 'leftovers',
         
         // A-Tier
         'chaleco asalto': 'assault vest', 'chalecoasalto': 'assault vest',
@@ -680,7 +932,7 @@
         'cinturón experto': 'expert belt', 'cinturon experto': 'expert belt',
         'cinta focus': 'focus band', 'cinta de enfoque': 'focus band', 'banda de enfoque': 'focus band',
         'piedra lunar': 'moon stone', 'piedra de luna': 'moon stone',
-        'roca del rey': 'kings rock', 'roca rey': 'kings rock',
+        'roca del rey': 'kings rock', 'roca rey': 'kings rock', 'corona': 'kings rock',
         
         // D-Tier
         'banda focus': 'focus sash', 'banda de enfoque': 'focus sash', 'cinta de focus': 'focus sash',
@@ -715,6 +967,22 @@
         return clean;
     }
 
+    function getItemNameFromElement(element) {
+        if (!element) return '';
+        const textName = element.querySelector?.('.item-name, [class*="item-name"], [class*="name"]')?.innerText || '';
+        if (textName) return normalizeItemName(textName);
+
+        const img = element.tagName === 'IMG' ? element : element.querySelector?.('img[src*="items/"], img');
+        const imageName = img ? (img.alt || img.title || '') : '';
+        if (imageName) return normalizeItemName(imageName);
+
+        const src = img ? (img.src || img.getAttribute('src') || '') : '';
+        const match = src.match(/\/items\/([^\/\.]+)/);
+        if (match) return normalizeItemName(match[1]);
+
+        return normalizeItemName(element.innerText || element.getAttribute?.('aria-label') || element.getAttribute?.('title') || '');
+    }
+
     const ITEM_TYPE_MATCH = {
         'charcoal': 'Fire',
         'mystic water': 'Water',
@@ -738,6 +1006,12 @@
     };
 
     const USABLE_ITEMS = new Set(['rare candy', 'moon stone', 'sacred ash', 'tm normal']);
+    const LOW_VALUE_HELD_ITEMS = new Set([
+        'lagging tail', 'kings rock', "king's rock", 'eviolite',
+        'focus band', 'focus sash', 'air balloon'
+    ]);
+    const MAIN_CARRY_SUSTAIN_ITEMS = new Set(['leftovers', 'shell bell']);
+    const MAIN_CARRY_OFFENSE_ITEMS = new Set(['choice band', 'choice specs', 'atk band', 'spa specs', 'life orb']);
     const SWEEPER_TYPES = ['Fire','Dragon','Dark','Psychic','Fighting','Electric','Ghost','Flying'];
     const TANK_TYPES = ['Steel','Rock','Normal','Water','Grass','Poison'];
     const PHYSICAL_TYPES = ['Normal','Fighting','Ground','Rock','Bug','Steel','Flying','Poison','Dark'];
@@ -766,6 +1040,15 @@
     };
 
     const POKEMON_STAT_OVERRIDES = {
+        turtwig: { hp: 55, atk: 68, def: 64, speed: 31, special: 45, spdef: 55 },
+        grotle: { hp: 75, atk: 89, def: 85, speed: 36, special: 55, spdef: 65 },
+        torterra: { hp: 95, atk: 109, def: 105, speed: 56, special: 75, spdef: 85 },
+        chimchar: { hp: 44, atk: 58, def: 44, speed: 61, special: 58, spdef: 44 },
+        monferno: { hp: 64, atk: 78, def: 52, speed: 81, special: 78, spdef: 52 },
+        infernape: { hp: 76, atk: 104, def: 71, speed: 108, special: 104, spdef: 71 },
+        piplup: { hp: 53, atk: 51, def: 53, speed: 40, special: 61, spdef: 56 },
+        prinplup: { hp: 64, atk: 66, def: 68, speed: 50, special: 81, spdef: 76 },
+        empoleon: { hp: 84, atk: 86, def: 88, speed: 60, special: 111, spdef: 101 },
         genesect: { hp: 71, atk: 120, def: 95, speed: 99, special: 120, spdef: 95 },
         thundurus: { hp: 79, atk: 115, def: 70, speed: 111, special: 125, spdef: 80 },
         'thundurus-incarnate': { hp: 79, atk: 115, def: 70, speed: 111, special: 125, spdef: 80 },
@@ -818,6 +1101,8 @@
     let catchRerollAttemptsBySignature = {};
     let catchScreenSessionActive = false;
     let catchRerollsThisEncounter = 0;
+    let sinnohCarryKnownTmTiers = {};
+    let lastChosenItemName = '';
     let baggedItemCooldowns = {};
     let pokemonRuntimeInfoCache = {};
     let currentRunTelemetry = null;
@@ -838,13 +1123,25 @@
         xp: 'XP',
         duplicate: 'Duplicados'
     };
+    const BOT_CONTROL_RUN_MODES = {
+        battleTower: 'Torre batalla',
+        story: 'Historia',
+        weeklyChallenges: 'Desafio semanal',
+        challengeMode: 'Desafio',
+        auto: 'Auto config',
+        manual: 'Manual'
+    };
     const BOT_CONTROL_DEFAULT_STATE = {
         paused: false,
         tactic: 'auto',
+        runMode: 'battleTower',
+        mapPreference: '',
         mainCarryKey: '',
         lockedKeys: [],
         panel: { x: 16, y: 128 },
         collapsed: false,
+        starterMode: 'auto',
+        autoRestart: CONFIG.AUTO_RESTART,
         starterPreference: ''
     };
     let botControlState = null;
@@ -883,6 +1180,8 @@
             ...BOT_CONTROL_DEFAULT_STATE,
             ...raw,
             tactic: BOT_CONTROL_TACTICS[raw.tactic] ? raw.tactic : BOT_CONTROL_DEFAULT_STATE.tactic,
+            runMode: BOT_CONTROL_RUN_MODES[raw.runMode] ? raw.runMode : BOT_CONTROL_DEFAULT_STATE.runMode,
+            mapPreference: raw.mapPreference || '',
             mainCarryKey: raw.mainCarryKey || '',
             lockedKeys: Array.isArray(raw.lockedKeys) ? [...new Set(raw.lockedKeys.filter(Boolean))] : [],
             panel: {
@@ -891,6 +1190,10 @@
             },
             collapsed: Boolean(raw.collapsed),
             paused: Boolean(raw.paused),
+            starterMode: ['auto', 'manual', 'preferred'].includes(raw.starterMode)
+                ? raw.starterMode
+                : (raw.starterPreference ? 'preferred' : BOT_CONTROL_DEFAULT_STATE.starterMode),
+            autoRestart: raw.autoRestart === undefined ? CONFIG.AUTO_RESTART : Boolean(raw.autoRestart),
             starterPreference: raw.starterPreference || ''
         };
     }
@@ -923,12 +1226,24 @@
         return getBotControlState().tactic || 'auto';
     }
 
+    function getBotControlRunMode() {
+        return getBotControlState().runMode || BOT_CONTROL_DEFAULT_STATE.runMode;
+    }
+
+    function getBotControlMapPreference() {
+        return foldText(getBotControlState().mapPreference || '');
+    }
+
     function isBotPaused() {
         return Boolean(getBotControlState().paused);
     }
 
     function getBotControlSelectedMainKey() {
         return getBotControlState().mainCarryKey || '';
+    }
+
+    function getBotControlAutoRestartEnabled() {
+        return Boolean(getBotControlState().autoRestart);
     }
 
     function isBotControlLockedKey(key) {
@@ -972,6 +1287,16 @@
         const tacticOptions = Object.entries(BOT_CONTROL_TACTICS).map(([key, label]) => {
             return `<option value="${escapeHtml(key)}"${state.tactic === key ? ' selected' : ''}>${escapeHtml(label)}</option>`;
         }).join('');
+        const runModeOptions = Object.entries(BOT_CONTROL_RUN_MODES).map(([key, label]) => {
+            return `<option value="${escapeHtml(key)}"${state.runMode === key ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+        }).join('');
+        const starterModeOptions = [
+            ['auto', 'Auto IA'],
+            ['preferred', 'Forzar nombre'],
+            ['manual', 'Jugador']
+        ].map(([key, label]) => {
+            return `<option value="${escapeHtml(key)}"${state.starterMode === key ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+        }).join('');
         const mainOptions = [
             `<option value=""${!mainKey ? ' selected' : ''}>Auto</option>`,
             ...(team || []).map(unit => {
@@ -1005,19 +1330,32 @@
 
         return `
             <div class="e7c-head" data-drag-handle="true">
-                <button class="e7c-icon-btn e7c-play" data-action="pause" title="${state.paused ? 'Reanudar' : 'Pausar'}">${state.paused ? 'Play' : 'Pause'}</button>
+                <button class="e7c-icon-btn e7c-play" data-action="pause" data-short="${state.paused ? '>' : '||'}" title="${state.paused ? 'Reanudar' : 'Pausar'}">${state.paused ? 'Play' : 'Pause'}</button>
                 <strong>Engine 7</strong>
                 <button class="e7c-icon-btn" data-action="collapse" title="Plegar">${state.collapsed ? '+' : '-'}</button>
             </div>
             <div class="e7c-body"${state.collapsed ? ' hidden' : ''}>
+                <label class="e7c-field">Modo run
+                    <select data-action="run-mode">${runModeOptions}</select>
+                </label>
+                <label class="e7c-field">Mapa/region
+                    <input type="text" data-action="map-input" value="${escapeHtml(state.mapPreference || '')}" placeholder="Auto o texto (ej: Sinnoh/Lorelei)" style="width:100%;min-height:30px;color:#f8fafc;background:#111827;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:4px 8px;">
+                </label>
                 <label class="e7c-field">Tactica
                     <select data-action="tactic">${tacticOptions}</select>
                 </label>
                 <label class="e7c-field">Principal
                     <select data-action="main-select">${mainOptions}</select>
                 </label>
-                <label class="e7c-field">Starter Preferido
+                <label class="e7c-field">Starter
+                    <select data-action="starter-mode">${starterModeOptions}</select>
+                </label>
+                <label class="e7c-field">Nombre starter
                     <input type="text" data-action="starter-input" value="${escapeHtml(state.starterPreference || '')}" placeholder="Nombre (ej: Dialga)" style="width:100%;min-height:30px;color:#f8fafc;background:#111827;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:4px 8px;">
+                </label>
+                <label class="e7c-check">
+                    <input type="checkbox" data-action="auto-restart"${state.autoRestart ? ' checked' : ''}>
+                    <span>Restart automatico</span>
                 </label>
                 <div class="e7c-team">${slots}</div>
             </div>
@@ -1030,12 +1368,17 @@
         style.id = 'engine7-control-style';
         style.textContent = `
             #engine7-control-panel { position: fixed; z-index: 2147483647; width: min(330px, calc(100vw - 24px)); max-height: min(620px, calc(100vh - 24px)); overflow: hidden; background: rgba(18,24,31,.94); color: #f7fafc; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 14px 36px rgba(0,0,0,.35); border-radius: 8px; font: 12px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+            #engine7-control-panel.is-collapsed { width: auto; max-width: calc(100vw - 12px); max-height: 42px; }
             #engine7-control-panel * { box-sizing: border-box; }
             .e7c-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 8px; cursor: move; background: rgba(255,255,255,.08); user-select: none; }
+            #engine7-control-panel.is-collapsed .e7c-head { grid-template-columns: auto auto; gap: 6px; padding: 6px; }
             .e7c-head strong { font-size: 13px; letter-spacing: 0; }
+            #engine7-control-panel.is-collapsed .e7c-head strong { display: none; }
             .e7c-body { display: grid; gap: 8px; padding: 8px; overflow: auto; max-height: 560px; }
             .e7c-field { display: grid; gap: 4px; color: #cbd5e1; }
             .e7c-field select { width: 100%; min-height: 30px; color: #f8fafc; background: #111827; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 4px 8px; }
+            .e7c-check { display: flex; align-items: center; gap: 8px; min-height: 28px; color: #cbd5e1; }
+            .e7c-check input { width: 16px; height: 16px; accent-color: #74d680; }
             .e7c-team { display: grid; gap: 6px; }
             .e7c-slot { display: grid; grid-template-columns: 32px 38px minmax(0,1fr) 50px; gap: 6px; align-items: center; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: rgba(255,255,255,.05); }
             .e7c-slot.is-main { border-color: #74d680; background: rgba(43,138,62,.18); }
@@ -1050,8 +1393,15 @@
             .e7c-hp span { display: block; height: 100%; background: #4ade80; }
             .e7c-icon-btn { min-width: 30px; min-height: 28px; border: 1px solid rgba(255,255,255,.18); border-radius: 6px; color: #f8fafc; background: rgba(255,255,255,.08); cursor: pointer; font: inherit; }
             .e7c-icon-btn:hover { background: rgba(255,255,255,.16); }
+            #engine7-control-panel.is-collapsed .e7c-icon-btn { width: 32px; min-width: 32px; padding: 0; overflow: hidden; white-space: nowrap; }
+            #engine7-control-panel.is-collapsed .e7c-play { font-size: 0; }
+            #engine7-control-panel.is-collapsed .e7c-play::after { content: attr(data-short); font-size: 12px; }
             .e7c-lock-btn { width: 50px; }
             .e7c-empty { color: #a7b4c4; padding: 10px; text-align: center; }
+            @media (max-width: 520px) {
+                #engine7-control-panel { width: min(330px, calc(100vw - 12px)); max-height: calc(100vh - 12px); }
+                .e7c-body { max-height: calc(100vh - 58px); }
+            }
         `;
         document.head?.appendChild(style);
     }
@@ -1076,21 +1426,26 @@
         panel.onchange = event => {
             const target = event.target;
             const action = target.getAttribute('data-action');
-            if (action === 'tactic') updateBotControlState({ tactic: target.value });
+            if (action === 'run-mode') updateBotControlState({ runMode: target.value || 'battleTower' });
+            else if (action === 'tactic') updateBotControlState({ tactic: target.value });
             else if (action === 'main-select') updateBotControlState({ mainCarryKey: target.value || '' });
+            else if (action === 'starter-mode') updateBotControlState({ starterMode: target.value || 'auto' });
+            else if (action === 'auto-restart') updateBotControlState({ autoRestart: Boolean(target.checked) });
             else if (action === 'starter-input') updateBotControlState({ starterPreference: target.value });
+            else if (action === 'map-input') updateBotControlState({ mapPreference: target.value });
             renderBotControlPanel(true);
         };
         panel.addEventListener('input', event => {
             const target = event.target;
             const action = target.getAttribute('data-action');
             if (action === 'starter-input') updateBotControlState({ starterPreference: target.value });
+            else if (action === 'map-input') updateBotControlState({ mapPreference: target.value });
         });
 
         const handle = panel.querySelector('[data-drag-handle]');
         if (!handle) return;
         handle.onpointerdown = event => {
-            if (event.target.closest('button, select')) return;
+            if (event.target.closest('button, select, input, label')) return;
             const state = getBotControlState();
             const startX = event.clientX;
             const startY = event.clientY;
@@ -1128,12 +1483,16 @@
         if (!force && signature === botControlLastRenderSignature) return;
 
         const activeAction = isInteracting ? document.activeElement.getAttribute('data-action') : null;
-        const activeSelStart = activeAction && document.activeElement.tagName === 'INPUT' ? document.activeElement.selectionStart : null;
-        const activeSelEnd = activeAction && document.activeElement.tagName === 'INPUT' ? document.activeElement.selectionEnd : null;
+        const activeIsTextInput = activeAction &&
+                                  document.activeElement.tagName === 'INPUT' &&
+                                  ['text', 'search', ''].includes(document.activeElement.type || '');
+        const activeSelStart = activeIsTextInput ? document.activeElement.selectionStart : null;
+        const activeSelEnd = activeIsTextInput ? document.activeElement.selectionEnd : null;
 
         botControlLastRenderSignature = signature;
         botControlPanel.style.left = `${state.panel.x}px`;
         botControlPanel.style.top = `${state.panel.y}px`;
+        botControlPanel.classList.toggle('is-collapsed', Boolean(state.collapsed));
         botControlPanel.innerHTML = getBotControlPanelHtml(team);
         attachBotControlHandlers(botControlPanel);
 
@@ -1615,6 +1974,7 @@
             isFainted: hp === 0,
             types,
             attackTypes: getAttackTypesFromElement(row, cachedInfo?.attackTypes || types),
+            moves: cachedInfo?.moves || [],
             baseStats,
             currentStats: cachedInfo?.currentStats || null,
             heldItem: null,
@@ -1703,6 +2063,7 @@
                     isFainted: hpPercent === 0,
                     types,
                     attackTypes: getAttackTypesFromElement(slot, cachedInfo?.attackTypes || types),
+                    moves: cachedInfo?.moves || [],
                     baseStats,
                     currentStats: cachedInfo?.currentStats || null,
                     isShiny, heldItem, element: slot
@@ -1763,8 +2124,13 @@
         bagItemName = normalizeItemName(bagItemName);
         if (isItemOnBagCooldown(bagItemName)) return false;
         const bagItemScore = scoreItemForTeam(bagItemName, team, bossType);
+        if (bagItemName === 'tm normal') {
+            const sinnohTraining = getSinnohTowerTrainingContext(team, bossType);
+            if (sinnohTraining.active && !sinnohTraining.needsTm) return false;
+        }
 
         if (USABLE_ITEMS.has(bagItemName)) return true;
+        if (isLowValueHeldItem(bagItemName)) return false;
         if (!isTypeBoostItemUsefulForTeam(bagItemName, team)) return false;
 
         // Try to fill empty slots of alive units first
@@ -1800,7 +2166,7 @@
         return leveled.reduce((sum, p) => sum + p.level, 0) / leveled.length;
     }
 
-    function getCenterNeedStatus(team) {
+    function getCenterNeedStatus(team, opponentProfile = null, prepStatus = null) {
         const alive = getAliveTeam(team || []);
         const avgHP = getTeamAverageHP(team || []);
         const lowestHP = alive.length > 0 ? Math.min(...alive.map(p => p.hp || 0)) : 0;
@@ -1814,6 +2180,35 @@
                            avgHP >= CONFIG.CENTER_AVOID_ALMOST_FULL_HP_AVG_THRESHOLD &&
                            lowestHP >= CONFIG.CENTER_AVOID_LOWEST_HP_THRESHOLD &&
                            lowHPCount === 0;
+        const primaryCarry = getPrimaryCarry(team || []);
+        const carryHP = primaryCarry ? (primaryCarry.hp || 0) : 0;
+        const prep = prepStatus || getBossPrepStatus(team || [], opponentProfile);
+        const avgDeficit = prep?.avgDeficit || 0;
+        const leadDeficit = prep?.leadDeficit || 0;
+        const prepPressure = avgDeficit + leadDeficit;
+        const carryBossScore = opponentProfile && primaryCarry
+            ? scoreLeadCandidate(primaryCarry, opponentProfile, { ignoreHeldItem: true })
+            : 0;
+        const carryPowerScore = primaryCarry ? getPokemonCarryScore(primaryCarry) : 0;
+        const carryOverpowersBoss = Boolean(
+            primaryCarry &&
+            !primaryCarry.isFainted &&
+            leadDeficit <= 0 &&
+            (
+                avgDeficit <= 3 ||
+                !opponentProfile ||
+                carryBossScore >= CONFIG.CENTER_STRONG_CARRY_SCORE_THRESHOLD ||
+                carryPowerScore >= CONFIG.CENTER_STRONG_CARRY_SCORE_THRESHOLD ||
+                isMainCarryUnit(primaryCarry)
+            )
+        );
+        const healthyCarryCanSkip = Boolean(
+            carryOverpowersBoss &&
+            carryHP >= CONFIG.CENTER_CARRY_SAFE_HP_THRESHOLD &&
+            avgHP >= CONFIG.CENTER_CARRY_SKIP_AVG_HP_THRESHOLD &&
+            lowestHP >= CONFIG.CENTER_CARRY_SKIP_LOWEST_HP_THRESHOLD &&
+            lowHPCount <= 1
+        );
 
         return {
             avgHP,
@@ -1823,7 +2218,12 @@
             criticalHPCount,
             fullEnough,
             almostFull,
-            canSkipCenter: !hasFainted && criticalHPCount === 0 && (fullEnough || almostFull)
+            healthyCarryCanSkip,
+            carry: primaryCarry ? primaryCarry.name : null,
+            carryHP,
+            carryBossScore,
+            prepPressure,
+            canSkipCenter: !hasFainted && criticalHPCount === 0 && (fullEnough || almostFull || healthyCarryCanSkip)
         };
     }
 
@@ -1841,17 +2241,55 @@
         const opponentName = foldText(opponentProfile?.name || '');
         const rewardMatch = labelText.match(/\+(\d+)/);
         const reward = rewardMatch ? Number.parseInt(rewardMatch[1], 10) : 0;
-        const isFinalBoss = Boolean(
+        const isArceusCheckpoint = opponentName === 'arceus' || (!opponentName && labelText.includes('arceus'));
+        const isFinalBoss = !isArceusCheckpoint && Boolean(
             labelText.match(/stage final boss|final boss|champion|campeon/) ||
             reward >= 400 ||
             ['steven', 'cynthia', 'red'].includes(opponentName)
         );
-        const isBigBoss = isFinalBoss || labelText.includes('big boss') || opponentName === 'brawly';
+        const isBigBoss = isFinalBoss || isArceusCheckpoint || labelText.includes('big boss') || opponentName === 'brawly';
         const isMap2 = labelText.includes('map 2/2') || ['glacia', 'lorelei', 'pryce', 'phoebe'].includes(opponentName);
         const roundMatch = labelText.match(/\br\s*(\d+)/);
         const labelRound = roundMatch ? Number.parseInt(roundMatch[1], 10) : 1;
         const rewardRound = reward >= 300 ? 3 : reward >= 150 ? 2 : 1;
         const round = Math.max(labelRound || 1, rewardRound);
+        const progress = getTowerProgressContext();
+        const sinnohMapOrdinal = progress.mapOrdinal ||
+            (round === 1 && isMap2 ? 2 : (round === 2 && !isMap2 ? 3 : null));
+
+        if (progress.isSinnoh && isArceusCheckpoint) {
+            return {
+                avgLevel: CONFIG.R3_BIG_BOSS_MIN_AVG_LEVEL,
+                leadLevel: CONFIG.R3_BIG_BOSS_MIN_LEAD_LEVEL,
+                reason: `sinnoh-arceus-battle-${SINNOH_ARCEUS_BATTLE_INDEX}-checkpoint`
+            };
+        }
+
+        if (CONFIG.SINNOH_TOWER_EARLY_TRAINING &&
+            progress.isSinnoh &&
+            sinnohMapOrdinal &&
+            sinnohMapOrdinal <= CONFIG.SINNOH_TRAINING_MAP_COUNT &&
+            !isFinalBoss) {
+            if (sinnohMapOrdinal <= 1) {
+                return {
+                    avgLevel: CONFIG.SINNOH_MAP1_MIN_AVG_LEVEL,
+                    leadLevel: CONFIG.SINNOH_MAP1_MIN_LEAD_LEVEL,
+                    reason: 'sinnoh-map-1-carry-training'
+                };
+            }
+            if (sinnohMapOrdinal === 2) {
+                return {
+                    avgLevel: CONFIG.SINNOH_MAP2_MIN_AVG_LEVEL,
+                    leadLevel: CONFIG.SINNOH_MAP2_MIN_LEAD_LEVEL,
+                    reason: 'sinnoh-map-2-carry-training'
+                };
+            }
+            return {
+                avgLevel: CONFIG.SINNOH_MAP3_MIN_AVG_LEVEL,
+                leadLevel: CONFIG.SINNOH_MAP3_MIN_LEAD_LEVEL,
+                reason: 'sinnoh-map-3-carry-training'
+            };
+        }
 
         if (round >= 3) {
             if (isFinalBoss) {
@@ -1984,6 +2422,28 @@
         return 'skip';
     }
 
+    function isEarlyShinyRerollWindow(team = []) {
+        const progress = getTowerProgressContext();
+        if (progress.mapOrdinal !== null) {
+            return progress.mapOrdinal <= CONFIG.EARLY_SHINY_REROLL_MAP_COUNT;
+        }
+        if (progress.reward > 0) {
+            return progress.reward < CONFIG.EARLY_SHINY_REROLL_MAP_COUNT * 100;
+        }
+        return getAliveTeam(team || []).length < CONFIG.EARLY_OPTIONAL_TEAM_SIZE;
+    }
+
+    function isSettledCatchDecisionWindow(team = []) {
+        const progress = getTowerProgressContext();
+        if (progress.mapOrdinal !== null) {
+            return progress.mapOrdinal > CONFIG.EARLY_SHINY_REROLL_MAP_COUNT;
+        }
+        if (progress.reward > 0) {
+            return progress.reward >= CONFIG.EARLY_SHINY_REROLL_MAP_COUNT * 100;
+        }
+        return getAliveTeam(team || []).length >= CONFIG.EARLY_OPTIONAL_TEAM_SIZE;
+    }
+
     function getTeamTypes(team) {
         const typeSet = new Set();
         team.forEach(p => p.types.forEach(t => typeSet.add(t)));
@@ -1999,6 +2459,379 @@
             });
         });
         return counts;
+    }
+
+    function isTopTraitType(type) {
+        const trait = TRAIT_DATA[type];
+        return Boolean(trait && ['S', 'A'].includes(trait.tier));
+    }
+
+    function getShinyDraftScore(candidateTypes, team, isShiny = false) {
+        if (!isShiny) return 0;
+        const aliveCount = getAliveTeam(team || []).length;
+        const types = normalizeTypeList(candidateTypes || []);
+        let score = aliveCount < CONFIG.EARLY_OPTIONAL_TEAM_SIZE
+            ? CONFIG.EARLY_SHINY_CATCH_BONUS
+            : CONFIG.SHINY_CATCH_BONUS;
+
+        if (!(team || []).some(p => p.isShiny)) score += 12;
+        types.forEach(type => {
+            if (isTopTraitType(type)) score += CONFIG.SHINY_TOP_TYPE_BONUS;
+            if (['Fairy', 'Water', 'Fire', 'Dragon', 'Dark'].includes(type)) score += 10;
+        });
+
+        return score;
+    }
+
+    function getShinyReplacementKeepScore(unit, team) {
+        if (!unit?.isShiny) return 0;
+        const aliveCount = getAliveTeam(team || []).length;
+        const types = normalizeTypeList(unit.types || []);
+        let score = CONFIG.SHINY_REPLACEMENT_KEEP_BONUS;
+        if (aliveCount <= CONFIG.EARLY_OPTIONAL_TEAM_SIZE) score += 34;
+        types.forEach(type => {
+            if (isTopTraitType(type)) score += CONFIG.SHINY_TOP_TYPE_BONUS;
+            if (['Fairy', 'Water', 'Fire', 'Dragon', 'Dark'].includes(type)) score += 8;
+        });
+        return score;
+    }
+
+    function getTowerProgressContext(labels = getProgressLabels()) {
+        const labelText = foldText([
+            ...(labels || []),
+            currentMapKey || '',
+            activeAutoRunMode || ''
+        ].join(' '));
+        const rewardMatch = labelText.match(/\+(\d+)/);
+        const reward = rewardMatch ? Number.parseInt(rewardMatch[1], 10) : 0;
+        const roundMatch = labelText.match(/\b(?:r|round|ronda)\s*\.?\s*(\d+)/);
+        const round = roundMatch ? Number.parseInt(roundMatch[1], 10) : 1;
+        const mapMatch = labelText.match(/\b(?:map|mapa)\s*\.?\s*(\d+)\s*\/\s*(\d+)/);
+        const mapNumber = mapMatch ? Number.parseInt(mapMatch[1], 10) : null;
+        const mapTotal = mapMatch ? Number.parseInt(mapMatch[2], 10) : null;
+        let mapOrdinal = null;
+
+        if (mapNumber && mapTotal) {
+            mapOrdinal = Math.max(1, ((round || 1) - 1) * mapTotal + mapNumber);
+        } else if (reward > 0) {
+            mapOrdinal = reward >= 200 ? 3 : reward >= 100 ? 2 : 1;
+        }
+
+        const nonSinnohRegionSignal = Boolean(labelText.match(/\b(?:kanto|johto|hoenn|unova|kalos|alola|galar|paldea)\b/));
+        const nonSinnohStageSignal = Boolean(labelText.match(/\b(?:stage|region|tower|torre)\s*[123]\b|\b[123]\s*(?:stage|region|tower|torre)\b|\b(?:primera|segunda|tercera)\b/));
+        const towerSignal = activeAutoRunMode === 'battle-tower' || Boolean(labelText.match(/\b(?:battle tower|tower|torre)\b/));
+        const sinnohBossSignal = Boolean(labelText.match(/\b(?:roark|gardenia|maylene|crasher wake|fantina|byron|candice|volkner|aaron|bertha|flint|lucian|cynthia|arceus)\b/));
+        const assumedTowerSinnoh = Boolean(
+            CONFIG.SINNOH_ASSUME_TOWER_WHEN_STAGE_UNKNOWN &&
+            towerSignal &&
+            !nonSinnohRegionSignal &&
+            !nonSinnohStageSignal
+        );
+
+        return {
+            labelText,
+            isSinnoh: Boolean(
+                labelText.match(/\b(?:sinnoh|shinnoh)\b/) ||
+                labelText.match(/\b(?:stage|region|tower|torre)\s*4\b|\b4\s*(?:stage|region|tower|torre)\b|\bcuarta\b/) ||
+                sinnohBossSignal ||
+                assumedTowerSinnoh
+            ),
+            assumedTowerSinnoh,
+            reward,
+            round: round || 1,
+            mapNumber,
+            mapTotal,
+            mapOrdinal
+        };
+    }
+
+    function normalizeMoveNameKey(name) {
+        return foldText(name || '').replace(/[^a-z0-9]+/g, '');
+    }
+
+    function getMovePoolTierForMove(move) {
+        if (!move) return -1;
+        const moveKey = normalizeMoveNameKey(move.name);
+        const movePower = Number.parseInt(move.power || 0, 10) || 0;
+        const moveTypes = normalizeTypeList(move.type ? [move.type] : []);
+        const poolEntries = moveTypes.length > 0
+            ? moveTypes.map(type => [type, POKELIKE_MOVE_POOL[type]]).filter(([, pool]) => pool)
+            : Object.entries(POKELIKE_MOVE_POOL);
+        const preferredCategories = [...new Set([move.category, 'physical', 'special'].filter(category => category === 'physical' || category === 'special'))];
+        let bestTier = -1;
+
+        poolEntries.forEach(([, pool]) => {
+            preferredCategories.forEach(category => {
+                (pool[category] || []).forEach(([poolName, poolPower], tier) => {
+                    const nameMatches = moveKey && moveKey === normalizeMoveNameKey(poolName);
+                    const powerMatches = !moveKey && movePower > 0 && movePower === (poolPower || 0);
+                    if (nameMatches || powerMatches) bestTier = Math.max(bestTier, tier);
+                });
+            });
+        });
+
+        return bestTier;
+    }
+
+    function getUnitKnownMoveTier(unit) {
+        if (!unit) return -1;
+        const cachedInfo = getCachedPokemonInfo(unit.name);
+        const moves = Array.isArray(unit.moves) && unit.moves.length > 0
+            ? unit.moves
+            : (Array.isArray(cachedInfo?.moves) ? cachedInfo.moves : []);
+        if (moves.length === 0) return -1;
+        return Math.max(...moves.map(move => getMovePoolTierForMove(move)));
+    }
+
+    function getUnitOffenseSpeedSnapshot(unit) {
+        if (!unit) return { offense: 0, speed: 0, statsKnown: false, currentStatsKnown: false };
+        const currentStats = unit.currentStats || getCachedPokemonInfo(unit.name)?.currentStats || null;
+        const hasCurrentStats = Boolean(currentStats && Object.keys(currentStats).length > 0);
+        const stats = hasCurrentStats ? currentStats : getPokemonBaseStats(unit);
+        const offense = Math.max(
+            getPokemonStat(stats, 'atk', 'attack'),
+            getPokemonStat(stats, 'special', 'spa', 'spatk')
+        );
+        const speed = getPokemonStat(stats, 'speed', 'spe');
+        return {
+            offense,
+            speed,
+            statsKnown: Boolean(stats),
+            currentStatsKnown: hasCurrentStats
+        };
+    }
+
+    function getSinnohTowerTrainingContext(team = [], opponentProfile = null) {
+        const progress = getTowerProgressContext();
+        const earlyByMap = progress.mapOrdinal !== null
+            ? progress.mapOrdinal <= CONFIG.SINNOH_TRAINING_MAP_COUNT
+            : (progress.reward > 0 ? progress.reward < CONFIG.SINNOH_TRAINING_MAX_REWARD : progress.round <= 2);
+        const active = Boolean(CONFIG.SINNOH_TOWER_EARLY_TRAINING && progress.isSinnoh && earlyByMap);
+        const carry = getPrimaryCarry(team || []);
+        const carryKey = carry ? getPokemonIdentityKey(carry.name) : '';
+        const observedMoveTier = getUnitKnownMoveTier(carry);
+        const rememberedMoveTier = carryKey && Number.isFinite(sinnohCarryKnownTmTiers[carryKey])
+            ? sinnohCarryKnownTmTiers[carryKey]
+            : -1;
+        const moveTier = Math.max(observedMoveTier, rememberedMoveTier);
+        const stats = getUnitOffenseSpeedSnapshot(carry);
+
+        return {
+            active,
+            progress,
+            carry,
+            carryKey,
+            carryMoveTier: moveTier,
+            observedCarryMoveTier: observedMoveTier,
+            rememberedCarryMoveTier: rememberedMoveTier,
+            needsTm: Boolean(active && carry && moveTier < CONFIG.SINNOH_TM_MAX_MOVE_TIER),
+            needsOffense: Boolean(active && carry && (!stats.statsKnown || stats.offense < CONFIG.SINNOH_OFFENSE_TARGET || moveTier < CONFIG.SINNOH_TM_MAX_MOVE_TIER)),
+            needsSpeed: Boolean(active && carry && (!stats.statsKnown || stats.speed < CONFIG.SINNOH_SPEED_TARGET)),
+            stats,
+            opponent: opponentProfile || null
+        };
+    }
+
+    function getNextTraitThreshold(count) {
+        if ((count || 0) < 2) return 2;
+        if ((count || 0) < 4) return 4;
+        if ((count || 0) < 6) return 6;
+        return 0;
+    }
+
+    function isSinnohTowerRunContext() {
+        return Boolean(CONFIG.SINNOH_TOWER_EARLY_TRAINING && getTowerProgressContext().isSinnoh);
+    }
+
+    function getSinnohBossKeyFromProfile(opponentProfile = null) {
+        const profileText = foldText([
+            opponentProfile?.name || '',
+            ...(opponentProfile?.team || []).map(mon => mon.name || ''),
+            ...(opponentProfile?.types || []),
+            ...(opponentProfile?.teamTypes || []),
+            ...(getProgressLabels() || [])
+        ].join(' '));
+
+        const bossKeys = Object.keys(SINNOH_BOSS_RUN_PLAN).sort((a, b) => b.length - a.length);
+        for (const key of bossKeys) {
+            const dbName = BOSS_TEAM_DB[key]?.name || '';
+            if (profileText.includes(foldText(key)) || (dbName && profileText.includes(foldText(dbName)))) {
+                return key;
+            }
+        }
+
+        if (profileText.includes('arceus')) return 'arceus';
+        return '';
+    }
+
+    function getSinnohBossRunPlan(opponentProfile = null) {
+        const key = getSinnohBossKeyFromProfile(opponentProfile);
+        if (!key || !SINNOH_BOSS_RUN_PLAN[key]) return null;
+        return {
+            key,
+            battleIndex: SINNOH_BOSS_ORDER.indexOf(key) >= 0 ? SINNOH_BOSS_ORDER.indexOf(key) + 1 : null,
+            ...SINNOH_BOSS_RUN_PLAN[key],
+            bossProfile: BOSS_TEAM_DB[key] || null
+        };
+    }
+
+    function scoreSinnohBossRunPlanFit(passiveTypes = [], attackTypes = [], team = [], opponentProfile = null, options = {}) {
+        if (!isSinnohTowerRunContext()) return 0;
+        const types = normalizeTypeList(passiveTypes);
+        const rawAttacks = Array.isArray(attackTypes) ? attackTypes : [];
+        const attacks = normalizeTypeList(rawAttacks.length > 0 ? rawAttacks : passiveTypes);
+        const bossPlan = getSinnohBossRunPlan(opponentProfile);
+        const bossKey = bossPlan?.key || '';
+        const arceusPlan = SINNOH_BOSS_RUN_PLAN.arceus;
+        const postArceusPlan = SINNOH_BOSS_RUN_PLAN[SINNOH_POST_ARCEUS_BOSS_KEY];
+        let score = 0;
+
+        const scorePlan = (plan, weight) => {
+            if (!plan || weight <= 0) return;
+            const wantedAttacks = normalizeTypeList(plan.attackTypes || []);
+            const wantedPassives = normalizeTypeList(plan.passiveTypes || []);
+
+            wantedAttacks.forEach(type => {
+                if (attacks.includes(type)) score += 13 * weight;
+                else if (types.includes(type)) score += 6 * weight;
+            });
+            wantedPassives.forEach(type => {
+                if (types.includes(type)) score += 8 * weight;
+            });
+        };
+
+        const scoreBossProfileCoverage = (profile, weight) => {
+            if (!profile || weight <= 0) return;
+            const bossTypes = getOpponentTeamTypes(profile);
+            if (bossTypes.length === 0) return;
+            score += getAttackCoverageScore(attacks, bossTypes) * 6 * weight;
+            score += getDefensiveMatchupScore(types, bossTypes) * 3 * weight;
+        };
+
+        scorePlan(bossPlan, options.bossWeight ?? 1);
+        if (bossKey !== 'arceus') {
+            const arceusWeight = options.arceusWeight ?? 0.65;
+            scorePlan(arceusPlan, arceusWeight);
+            scoreBossProfileCoverage(BOSS_TEAM_DB.arceus, arceusWeight * 0.75);
+        }
+        if (bossKey !== SINNOH_POST_ARCEUS_BOSS_KEY) {
+            scorePlan(postArceusPlan, options.postArceusWeight ?? 0.55);
+            scoreBossProfileCoverage(BOSS_TEAM_DB[SINNOH_POST_ARCEUS_BOSS_KEY], (options.postArceusWeight ?? 0.55) * 0.75);
+        }
+
+        if (bossPlan?.bossProfile) {
+            scoreBossProfileCoverage(bossPlan.bossProfile, options.bossWeight ?? 1);
+        }
+
+        const counts = getTeamTraitCounts(team || []);
+        types.forEach(type => {
+            const current = counts[type] || 0;
+            if (current === 1 || current === 3 || current === 5) score += 6;
+        });
+
+        return score;
+    }
+
+    function scoreSinnohPassivePlanForTypes(types, team, options = {}) {
+        const passiveTypes = normalizeTypeList(types || []);
+        if (!isSinnohTowerRunContext() || passiveTypes.length === 0) return 0;
+
+        const targets = CONFIG.SINNOH_PASSIVE_TARGETS || {};
+        const counts = getTeamTraitCounts(team || []);
+        const addCount = options.isShiny ? 2 : 1;
+        let score = 0;
+
+        passiveTypes.forEach(type => {
+            const plan = targets[type];
+            if (!plan) return;
+
+            const current = counts[type] || 0;
+            const target = current < plan.target ? plan.target : (current < plan.stretch ? plan.stretch : 0);
+            const nextThreshold = getNextTraitThreshold(current);
+            const completesThreshold = nextThreshold > 0 && current < nextThreshold && current + addCount >= nextThreshold;
+
+            if (target > 0) {
+                const missingBefore = Math.max(0, target - current);
+                const missingAfter = Math.max(0, target - current - addCount);
+                const progress = missingBefore - missingAfter;
+                score += plan.priority * (progress > 0 ? 0.32 * progress : 0.12);
+                if (completesThreshold) score += plan.priority * 0.45;
+                if (type === 'Rock' && target >= 4) score += 16;
+                if (type === 'Dragon' && current < plan.target) score += 14;
+            } else {
+                score += Math.min(10, plan.priority * 0.08);
+            }
+        });
+
+        score += scoreSinnohBossRunPlanFit(passiveTypes, passiveTypes, team, options.opponentProfile || null, {
+            bossWeight: 0.55,
+            arceusWeight: 0.85,
+            postArceusWeight: 0.75
+        });
+
+        return score;
+    }
+
+    function scoreSinnohPowerCatchCandidate(candidateName, candidateTypes, team, options = {}) {
+        if (!isSinnohTowerRunContext() || !candidateName) return 0;
+
+        const types = normalizeTypeList(candidateTypes || getKnownPokemonTypes(candidateName));
+        const attackTypes = normalizeTypeList(options.attackTypes || types);
+        const stats = getPokemonBaseStats(candidateName);
+        const bst = getPokemonBaseStatTotal(stats);
+        const offense = Math.max(getPokemonStat(stats, 'atk', 'attack'), getPokemonStat(stats, 'special', 'spa', 'spatk'));
+        const speed = getPokemonStat(stats, 'speed', 'spe');
+        const bulk = getPokemonStat(stats, 'hp') + getPokemonStat(stats, 'def') + getPokemonStat(stats, 'spdef', 'spd');
+        const currentAvgLevel = getTeamAverageLevel(team || []);
+        const candidateLevel = options.level || 0;
+        let score = 0;
+
+        score += Math.max(0, bst - 460) / 7;
+        score += offense / 8;
+        score += speed / 12;
+        score += bulk / 55;
+        if (candidateLevel && currentAvgLevel && candidateLevel >= currentAvgLevel - 3) score += 14;
+        if (candidateLevel && currentAvgLevel && candidateLevel < currentAvgLevel - 8) score -= 12;
+        if (isLegendaryPokemonName(candidateName)) score += 38;
+        if (options.isShiny) score += 10;
+        if (isMainCarryName(candidateName)) score += 34;
+
+        if (attackTypes.includes('Fighting')) score += 18; // Arceus checkpoint is normally typed here.
+        if (types.includes('Fire') || types.includes('Dragon') || types.includes('Dark') || types.includes('Ghost') || types.includes('Fairy')) score += 12;
+        if (types.includes('Rock') || types.includes('Steel') || types.includes('Water') || types.includes('Grass')) score += 9;
+        if (types.includes('Poison') && bst < 520) score -= 12;
+        score += scoreSinnohBossRunPlanFit(types, attackTypes, team, options.opponentProfile || null, {
+            bossWeight: 1.25,
+            arceusWeight: 0.8,
+            postArceusWeight: 0.7
+        });
+
+        return score;
+    }
+
+    function scoreSinnohPassiveCardPurpose({ passiveTypes, text, team, isShinyPassive, isSpeed, isSurvival, isDamage }) {
+        if (!isSinnohTowerRunContext()) return 0;
+
+        const typeScore = scoreSinnohPassivePlanForTypes(passiveTypes, team, { isShiny: isShinyPassive });
+        const lowersOffense = Boolean(
+            text.match(/lower|reduce|decrease|drop|debuff|baj|reduc|dismin|resta/) &&
+            text.match(/atk|attack|ataque|sp\.?\s*atk|special attack|ataque especial|ofens/)
+        );
+        const raisesDefense = Boolean(text.match(/def|defense|defensa|sp\.?\s*def|resist|shield|escudo|armor|armadura/));
+        const types = normalizeTypeList(passiveTypes);
+        let score = typeScore;
+
+        if (isSpeed || text.match(/first|priority|primero|velocidad/)) score += 54;
+        if (lowersOffense) score += 58;
+        if (isSurvival || raisesDefense) score += 36;
+        if (isDamage && types.includes('Dragon')) score += 22;
+        if (types.includes('Rock') && (raisesDefense || isSurvival)) score += 32;
+        if (types.includes('Water') && lowersOffense) score += 34;
+        if (types.includes('Fairy') && lowersOffense) score += 22;
+        if (types.includes('Flying') && isSpeed) score += 20;
+        if (types.length === 0 && !(isSpeed || lowersOffense || raisesDefense || isSurvival)) score -= 14;
+
+        return score;
     }
 
     function getTierScore(itemName) {
@@ -2248,6 +3081,31 @@
         return ['shell bell', 'leftovers'].includes(normalizeItemName(itemName));
     }
 
+    function isLowValueHeldItem(itemName) {
+        return LOW_VALUE_HELD_ITEMS.has(normalizeItemName(itemName));
+    }
+
+    function isMainCarryPreferredHeldItem(itemName) {
+        itemName = normalizeItemName(itemName);
+        return MAIN_CARRY_SUSTAIN_ITEMS.has(itemName) || MAIN_CARRY_OFFENSE_ITEMS.has(itemName);
+    }
+
+    function isMainCarryOffenseItem(itemName) {
+        return MAIN_CARRY_OFFENSE_ITEMS.has(normalizeItemName(itemName));
+    }
+
+    function isPokemonElementShiny(element) {
+        if (!element) return false;
+        const text = element.innerText || '';
+        return Boolean(
+            element.classList?.contains('shiny') ||
+            element.classList?.contains('shiny-card') ||
+            element.classList?.contains('pc-dex-card--shiny') ||
+            element.querySelector?.('.shiny, .shiny-icon, .shiny-star, .pc-shiny-star, [class*="shiny"], [data-shiny="true"]') ||
+            text.includes('★')
+        );
+    }
+
     function getOffenseRole(unit) {
         return isSpecialAttacker(unit) ? 'special' : 'physical';
     }
@@ -2332,6 +3190,7 @@
         let score = getTierScore(itemName) / 4;
         score += (p.hp || 0) / 25;
         score += getPokemonCarryScore(p) / 14;
+        if (isLowValueHeldItem(itemName)) score -= 120;
 
         const matchingType = getItemBoostType(itemName);
         if (matchingType) {
@@ -2352,8 +3211,8 @@
         const speed = getPokemonStat(stats, 'speed', 'spe');
         const offense = Math.max(getPokemonStat(stats, 'atk', 'attack'), getPokemonStat(stats, 'special', 'spa', 'spatk'));
         const bulk = getPokemonStat(stats, 'hp') + getPokemonStat(stats, 'def') + getPokemonStat(stats, 'spdef', 'spd');
-        if (['choice band', 'atk band'].includes(itemName)) score += specialAttacker ? -8 : 32;
-        if (['choice specs', 'spa specs'].includes(itemName)) score += specialAttacker ? 32 : -8;
+        if (['choice band', 'atk band'].includes(itemName)) score += specialAttacker ? -70 : 64;
+        if (['choice specs', 'spa specs'].includes(itemName)) score += specialAttacker ? 64 : -70;
         if (itemName === 'life orb') score += 26 + (isSweeper ? 12 : 0);
         if (itemName === 'lagging tail') {
             if (stats) {
@@ -2368,18 +3227,21 @@
                 score += isTank ? 18 : -12;
             }
             if (isSweeper && speed >= 90) score -= 24;
+            score -= 150;
         }
         if (['choice scarf', 'quick claw'].includes(itemName) && isSweeper) score += 22;
         if (['scope lens', 'razor claw'].includes(itemName) && p.types.some(t => ['Dark','Ghost','Flying','Electric'].includes(t))) score += 26;
         if (itemName === 'shell bell' && isSweeper) score += 24;
         if (['leftovers', 'assault vest', 'rocky helmet', 'red card'].includes(itemName) && isTank) score += 24;
-        if (itemName === 'eviolite' && (!p.level || p.level < 40)) score += 22;
+        if (itemName === 'eviolite') score -= 80;
         if (itemName === 'lucky egg') score += (p.index === 0 ? 34 : 16) + Math.max(0, 55 - (p.level || 55)) / 2;
         if (isMainCarry) {
-            if (isHealingItem(itemName)) {
-                score += CONFIG.MAIN_CARRY_HEAL_ITEM_BONUS + (p.index === 0 ? 45 : 0);
+            if (itemName === 'leftovers') {
+                score += CONFIG.MAIN_CARRY_HEAL_ITEM_BONUS + 125 + (p.index === 0 ? 55 : 0);
+            } else if (itemName === 'shell bell') {
+                score += CONFIG.MAIN_CARRY_HEAL_ITEM_BONUS + 35 + (p.index === 0 ? 45 : 0);
             }
-            if (['choice band', 'choice specs', 'atk band', 'spa specs', 'life orb', 'power bracer', 'loaded dice', 'expert belt'].includes(itemName)) {
+            if (isMainCarryOffenseItem(itemName) || ['power bracer', 'loaded dice', 'expert belt'].includes(itemName)) {
                 score += CONFIG.MAIN_CARRY_OFFENSE_ITEM_BONUS;
             }
             if (itemName === 'lucky egg') {
@@ -2622,6 +3484,7 @@
     function isFinalBossOpponentProfile(profile = null) {
         const labelText = foldText((getProgressLabels() || []).join(' '));
         const opponentName = foldText(profile?.name || '');
+        if (opponentName === 'arceus' || (!opponentName && labelText.includes('arceus'))) return false;
         return Boolean(
             labelText.match(/stage final boss|final boss|champion|campeon/) ||
             labelText.match(/\+400\b/) ||
@@ -3040,18 +3903,29 @@
         const targetTypes = getOpponentTeamTypes(bossType);
         if (alive.length === 0) return getTierScore(itemName);
 
+        if (!USABLE_ITEMS.has(itemName) && isLowValueHeldItem(itemName)) {
+            return -140 + getTierScore(itemName);
+        }
+
         if (itemName === 'sacred ash') {
             const faintedCount = team.filter(p => p.isFainted).length;
             return faintedCount > 0 ? 140 + faintedCount * 45 : 35;
         }
         if (itemName === 'rare candy') {
-            return 88 + Math.max(...alive.map(p => scoreConsumableTarget(p, itemName))) / 4;
+            const sinnohTraining = getSinnohTowerTrainingContext(team, bossType);
+            return 88 +
+                Math.max(...alive.map(p => scoreConsumableTarget(p, itemName))) / 4 +
+                (sinnohTraining.active ? CONFIG.SINNOH_TM_ITEM_BONUS + 220 : 0);
         }
         if (itemName === 'moon stone') {
             return 50 + Math.max(...alive.map(p => scoreConsumableTarget(p, itemName))) / 6;
         }
         if (itemName === 'tm normal') {
-            return 72 + Math.max(...alive.map(p => scoreConsumableTarget(p, itemName))) / 5;
+            const sinnohTraining = getSinnohTowerTrainingContext(team, bossType);
+            if (sinnohTraining.active && !sinnohTraining.needsTm) return 18;
+            return 72 +
+                Math.max(...alive.map(p => scoreConsumableTarget(p, itemName))) / 5 +
+                (sinnohTraining.active && sinnohTraining.needsTm ? CONFIG.SINNOH_TM_ITEM_BONUS : 0);
         }
 
         let score = getTierScore(itemName);
@@ -3650,6 +4524,15 @@
         if (text.match(/execute|remata|ejecut/)) score += 16 + (traitCounts.Ghost || 0) * 8;
         if (carry && isSustain) score += 18;
         if (carry && passiveTypes.includes('Grass')) score += 18 + (traitCounts.Grass || 0) * 6;
+        score += scoreSinnohPassiveCardPurpose({
+            passiveTypes,
+            text,
+            team,
+            isShinyPassive,
+            isSpeed,
+            isSurvival,
+            isDamage
+        });
 
         if (profile.weakCore) {
             if (isScaling) score += CONFIG.PASSIVE_WEAK_CORE_SCALING_BONUS;
@@ -4379,9 +5262,11 @@
         const hasLowLevelForSwap = !openTeamSlot && team.some(p => (p.level || 0) < teamMaxLevel - 3);
         const prepStatus = context.bossPrepStatus || getBossPrepStatus(team);
         const prepPressure = (prepStatus.avgDeficit || 0) + (prepStatus.leadDeficit || 0);
+        const bossLevelPressure = Math.max(0, prepPressure);
         const primaryCarry = getPrimaryCarry(team);
         const duplicateRouteScore = getDuplicatePairRouteScore(team);
         const centerNeed = context.centerNeed || getCenterNeedStatus(team);
+        const sinnohTraining = context.sinnohTraining || getSinnohTowerTrainingContext(team);
         const carryNeedsHealingItem = Boolean(
             primaryCarry &&
             isMainCarryUnit(primaryCarry) &&
@@ -4396,11 +5281,20 @@
                 else if (avgHP < CONFIG.LOW_HP_THRESHOLD) score += 2000;
                 else if (lowHPCount >= 2) score += 1500;
                 else if (centerNeed.fullEnough) score -= CONFIG.CENTER_HEALTHY_PATH_PENALTY;
+                else if (centerNeed.healthyCarryCanSkip) score -= CONFIG.CENTER_STRONG_CARRY_PATH_PENALTY;
                 else if (centerNeed.almostFull) score -= CONFIG.CENTER_ALMOST_HEALTHY_PATH_PENALTY;
+                else if (bossLevelPressure > 0 && avgHP >= CONFIG.CENTER_CARRY_SKIP_AVG_HP_THRESHOLD) {
+                    score -= 650 + bossLevelPressure * 55;
+                }
                 else score -= 250;
                 break;
             case 'buff':
                 score += earlyLevelingPriority ? 360 + prepPressure * 45 : 500;
+                if (bossLevelPressure > 0) score += bossLevelPressure * CONFIG.BOSS_LEVEL_PRESSURE_BUFF_BONUS;
+                if (sinnohTraining.active) {
+                    score += CONFIG.SINNOH_BUFF_NODE_BONUS;
+                    if (sinnohTraining.needsOffense) score += CONFIG.SINNOH_OFFENSE_BUFF_NODE_BONUS;
+                }
                 break;
             case 'legendary':
                 score += scoreLegendaryNode(context);
@@ -4415,7 +5309,11 @@
                 else if (openTeamSlot) score += 120;
                 else if (getAliveTeam(team).length < CONFIG.EARLY_OPTIONAL_TEAM_SIZE) score += 180;
                 else score -= 450;
+                if (bossLevelPressure > 0) score -= bossLevelPressure * CONFIG.BOSS_LEVEL_PRESSURE_CATCH_PENALTY;
                 score += duplicateRouteScore;
+                if (sinnohTraining.active && getAliveTeam(team).length >= CONFIG.SINNOH_TRAINING_CORE_TEAM_SIZE) {
+                    score -= CONFIG.SINNOH_CATCH_NODE_PENALTY;
+                }
                 break;
             case 'grass':
                 if (earlyExpansionClosed && !hasLowLevelForSwap) score -= 1400 + prepPressure * 60;
@@ -4426,13 +5324,24 @@
                 else if (earlyLevelingPriority) score -= 650 + prepPressure * 40;
                 else if (openTeamSlot) score += 40;
                 else score -= 250;
+                if (bossLevelPressure > 0) score -= bossLevelPressure * Math.round(CONFIG.BOSS_LEVEL_PRESSURE_CATCH_PENALTY * 0.7);
                 score += Math.round(duplicateRouteScore * 0.55);
+                if (sinnohTraining.active && getAliveTeam(team).length >= CONFIG.SINNOH_TRAINING_CORE_TEAM_SIZE) {
+                    score -= CONFIG.SINNOH_GRASS_NODE_PENALTY;
+                }
                 break;
             case 'item':
                 if (earlyLevelingPriority) {
                     score += carryNeedsHealingItem ? 260 : (leadNeedsItem && !buildingCoreTeam ? 120 : -420);
                 } else {
                     score += carryNeedsHealingItem ? 720 : (leadNeedsItem ? 520 : 260);
+                }
+                if (bossLevelPressure > 0 && !carryNeedsHealingItem && !leadNeedsItem) {
+                    score -= bossLevelPressure * CONFIG.BOSS_LEVEL_PRESSURE_ITEM_PENALTY;
+                }
+                if (sinnohTraining.active) {
+                    score += CONFIG.SINNOH_ITEM_NODE_BONUS;
+                    if (sinnohTraining.needsTm) score += CONFIG.SINNOH_TM_NODE_BONUS;
                 }
                 break;
             case 'trainer': {
@@ -4444,6 +5353,10 @@
                 }
                 const matchupScore = (isNodeSpecificOpponentProfile(profile) || isBossOpponentProfile(profile)) ? scoreLeadCandidate(getAliveTeam(team)[0], profile) / 3 : getTrainerMatchupScore(mapNode.src, team);
                 score += baseScore + matchupScore - (leadNeedsItem ? 70 : 0) + (earlyLevelingPriority ? 1150 + prepPressure * 80 : 120);
+                if (bossLevelPressure > 0) score += bossLevelPressure * CONFIG.BOSS_LEVEL_PRESSURE_TRAINER_BONUS;
+                if (sinnohTraining.active) {
+                    score += CONFIG.SINNOH_TRAINER_NODE_BONUS + prepPressure * 70;
+                }
                 break;
             }
             case 'boss': {
@@ -4468,6 +5381,10 @@
         let immediate = scoreMapNodeImmediate(mapNode, context);
         if (context.earlyLevelingPriority && mapNode.type === 'item' && routeItemCount > 0) {
             immediate -= 900 * routeItemCount;
+        }
+        const prepPressure = (context.bossPrepStatus?.avgDeficit || 0) + (context.bossPrepStatus?.leadDeficit || 0);
+        if (prepPressure > 0 && mapNode.type === 'item' && routeItemCount > 0) {
+            immediate -= Math.round(prepPressure * 80 * routeItemCount);
         }
         if (depth <= 1) return immediate;
 
@@ -4522,7 +5439,17 @@
         const traitCounts = getTeamTraitCounts(team);
         const teamTypes = getTeamTypes(team);
         const bossTypes = bossTypesOverride || getCurrentCatchBossTypes();
+        const aliveCount = getAliveTeam(team || []).length;
+        const coverageWeight = aliveCount < CONFIG.EARLY_OPTIONAL_TEAM_SIZE
+            ? CONFIG.EARLY_NEW_TYPE_COVERAGE_WEIGHT
+            : CONFIG.SETTLED_NEW_TYPE_COVERAGE_WEIGHT;
         score += getTraitCompletionScore(candidateTypes, team);
+        score += scoreSinnohPassivePlanForTypes(candidateTypes, team, { isShiny });
+        score += scoreSinnohPowerCatchCandidate(candidateName, candidateTypes, team, {
+            isShiny,
+            attackTypes,
+            level: options.level || 0
+        }) * 0.45;
         score += scorePokemonStats(getPokemonBaseStats(candidateName)) * 0.6;
 
         // 1. Trait synergy score — prioritize completing trait thresholds
@@ -4545,7 +5472,7 @@
         // 2. Type coverage — fill gaps
         candidateTypes.forEach(type => {
             if (!teamTypes.includes(type)) {
-                score += 5; // New type coverage
+                score += coverageWeight;
             }
         });
 
@@ -4565,10 +5492,8 @@
             score += CONFIG.LEGENDARY_CATCH_SCORE_BONUS;
         }
 
-        // 7. Shiny bonus
-        if (isShiny) {
-            score += 15; // Massive flat bonus for shiny rarity and 2x trait value
-        }
+        // 7. Shiny bonus: early shiny depth is stronger than chasing weak one-off type coverage.
+        score += getShinyDraftScore(candidateTypes, team, isShiny);
 
         return score;
     }
@@ -4651,6 +5576,7 @@
             const bestBagItem = pickBestBagItemForTeam(bagItems, team, opponentProfile);
             if (bestBagItem && shouldEquipBagItem(bestBagItem.name, team, opponentProfile)) {
                 log('info', '🎒', `Found useful bag item: [${bestBagItem.name}]. Opening equip modal.`);
+                lastChosenItemName = bestBagItem.name;
                 triggerRealClick(bestBagItem.element);
                 return; // Let the modal open and settle
             }
@@ -4678,7 +5604,8 @@
         const earlyExpansionClosed = shouldStopEarlyExpansion(team, opponentProfile);
         const captureCapReached = hasReachedMapCaptureCap();
         const mapTree = parseMapTree();
-        const centerNeed = getCenterNeedStatus(team);
+        const centerNeed = getCenterNeedStatus(team, opponentProfile, bossPrepStatus);
+        const sinnohTraining = getSinnohTowerTrainingContext(team, opponentProfile);
         const context = {
             team,
             avgHP,
@@ -4691,7 +5618,8 @@
             earlyExpansionClosed,
             bossPrepStatus,
             captureCapReached,
-            centerNeed
+            centerNeed,
+            sinnohTraining
         };
 
         let bestNode = null;
@@ -4813,6 +5741,17 @@
                     bossPrepStatus,
                     capturesThisMap,
                     captureCapReached,
+                    sinnohTraining: sinnohTraining.active ? {
+                        assumedTowerSinnoh: sinnohTraining.progress.assumedTowerSinnoh,
+                        mapOrdinal: sinnohTraining.progress.mapOrdinal,
+                        carry: sinnohTraining.carry ? sinnohTraining.carry.name : null,
+                        carryMoveTier: sinnohTraining.carryMoveTier,
+                        observedCarryMoveTier: sinnohTraining.observedCarryMoveTier,
+                        rememberedCarryMoveTier: sinnohTraining.rememberedCarryMoveTier,
+                        needsTm: sinnohTraining.needsTm,
+                        needsOffense: sinnohTraining.needsOffense,
+                        needsSpeed: sinnohTraining.needsSpeed
+                    } : null,
                     centerNeed
                 });
                 currentRunTelemetry.best.mapSteps = Math.max(currentRunTelemetry.best.mapSteps, currentRunTelemetry.events.filter(event => event.type === 'map-choice').length);
@@ -5023,14 +5962,22 @@
         if (!candidate) return false;
         return isPremiumCatchCandidate(candidate.score, candidate.isShiny, candidate.name) ||
                (candidate.duplicatePairScore || 0) >= CONFIG.DUPLICATE_PAIR_PROTECT_SCORE ||
+               (candidate.sinnohPassivePlanScore || 0) >= CONFIG.SINNOH_PASSIVE_PLAN_STRONG_SCORE ||
+               (candidate.sinnohPowerScore || 0) >= CONFIG.SINNOH_POWER_CATCH_PROTECT_SCORE ||
                isBossRelevantCatchCandidate(candidate, bossTypes);
     }
 
-    function findCatchRerollButton(scoredCards) {
+    function findCatchRerollButton(scoredCards, options = {}) {
         const bossTypes = getCurrentCatchBossTypes();
-        const hasProtectedVisible = scoredCards.some(item => isProtectedCatchCandidate(item, bossTypes));
+        const shouldProtect = item => {
+            if (!item) return true;
+            if (options.preserveShiny && item.isShiny) return true;
+            if (options.ignoreProtectedForReroll) return false;
+            return isProtectedCatchCandidate(item, bossTypes);
+        };
+        const hasProtectedVisible = scoredCards.some(item => shouldProtect(item));
         const sortedCards = [...scoredCards]
-            .filter(item => item.rerollButton && !isProtectedCatchCandidate(item, bossTypes))
+            .filter(item => item.rerollButton && !shouldProtect(item))
             .sort((a, b) => a.score - b.score);
 
         for (const item of sortedCards) {
@@ -5038,7 +5985,7 @@
         }
 
         const catchScope = document.getElementById('catch-screen') || document.getElementById('catch-choices');
-        const globalReroll = hasProtectedVisible ? null : findRerollControlInScope(catchScope);
+        const globalReroll = hasProtectedVisible && !options.allowProtectedGlobal ? null : findRerollControlInScope(catchScope);
         if (globalReroll) {
             return { button: globalReroll, score: null, name: 'global reroll', isGlobal: true };
         }
@@ -5048,12 +5995,25 @@
 
     function getCatchRerollReason(team, bestScore, bestIsShiny, earlyAllowance, scoredCards = [], opponentProfile = null) {
         const bossTypes = getCurrentCatchBossTypes();
+        const sinnohTraining = getSinnohTowerTrainingContext(team, opponentProfile);
+        const bestCandidate = [...scoredCards].sort((a, b) => b.score - a.score)[0] || null;
+        const bestPassivePlanScore = bestCandidate?.sinnohPassivePlanScore || 0;
+        const bestPowerScore = bestCandidate?.sinnohPowerScore || 0;
         const worstRerollable = [...scoredCards]
             .filter(item => item.rerollButton && !isProtectedCatchCandidate(item, bossTypes))
             .sort((a, b) => a.score - b.score)[0];
 
         if (worstRerollable && worstRerollable.score < CONFIG.CATCH_REROLL_ALWAYS_BELOW_SCORE) {
             return `weak rerollable card ${worstRerollable.score.toFixed(1)} below ${CONFIG.CATCH_REROLL_ALWAYS_BELOW_SCORE}`;
+        }
+
+        if (sinnohTraining.active &&
+            catchRerollsThisEncounter < CONFIG.SINNOH_CATCH_SCOUT_ATTEMPTS &&
+            !bestIsShiny &&
+            !bestCandidate?.isLegendary &&
+            bestPassivePlanScore < CONFIG.SINNOH_PASSIVE_PLAN_STRONG_SCORE &&
+            bestPowerScore < CONFIG.SINNOH_POWER_CATCH_PROTECT_SCORE) {
+            return `Sinnoh scouting: best passive/power scores ${bestPassivePlanScore.toFixed(1)}/${bestPowerScore.toFixed(1)} below strong target`;
         }
 
         if (bestIsShiny) return '';
@@ -5079,7 +6039,7 @@
             return false;
         }
 
-        const reroll = findCatchRerollButton(scoredCards);
+        const reroll = findCatchRerollButton(scoredCards, options);
         if (!reroll) return false;
 
         const catchScreen = document.getElementById('catch-screen') || document.getElementById('catch-choices');
@@ -5140,6 +6100,7 @@
         const bossTypes = getCurrentCatchBossTypes();
         const earlyExpansionClosed = shouldStopEarlyExpansion(team, opponentProfile);
         const bossPrepStatus = getBossPrepStatus(team, opponentProfile);
+        const sinnohTraining = getSinnohTowerTrainingContext(team, opponentProfile);
         const teamAvgLevelBeforeCatch = getTeamAverageLevel(team);
         const expectedCatchCopies = getExpectedCatchCopiesFromOpenSlots(team);
 
@@ -5180,18 +6141,27 @@
                 });
             }
 
-            const isShiny = card.classList.contains('shiny') ||
-                            card.classList.contains('shiny-card') ||
-                            card.querySelector('[class*="shiny"]') !== null ||
-                            card.querySelector('.shiny-star') !== null ||
-                            card.innerText.includes('★');
+            const isShiny = isPokemonElementShiny(card);
             const isLegendary = isLegendaryPokemonName(name);
 
             const attackTypes = learnedInfo?.attackTypes?.length ? learnedInfo.attackTypes : getAttackTypesFromElement(card, types);
+            const candidateLevel = learnedInfo?.level || parseLevelText(card.querySelector('.poke-level, .team-slot-lv, [class*="level"]')?.innerText || card.innerText || '');
             const bossMatchupScore = scoreCatchBossCounter(types, attackTypes, bossTypes);
             const grassSupportScore = getGrassSupportCatchScore(types, team);
             const duplicatePairScore = getDuplicatePairCatchScore(name, types, team, attackTypes, bossTypes, { expectedCatchCopies });
-            let score = scoreCatchCandidate(name, types, team, isShiny, attackTypes, bossTypes, { expectedCatchCopies });
+            const sinnohPassivePlanScore = scoreSinnohPassivePlanForTypes(types, team, { isShiny, opponentProfile });
+            const sinnohPowerScore = scoreSinnohPowerCatchCandidate(name, types, team, {
+                isShiny,
+                attackTypes,
+                level: candidateLevel,
+                opponentProfile
+            });
+            let score = scoreCatchCandidate(name, types, team, isShiny, attackTypes, bossTypes, {
+                expectedCatchCopies,
+                level: candidateLevel,
+                opponentProfile
+            });
+            score += sinnohPowerScore * 0.55;
             const tacticScore = getBotControlCatchScoreBonus({
                 name,
                 score,
@@ -5201,12 +6171,13 @@
                 attackTypes,
                 bossMatchupScore,
                 grassSupportScore,
-                duplicatePairScore
+                duplicatePairScore,
+                sinnohPassivePlanScore,
+                sinnohPowerScore
             }, team, bossTypes);
             score += tacticScore;
             score += scoreTraitPreviewFromCard(card);
             score += scorePokemonStats(learnedInfo?.currentStats || parseCardStats(card));
-            const candidateLevel = learnedInfo?.level || parseLevelText(card.querySelector('.poke-level, .team-slot-lv, [class*="level"]')?.innerText || card.innerText || '');
             const projectedAvgLevel = getProjectedAverageLevelAfterCatch(team, candidateLevel);
             const avgLevelDrop = projectedAvgLevel === null ? 0 : Math.max(0, teamAvgLevelBeforeCatch - projectedAvgLevel);
             const rerollButton = findRerollControlForCard(card);
@@ -5224,6 +6195,8 @@
                 bossMatchupScore,
                 grassSupportScore,
                 duplicatePairScore,
+                sinnohPassivePlanScore,
+                sinnohPowerScore,
                 tacticScore,
                 level: candidateLevel || 0,
                 projectedAvgLevel: projectedAvgLevel === null ? null : Number(projectedAvgLevel.toFixed(1)),
@@ -5248,13 +6221,35 @@
         const bestIsPremiumCatch = Boolean(bestCandidate && isPremiumCatchCandidate(bestCandidate.score, bestCandidate.isShiny, bestCandidate.name));
         const bestIsExceptional = Boolean(bestCandidate && (bestCandidate.isShiny || bestIsLegendary || bestScore >= CONFIG.EARLY_EXCEPTIONAL_CATCH_SCORE));
         const bestIsDirectCounter = isDirectBossCounterCandidate(bestCandidate, bossTypes);
+        const bestIsSinnohPowerPlan = Boolean(
+            bestCandidate &&
+            (bestCandidate.sinnohPowerScore || 0) >= CONFIG.SINNOH_POWER_CATCH_PROTECT_SCORE
+        );
+        const bestIsSinnohPassivePlan = Boolean(
+            bestCandidate &&
+            (
+                (bestCandidate.sinnohPassivePlanScore || 0) >= CONFIG.SINNOH_PASSIVE_CATCH_PROTECT_SCORE ||
+                bestIsSinnohPowerPlan
+            )
+        );
+        const bestIsStrongSinnohPassivePlan = Boolean(
+            bestCandidate &&
+            (
+                (bestCandidate.sinnohPassivePlanScore || 0) >= CONFIG.SINNOH_PASSIVE_PLAN_STRONG_SCORE ||
+                (bestCandidate.sinnohPowerScore || 0) >= CONFIG.SINNOH_POWER_CATCH_PROTECT_SCORE
+            )
+        );
+        const hasVisibleShiny = scoredCards.some(candidate => candidate.isShiny);
+        const earlyShinyScoutWindow = isEarlyShinyRerollWindow(team);
+        const settledCatchWindow = isSettledCatchDecisionWindow(team);
         const bestWouldDiluteLevels = Boolean(
             bestCandidate &&
             earlyExpansionClosed &&
             bestCandidate.avgLevelDrop > CONFIG.EARLY_MAX_CATCH_AVG_LEVEL_DROP &&
             !bestIsExceptional &&
             !bestIsPremiumCatch &&
-            !bestIsDirectCounter
+            !bestIsDirectCounter &&
+            !bestIsSinnohPassivePlan
         );
         const recordCatchSkip = (skipReason) => {
             ensureRunTelemetry('catch-screen');
@@ -5269,6 +6264,8 @@
                 bestAttackTypes: bestCandidate?.attackTypes || [],
                 bestGrassSupportScore: bestCandidate?.grassSupportScore || 0,
                 bestDuplicatePairScore: bestCandidate?.duplicatePairScore || 0,
+                bestSinnohPassivePlanScore: bestCandidate?.sinnohPassivePlanScore || 0,
+                bestSinnohPowerScore: bestCandidate?.sinnohPowerScore || 0,
                 bestTacticScore: bestCandidate?.tacticScore || 0,
                 expectedCatchCopies,
                 bossTypes,
@@ -5281,23 +6278,50 @@
                 isLegendary: bestIsLegendary,
                 isPremium: bestIsPremiumCatch,
                 isDuplicatePlan: bestIsDuplicatePlan,
+                isSinnohPowerPlan: bestIsSinnohPowerPlan,
+                isSinnohPassivePlan: bestIsSinnohPassivePlan,
                 isDirectCounter: bestIsDirectCounter
             });
             const skipBtn = document.getElementById('btn-skip-catch');
             if (skipBtn) triggerRealClick(skipBtn);
         };
 
-        if (!openTeamSlot && hasReachedMapCaptureCap() && !bestIsPremiumCatch && !bestIsDirectCounter && !hasLowLevelForSwap) {
+        const earlyShinyScoutTarget = Math.min(
+            CONFIG.EARLY_SHINY_REROLL_ATTEMPTS,
+            CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER
+        );
+        if (openTeamSlot &&
+            earlyShinyScoutWindow &&
+            !hasVisibleShiny &&
+            !bestIsLegendary &&
+            catchRerollsThisEncounter < earlyShinyScoutTarget) {
+            const scoutReason = `Early shiny scout ${catchRerollsThisEncounter + 1}/${earlyShinyScoutTarget}`;
+            if (tryRerollCatchOptions(scoredCards, scoutReason, {
+                allowStaleScoutRetry: true,
+                scoutTarget: earlyShinyScoutTarget,
+                allowProtectedGlobal: true,
+                ignoreProtectedForReroll: true,
+                preserveShiny: true
+            })) {
+                return;
+            }
+        }
+
+        if (!openTeamSlot && hasReachedMapCaptureCap() && !bestIsPremiumCatch && !bestIsDirectCounter && !bestIsSinnohPassivePlan && !hasLowLevelForSwap) {
             log('info', '🐾', `Skipping catch — map capture cap reached (${capturesThisMap}/${CONFIG.MAX_CATCHES_PER_MAP}) and best is not premium (best: ${bestName || 'unknown'} ${bestScore.toFixed(1)}).`);
             recordCatchSkip('map-capture-cap');
             return;
         }
 
-        const scoutTarget = Math.min(
-            CONFIG.CATCH_REROLL_MIN_ATTEMPTS_PER_ENCOUNTER,
-            CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER
-        );
-        if (openTeamSlot && catchRerollsThisEncounter < scoutTarget) {
+        const scoutTarget = sinnohTraining.active
+            ? Math.min(CONFIG.SINNOH_CATCH_SCOUT_ATTEMPTS, CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER)
+            : Math.min(CONFIG.CATCH_REROLL_MIN_ATTEMPTS_PER_ENCOUNTER, CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER);
+        const shouldScoutMore = openTeamSlot &&
+            catchRerollsThisEncounter < scoutTarget &&
+            !bestIsShiny &&
+            !bestIsLegendary &&
+            !bestIsStrongSinnohPassivePlan;
+        if (shouldScoutMore) {
             const scoutReason = `Reroll scout ${catchRerollsThisEncounter + 1}/${scoutTarget}`;
             if (tryRerollCatchOptions(scoredCards, scoutReason, { allowStaleScoutRetry: true, scoutTarget })) {
                 return; // Scout the refreshed choices before committing a team slot.
@@ -5309,10 +6333,50 @@
             return; // Settle and let the next loop score the refreshed choices.
         }
 
+        if (openTeamSlot &&
+            earlyShinyScoutWindow &&
+            !hasVisibleShiny &&
+            bestCandidate &&
+            bestScore < CONFIG.EARLY_NON_SHINY_MIN_ACCEPT_SCORE &&
+            !bestIsPremiumCatch &&
+            !bestIsExceptional &&
+            !bestIsDirectCounter &&
+            !bestIsSinnohPassivePlan) {
+            log('info', '🐾', `Skipping early non-shiny low-value catch after scouting — best: ${bestName || 'unknown'} ${bestScore.toFixed(1)} below ${CONFIG.EARLY_NON_SHINY_MIN_ACCEPT_SCORE}.`);
+            recordCatchSkip('early-non-shiny-low-value');
+            return;
+        }
+
+        if (openTeamSlot &&
+            settledCatchWindow &&
+            bestCandidate &&
+            bestScore < CONFIG.SETTLED_CATCH_MIN_ACCEPT_SCORE &&
+            !bestIsPremiumCatch &&
+            !bestIsExceptional &&
+            !bestIsDirectCounter &&
+            !bestIsDuplicatePlan &&
+            !bestIsSinnohPassivePlan) {
+            log('info', '🐾', `Skipping settled-run low-value catch — best: ${bestName || 'unknown'} ${bestScore.toFixed(1)} below ${CONFIG.SETTLED_CATCH_MIN_ACCEPT_SCORE}.`);
+            recordCatchSkip('settled-run-low-value');
+            return;
+        }
+
+        if (sinnohTraining.active &&
+            getAliveTeam(team).length >= CONFIG.SINNOH_TRAINING_CORE_TEAM_SIZE &&
+            !bestIsPremiumCatch &&
+            !bestIsExceptional &&
+            !bestIsDirectCounter &&
+            !bestIsSinnohPassivePlan) {
+            log('info', 'sinnoh', `Skipping catch for Sinnoh carry training - XP/MT/passive plan have priority (best: ${bestName || 'unknown'} ${bestScore.toFixed(1)}).`);
+            recordCatchSkip('sinnoh-carry-training');
+            return;
+        }
+
         if (openTeamSlot && bestCandidate && !shouldBuildCoreTeam(team)) {
             const isExceptional = bestIsExceptional;
             const isPremium = bestIsPremiumCatch;
             const isDuplicatePlan = bestIsDuplicatePlan;
+            const isSinnohPassivePlan = bestIsSinnohPassivePlan;
             const isBossRelevant = isBossRelevantCatchCandidate(bestCandidate, bossTypes);
             const isDirectCounter = bestIsDirectCounter;
             const fillingEarlyRoster = getAliveTeam(team).length < CONFIG.EARLY_OPTIONAL_TEAM_SIZE &&
@@ -5322,12 +6386,12 @@
                                      !hasReachedMapCaptureCap() &&
                                      bestScore >= CONFIG.CATCH_REROLL_MIN_ACCEPT_SCORE;
             const shouldAcceptRosterFill = fillingEarlyRoster && (!hasReachedMapCaptureCap() || isPremium || bestScore >= CONFIG.EARLY_EXCEPTIONAL_CATCH_SCORE);
-            const canBreakEarlyRosterCap = !earlyExpansionClosed || isExceptional || isPremium || isDirectCounter || isDuplicatePlan;
+            const canBreakEarlyRosterCap = !earlyExpansionClosed || isExceptional || isPremium || isDirectCounter || isDuplicatePlan || isSinnohPassivePlan;
 
-            if (bestWouldDiluteLevels || !canBreakEarlyRosterCap || (!isPremium && !isBossRelevant && !goodGeneralValue && !shouldAcceptRosterFill && !isExceptional && !isDirectCounter && !isDuplicatePlan)) {
+            if (bestWouldDiluteLevels || !canBreakEarlyRosterCap || (!isPremium && !isBossRelevant && !goodGeneralValue && !shouldAcceptRosterFill && !isExceptional && !isDirectCounter && !isDuplicatePlan && !isSinnohPassivePlan)) {
                 const skipReason = bestWouldDiluteLevels
                     ? 'would dilute levels'
-                    : earlyExpansionClosed && !isExceptional && !isPremium && !isDirectCounter && !isDuplicatePlan
+                    : earlyExpansionClosed && !isExceptional && !isPremium && !isDirectCounter && !isDuplicatePlan && !isSinnohPassivePlan
                     ? 'early roster closed'
                     : hasReachedMapCaptureCap()
                     ? 'already caught this map'
@@ -5342,21 +6406,21 @@
 
         if (!openTeamSlot && hasLowLevelForSwap && bestCandidate?.level) {
             const minUsefulSwapLevel = Math.max(1, teamMaxLevel - CONFIG.EARLY_LOW_LEVEL_SWAP_GAP);
-            if (bestCandidate.level < minUsefulSwapLevel && !bestIsPremiumCatch && !bestIsExceptional && !bestIsDirectCounter) {
+            if (bestCandidate.level < minUsefulSwapLevel && !bestIsPremiumCatch && !bestIsExceptional && !bestIsDirectCounter && !bestIsSinnohPassivePlan) {
                 log('info', '🐾', `Skipping catch — replacement too low level (${bestCandidate.level} < ${minUsefulSwapLevel}).`);
                 recordCatchSkip('replacement-too-low-level');
                 return;
             }
         }
 
-        if (!openTeamSlot && earlyAllowance === 'skip' && !hasLowLevelForSwap && !bestIsPremiumCatch) {
+        if (!openTeamSlot && earlyAllowance === 'skip' && !hasLowLevelForSwap && !bestIsPremiumCatch && !bestIsSinnohPassivePlan) {
             log('info', '🐾', `Skipping catch for XP focus — core team needs levels (best: ${bestName || 'unknown'} ${bestScore.toFixed(1)})`);
             recordCatchSkip('xp-focus');
             return;
         }
 
         // If team is full (6) and no candidate scores well, skip
-        if (!openTeamSlot && bestScore < 2 && !hasLowLevelForSwap && !bestIsPremiumCatch) {
+        if (!openTeamSlot && bestScore < 2 && !hasLowLevelForSwap && !bestIsPremiumCatch && !bestIsSinnohPassivePlan) {
             log('info', '🐾', `Skipping catch — no good candidates (best: ${bestScore.toFixed(1)})`);
             recordCatchSkip('weak-candidate');
             return;
@@ -5367,6 +6431,10 @@
                 ? 'Catching legendary/masterball reward'
                 : bestIsDuplicatePlan
                 ? 'Catching duplicate-pair target'
+                : bestIsSinnohPowerPlan
+                ? 'Catching Sinnoh run-power target'
+                : bestIsSinnohPassivePlan
+                ? 'Catching Sinnoh passive-plan target'
                 : (openTeamSlot ? 'Catching useful open-slot target' : 'Catching Pokemon');
             ensureRunTelemetry('catch-screen');
             recordRunEvent('catch-decision', {
@@ -5379,6 +6447,8 @@
                 bossTypes,
                 grassSupportScore: bestCandidate?.grassSupportScore || 0,
                 duplicatePairScore: bestCandidate?.duplicatePairScore || 0,
+                sinnohPassivePlanScore: bestCandidate?.sinnohPassivePlanScore || 0,
+                sinnohPowerScore: bestCandidate?.sinnohPowerScore || 0,
                 tacticScore: bestCandidate?.tacticScore || 0,
                 expectedCatchCopies,
                 level: bestCandidate?.level || 0,
@@ -5390,6 +6460,8 @@
                 isLegendary: bestIsLegendary,
                 isPremium: bestIsPremiumCatch,
                 isDuplicatePlan: bestIsDuplicatePlan,
+                isSinnohPowerPlan: bestIsSinnohPowerPlan,
+                isSinnohPassivePlan: bestIsSinnohPassivePlan,
                 isDirectCounter: bestIsDirectCounter,
                 teamAvgLevelBeforeCatch: Number(teamAvgLevelBeforeCatch.toFixed(1)),
                 openTeamSlot,
@@ -5416,9 +6488,8 @@
         let bestItemName = '';
 
         cards.forEach(card => {
-            const nameEl = card.querySelector('.item-name, [class*="name"]');
-            if (!nameEl) return;
-            const name = normalizeItemName(nameEl.innerText);
+            const name = getItemNameFromElement(card);
+            if (!name) return;
             const tier = ITEM_TIERS[name] || 'D';
             const score = scoreItemForTeam(name, team, bossType);
 
@@ -5432,6 +6503,7 @@
         });
 
         if (bestCard) {
+            lastChosenItemName = bestItemName;
             ensureRunTelemetry('item-screen');
             recordRunEvent('item-choice', {
                 item: bestItemName,
@@ -5509,13 +6581,46 @@
                 }
             }
         }
+        if (!equipItemName && lastChosenItemName) {
+            equipItemName = lastChosenItemName;
+        }
+        lastChosenItemName = '';
 
         const equipItemTier = ITEM_TIERS[equipItemName] || 'D';
         const equipItemScore = TIER_SCORE[equipItemTier] || 10;
         const bossTypes = detectBossTypes();
         const bossType = bossTypes.length > 0 ? bossTypes : null;
+        const sinnohTraining = getSinnohTowerTrainingContext(team, bossType);
 
         log('info', '🎒', `${isUsableModal ? 'Using' : 'Equipping'} item: [${equipItemName}] (Tier ${equipItemTier}, Score ${equipItemScore})`);
+
+        if (!isUsableModal && isLowValueHeldItem(equipItemName)) {
+            const bagBtn = document.getElementById('btn-equip-to-bag');
+            if (bagBtn) {
+                log('info', '🎒', `Low-value held item [${equipItemName}] is not worth equipping. Sending to bag.`);
+                markItemKeptInBag(equipItemName);
+                triggerRealClick(bagBtn);
+                return;
+            }
+        }
+
+        if (isUsableModal &&
+            equipItemName === 'tm normal' &&
+            sinnohTraining.active &&
+            !sinnohTraining.needsTm) {
+            const cancelBtn = document.getElementById('btn-cancel-use') || document.getElementById('btn-equip-cancel');
+            if (cancelBtn && isVisible(cancelBtn)) {
+                log('info', 'tm', `Skipping MT Normal: carry already has max move tier (${sinnohTraining.carryMoveTier + 1}).`);
+                recordRunEvent('item-skip', {
+                    item: equipItemName,
+                    reason: 'sinnoh-carry-max-move-tier',
+                    carry: sinnohTraining.carry ? sinnohTraining.carry.name : null,
+                    carryMoveTier: sinnohTraining.carryMoveTier
+                });
+                triggerRealClick(cancelBtn);
+                return;
+            }
+        }
 
         const candidates = rows.map((row, rowPosition) => {
             const rowIndex = Number.parseInt(row.getAttribute('data-idx'), 10);
@@ -5559,24 +6664,55 @@
         // - Priority 2: Swap/replace if the new item is better than their current item
         let bestCandidate = null;
         let bestTargetScore = -999;
+        const teamMainCarry = getMainCarry(team);
+        const itemIsCarryPreferred = !isUsableModal && isMainCarryPreferredHeldItem(equipItemName);
+        const mainCarryWouldLikeItem = Boolean(
+            teamMainCarry &&
+            itemIsCarryPreferred &&
+            (
+                !teamMainCarry.heldItem ||
+                !isMainCarryPreferredHeldItem(teamMainCarry.heldItem) ||
+                scoreHeldItemForPokemon(teamMainCarry, equipItemName, bossType) >
+                    scoreHeldItemForPokemon(teamMainCarry, teamMainCarry.heldItem, bossType) + 8
+            )
+        );
 
         candidates.forEach(candidate => {
             const p = candidate.unit;
 
             let score = p.hp / 20 + getPokemonCarryScore(p) / 8;
+            const candidateIsMainCarry = isMainCarryUnit(p);
             const mainCarryHealingLock = !isUsableModal &&
-                                         isMainCarryUnit(p) &&
+                                         candidateIsMainCarry &&
                                          p.heldItem &&
                                          isHealingItem(p.heldItem) &&
-                                         !isHealingItem(equipItemName);
+                                         !isMainCarryPreferredHeldItem(equipItemName);
             const healingUpgradeForCarry = !isUsableModal &&
-                                           isMainCarryUnit(p) &&
+                                           candidateIsMainCarry &&
                                            isHealingItem(equipItemName) &&
                                            (!p.heldItem || !isHealingItem(p.heldItem));
+            if (mainCarryWouldLikeItem) {
+                score += candidateIsMainCarry
+                    ? CONFIG.MAIN_CARRY_ITEM_RESERVE_BONUS
+                    : -CONFIG.MAIN_CARRY_ITEM_RESERVE_PENALTY;
+            }
 
             if (isUsableModal) {
                 // For consumables, the game decides valid targets via disabled rows.
                 score += scoreConsumableTarget(p, equipItemName);
+                if ((equipItemName === 'tm normal' || equipItemName === 'rare candy') && sinnohTraining.active) {
+                    const isCarryTarget = Boolean(
+                        sinnohTraining.carry &&
+                        (
+                            candidate.teamIdx === sinnohTraining.carry.index ||
+                            getPokemonIdentityKey(p.name) === sinnohTraining.carryKey
+                        )
+                    );
+                    const shouldFeedCarry = equipItemName === 'rare candy' || sinnohTraining.needsTm;
+                    score += shouldFeedCarry
+                        ? (isCarryTarget ? CONFIG.SINNOH_TM_TARGET_BONUS : -CONFIG.SINNOH_NON_CARRY_TM_TARGET_PENALTY)
+                        : -CONFIG.SINNOH_NON_CARRY_TM_TARGET_PENALTY;
+                }
             } else if (!p.heldItem) {
                 const newScore = scoreHeldItemForPokemon(p, equipItemName, bossType);
                 score += newScore;
@@ -5614,7 +6750,7 @@
                 isMainCarryUnit(targetUnit) &&
                 targetUnit.heldItem &&
                 isHealingItem(targetUnit.heldItem) &&
-                !isHealingItem(equipItemName)) {
+                !isMainCarryPreferredHeldItem(equipItemName)) {
                 const bagBtn = document.getElementById('btn-equip-to-bag');
                 if (bagBtn) {
                     log('info', '🎒', `Keeping healing item [${targetUnit.heldItem}] on main carry [${targetUnit.name}]. Sending [${equipItemName}] to bag.`);
@@ -5645,6 +6781,40 @@
             }
             
             log('info', '🎒', `${isUsableModal ? 'Using' : 'Assigning'} [${equipItemName}] on [${targetUnit.name}] (Replacing: [${targetUnit.heldItem || 'none'}])`);
+            const targetIsSinnohCarry = Boolean(
+                isUsableModal &&
+                equipItemName === 'tm normal' &&
+                sinnohTraining.active &&
+                sinnohTraining.carry &&
+                (
+                    bestCandidate.teamIdx === sinnohTraining.carry.index ||
+                    getPokemonIdentityKey(targetUnit.name) === sinnohTraining.carryKey
+                )
+            );
+            if (targetIsSinnohCarry && sinnohTraining.carryKey) {
+                const nextTier = Math.min(
+                    CONFIG.SINNOH_TM_MAX_MOVE_TIER,
+                    Math.max(sinnohTraining.carryMoveTier, -1) + 1
+                );
+                sinnohCarryKnownTmTiers[sinnohTraining.carryKey] = nextTier;
+            }
+            recordRunEvent('item-target', {
+                item: equipItemName,
+                action: isUsableModal ? 'use' : 'equip',
+                target: targetUnit.name,
+                targetIndex: bestCandidate.teamIdx,
+                targetScore: Number(bestTargetScore.toFixed(1)),
+                sinnohTraining: sinnohTraining.active ? {
+                    carry: sinnohTraining.carry ? sinnohTraining.carry.name : null,
+                    carryMoveTier: sinnohTraining.carryMoveTier,
+                    observedCarryMoveTier: sinnohTraining.observedCarryMoveTier,
+                    rememberedCarryMoveTier: sinnohTraining.carryKey ? (sinnohCarryKnownTmTiers[sinnohTraining.carryKey] ?? sinnohTraining.rememberedCarryMoveTier) : null,
+                    needsTm: sinnohTraining.needsTm,
+                    needsOffense: sinnohTraining.needsOffense,
+                    needsSpeed: sinnohTraining.needsSpeed,
+                    targetIsCarry: targetIsSinnohCarry
+                } : null
+            });
             triggerRealClick(bestCandidate.target);
             return;
         }
@@ -5757,7 +6927,8 @@
         const incomingName = incomingNameEl ? incomingNameEl.innerText.toLowerCase().trim() : '';
         const incomingTypes = getKnownPokemonTypes(incomingName);
         const incomingAttackTypes = getAttackTypesFromElement(incoming, incomingTypes);
-        const incomingScore = scoreCatchCandidate(incomingName, incomingTypes, team, false, incomingAttackTypes) +
+        const incomingIsShiny = isPokemonElementShiny(incoming);
+        const incomingScore = scoreCatchCandidate(incomingName, incomingTypes, team, incomingIsShiny, incomingAttackTypes) +
                               getDuplicateIncomingSwapScore(incomingName, team);
 
         // Find the weakest team member
@@ -5772,9 +6943,11 @@
                 const types = getKnownPokemonTypes(name);
                 const attackTypes = getAttackTypesFromElement(choice, types);
                 const teamUnit = team[idx] || { index: idx, name, types, attackTypes, isFainted: false };
+                teamUnit.isShiny = Boolean(teamUnit.isShiny || isPokemonElementShiny(choice));
                 const lockBonus = isBotControlLockedUnit(teamUnit) ? CONFIG.BOT_CONTROL_LOCK_KEEP_BONUS : 0;
-                const score = scoreCatchCandidate(name, types, team, false, attackTypes) +
+                const score = scoreCatchCandidate(name, types, team, teamUnit.isShiny, attackTypes) +
                               getDuplicatePairReplacementProtectionScore(teamUnit, team, incomingName) +
+                              getShinyReplacementKeepScore(teamUnit, team) +
                               lockBonus;
                 if (score < weakestScore) {
                     weakestScore = score;
@@ -5832,6 +7005,8 @@
         const team = parseTeamStatus();
         const carry = getPrimaryCarry(team);
         const preferSpecial = carry ? getOffenseRole(carry) === 'special' : true;
+        const opponentProfile = detectNextOpponentProfile();
+        const sinnohTraining = getSinnohTowerTrainingContext(team, opponentProfile);
 
         let bestChoice = null;
         let bestScore = -999;
@@ -5857,6 +7032,28 @@
             if (hp) score += 25;
             if (defense || specialDefense) score += 8;
             if (text.match(/random|azar|aleator/)) score -= 20;
+            if (sinnohTraining.active) {
+                if (preferSpecial) {
+                    if (specialAttack) score += 120;
+                    if (plainAttack) score += 45;
+                } else {
+                    if (plainAttack) score += 120;
+                    if (specialAttack) score += 45;
+                }
+                if (sinnohTraining.needsOffense) {
+                    if (preferSpecial) {
+                        if (specialAttack) score += 180;
+                        if (plainAttack) score += 70;
+                    } else {
+                        if (plainAttack) score += 180;
+                        if (specialAttack) score += 70;
+                    }
+                }
+                if (speed) score += sinnohTraining.needsSpeed ? 130 : 55;
+                if (hp) score += 20;
+                if (defense || specialDefense) score += 34;
+                if (text.match(/random|azar|aleator/)) score -= 35;
+            }
 
             if (score > bestScore) {
                 bestScore = score;
@@ -5869,7 +7066,13 @@
             carry: carry ? carry.name : null,
             offenseRole: carry ? getOffenseRole(carry) : null,
             choice: (bestChoice?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-            score: bestScore
+            score: bestScore,
+            sinnohTraining: sinnohTraining.active ? {
+                carryMoveTier: sinnohTraining.carryMoveTier,
+                needsTm: sinnohTraining.needsTm,
+                needsOffense: sinnohTraining.needsOffense,
+                needsSpeed: sinnohTraining.needsSpeed
+            } : null
         });
         log('info', '📈', `Stat buff: picking for ${carry ? carry.name : 'team'} (${carry ? getOffenseRole(carry) : 'auto'}, score ${bestScore}).`);
         triggerRealClick(bestChoice || choices[0]);
@@ -5906,6 +7109,7 @@
             const bestBagItem = pickBestBagItemForTeam(bagItems, team, prepProfile);
             if (bestBagItem && shouldEquipBagItem(bestBagItem.name, team, prepProfile)) {
                 log('info', '🎒', `Elite prep: equipping/using [${bestBagItem.name}] before FIGHT.`);
+                lastChosenItemName = bestBagItem.name;
                 triggerRealClick(bestBagItem.element);
                 return;
             }
@@ -5966,13 +7170,14 @@
         const retryBtn = document.getElementById('btn-retry');
         if (retryBtn) {
             finalizeRunTelemetry('gameover', {
-                autoRestart: CONFIG.AUTO_RESTART,
+                autoRestart: getBotControlAutoRestartEnabled(),
                 gameoverText: (document.getElementById('gameover-stats')?.innerText || '').replace(/\s+/g, ' ').trim()
             });
         }
-        if (!CONFIG.AUTO_RESTART) return;
+        if (!getBotControlAutoRestartEnabled()) return;
         if (retryBtn) {
             log('info', '💀', 'Game Over → Auto-restarting...');
+            sinnohCarryKnownTmTiers = {};
             resetMapCaptureState('game over');
             triggerRealClick(retryBtn);
         }
@@ -5980,13 +7185,14 @@
 
     // --- WIN SCREEN ---
     function handleWinScreen() {
-        if (!CONFIG.AUTO_RESTART) return;
+        if (!getBotControlAutoRestartEnabled()) return;
         // Prefer tower climb, otherwise play again
         const towerBtn = document.querySelector('#win-screen [onclick*="showEndlessStageSelect"], #win-screen .btn-secondary--gold');
         if (towerBtn) {
             ensureRunTelemetry('win-screen');
             recordRunEvent('win-screen', { action: 'climb-tower', snapshot: getRunProgressSnapshot('win-screen') });
             log('info', '🏆', 'Victory → Climbing tower!');
+            sinnohCarryKnownTmTiers = {};
             resetMapCaptureState('win tower');
             triggerRealClick(towerBtn);
             return;
@@ -5995,12 +7201,22 @@
         if (playAgainBtn) {
             finalizeRunTelemetry('win', { action: 'play-again' });
             log('info', '🏆', 'Victory → Playing again!');
+            sinnohCarryKnownTmTiers = {};
             resetMapCaptureState('win play again');
             triggerRealClick(playAgainBtn);
         }
     }
 
     function getAutoStartModeEnabled(mode) {
+        const runMode = getBotControlRunMode();
+        if (runMode === 'manual') return false;
+        if (runMode === 'battleTower') return mode === 'battleTower' || mode === 'resumeBattleTower';
+        if (runMode === 'weeklyChallenges') return mode === 'weeklyChallenges';
+        if (runMode === 'challengeMode') {
+            return mode === 'challengeMode' || (mode === 'resumeChallenge' && !getBotControlMapPreference());
+        }
+        if (runMode === 'story') return mode === 'story';
+
         const modes = CONFIG.AUTO_START_MODES || {};
         if (mode === 'battleTower' || mode === 'resumeBattleTower') {
             if (Object.prototype.hasOwnProperty.call(modes, mode)) {
@@ -6017,6 +7233,18 @@
     }
 
     function getAutoStartPriority() {
+        const runMode = getBotControlRunMode();
+        const hasMapPreference = Boolean(getBotControlMapPreference());
+        if (runMode === 'manual') return [];
+        if (runMode === 'battleTower') {
+            return hasMapPreference
+                ? ['battleTower', 'resumeBattleTower']
+                : ['resumeBattleTower', 'battleTower'];
+        }
+        if (runMode === 'weeklyChallenges') return ['weeklyChallenges'];
+        if (runMode === 'challengeMode') return hasMapPreference ? ['challengeMode'] : ['resumeChallenge', 'challengeMode'];
+        if (runMode === 'story') return ['story'];
+
         const configured = Array.isArray(CONFIG.AUTO_START_PRIORITY) ? CONFIG.AUTO_START_PRIORITY : [];
         return configured.length > 0 ? configured : [
             'resumeChallenge',
@@ -6036,9 +7264,63 @@
             .find(control => isEnabledActionControl(control)) || null;
     }
 
+    function getChoiceSearchText(element) {
+        if (!element) return '';
+        const attrs = Array.from(element.attributes || [])
+            .filter(attr => attr.name.startsWith('data-') || ['id', 'class', 'title', 'aria-label'].includes(attr.name))
+            .map(attr => `${attr.name} ${attr.value}`);
+        return foldText([
+            element.innerText || '',
+            element.textContent || '',
+            ...attrs
+        ].join(' '));
+    }
+
+    function isLockedChoice(element) {
+        if (!element) return true;
+        return Boolean(
+            element.disabled ||
+            element.hasAttribute?.('disabled') ||
+            element.getAttribute?.('aria-disabled') === 'true' ||
+            element.classList?.contains('locked') ||
+            element.classList?.contains('disabled') ||
+            element.classList?.contains('history-region-btn--locked')
+        );
+    }
+
+    function findPreferredChoice(choices, preference = getBotControlMapPreference()) {
+        const visibleChoices = Array.from(choices || []).filter(choice => isVisible(choice) && !isLockedChoice(choice));
+        if (visibleChoices.length === 0) return null;
+        if (preference) {
+            const preferred = visibleChoices.find(choice => getChoiceSearchText(choice).includes(preference));
+            if (preferred) return preferred;
+            log('warn', '🧭', `No visible map/region matched [${preference}]. Falling back to best available.`);
+        }
+        return visibleChoices[visibleChoices.length - 1] || null;
+    }
+
+    function getStoryLaunchControl() {
+        return getVisibleControl([
+            '#btn-story-run',
+            '#btn-history-run',
+            '#btn-regions-run',
+            '#btn-adventure-run',
+            '#btn-continue-story',
+            '#btn-continue-history',
+            '[onclick*="showHistoryRegionSelect"]',
+            '[onclick*="history"]',
+            '[onclick*="History"]',
+            '[id*="history"]',
+            '[id*="story"]',
+            '[class*="history"]',
+            '[class*="story"]'
+        ].join(', '));
+    }
+
     function prepareAutoRun(reason, mode, context = null, eventType = 'run-start') {
         activeAutoRunMode = mode;
         activeChallengeContext = context;
+        if (eventType === 'run-start') sinnohCarryKnownTmTiers = {};
         currentRunTelemetry = makeRunTelemetry(reason);
         recordRunEvent(eventType, {
             reason,
@@ -6127,6 +7409,18 @@
         if (tiles.length === 0) return null;
 
         const byId = new Map(tiles.map(tile => [foldText(tile.getAttribute('data-sub') || ''), tile]));
+        const preference = getBotControlMapPreference();
+        if (preference) {
+            const preferred = tiles.find(tile =>
+                !isWeeklySubComplete(tile.getAttribute('data-sub') || '', tile) &&
+                getChoiceSearchText(tile).includes(preference)
+            );
+            if (preferred) {
+                return { subId: preferred.getAttribute('data-sub') || preference, tile: preferred };
+            }
+            log('warn', '⚔️', `Weekly target [${preference}] not visible/incomplete. Falling back to configured order.`);
+        }
+
         const orderedIds = [
             ...(CONFIG.WEEKLY_CHALLENGE_ORDER || []),
             ...tiles.map(tile => tile.getAttribute('data-sub') || '')
@@ -6261,6 +7555,19 @@
                 }
             }
 
+            if (mode === 'story') {
+                const storyBtn = getStoryLaunchControl();
+                if (storyBtn) {
+                    prepareAutoRun('open story mode', 'story', {
+                        kind: 'story-mode',
+                        target: getBotControlMapPreference() || null
+                    });
+                    log('info', '🧭', 'Opening Story mode...');
+                    triggerRealClick(storyBtn);
+                    return;
+                }
+            }
+
             if (mode === 'resumeBattleTower') {
                 const resumeTower = getVisibleControl('#btn-continue-endless');
                 if (resumeTower) {
@@ -6348,33 +7655,47 @@
         if (choices.length === 0) return;
         choices = getAllowedStarterChoices(choices);
 
-        const stateStarter = getBotControlState().starterPreference;
-        const starterPreference = foldText(stateStarter || CONFIG.STARTER_PREFERENCE || '');
+        const botState = getBotControlState();
+        const starterMode = botState.starterMode || 'auto';
+        if (starterMode === 'manual') {
+            log('debug', '🐾', 'Starter mode is manual; waiting for player choice.');
+            return;
+        }
+
+        const stateStarter = botState.starterPreference;
+        const configuredStarter = starterMode === 'preferred'
+            ? stateStarter
+            : (CONFIG.STARTER_PREFERENCE || '');
+        const starterPreference = foldText(configuredStarter || '');
         if (starterPreference) {
             for (const choice of choices) {
                 const searchableText = getStarterChoiceSearchableText(choice);
 
                 if (searchableText.includes(starterPreference)) {
-                    log('info', '🐾', `Starter preference matched: ${stateStarter || CONFIG.STARTER_PREFERENCE}`);
+                    log('info', '🐾', `Starter preference matched: ${configuredStarter}`);
                     triggerRealClick(choice);
                     return;
                 }
             }
 
-            log('warn', '🐾', `Starter preference [${stateStarter || CONFIG.STARTER_PREFERENCE}] not visible. Falling back to auto starter scoring.`);
+            log('warn', '🐾', `Starter preference [${configuredStarter}] not visible. Falling back to auto starter scoring.`);
         }
 
-        // Prefer Fire starters (strong trait synergy)
+        // Score visible starters by configured carry value, shiny value, and Sinnoh trait goals.
         let bestChoice = null;
         let bestScore = -1;
 
         choices.forEach(choice => {
             const text = getStarterChoiceSearchableText(choice);
             let score = 0;
+            let matchedName = '';
+            let matchedTypes = [];
 
-            // Check for Fire type (S-tier trait)
+            // Score known type traits and remember the matched Pokemon for carry/stat bonuses.
             for (const { name, types } of getAllKnownPokemonEntries()) {
                 if (text.includes(foldText(name))) {
+                    matchedName = name;
+                    matchedTypes = normalizeTypeList(types);
                     types.forEach(t => {
                         const traitInfo = TRAIT_DATA[t];
                         if (traitInfo) score += TRAIT_TIER_VALUE[traitInfo.tier] || 1;
@@ -6382,13 +7703,29 @@
                     break;
                 }
             }
+            if (matchedName && isMainCarryName(matchedName)) score += 90;
+            if (matchedName) score += scorePokemonStats(getPokemonBaseStats(matchedName)) * 0.8;
 
             // Shiny bonus for starters (they count as 2x for traits and are rare)
-            const isShiny = choice.classList.contains('pc-dex-card--shiny') ||
-                            choice.querySelector('.pc-shiny-star') !== null ||
-                            choice.innerText.includes('★');
+            const isShiny = isPokemonElementShiny(choice);
             if (isShiny) {
-                score += 50;
+                score += 35 + getShinyDraftScore(matchedTypes, [], true);
+            }
+            if (isSinnohTowerRunContext()) {
+                score += scoreSinnohPassivePlanForTypes(matchedTypes, [], { isShiny });
+                const matchedAttackTypes = matchedName
+                    ? getLikelyAttackTypes({ name: matchedName, types: matchedTypes, level: 0 })
+                    : matchedTypes;
+                score += scoreSinnohBossRunPlanFit(matchedTypes, matchedAttackTypes, [], null, {
+                    bossWeight: 0.6,
+                    arceusWeight: 0.8,
+                    postArceusWeight: 0.7
+                });
+                if (matchedTypes.includes('Rock')) score += 24;
+                if (matchedTypes.includes('Water')) score += 24;
+                if (matchedTypes.includes('Dragon')) score += 24;
+                if (matchedTypes.includes('Fairy')) score += 34;
+                if (isShiny && (matchedTypes.includes('Normal') || matchedTypes.includes('Bug'))) score += 8;
             }
 
             if (score > bestScore) {
@@ -6405,26 +7742,41 @@
         const stages = document.querySelectorAll('#stage-select-list .region-card, #stage-select-list .history-region-btn, #stage-select-list > *');
         if (stages.length === 0) return;
 
-        // Pick the last unlocked (highest progression) stage
-        let lastClickable = null;
-        stages.forEach(stage => {
-            const isLocked = stage.classList.contains('locked') ||
-                             stage.classList.contains('history-region-btn--locked') ||
-                             stage.getAttribute('aria-disabled') === 'true' ||
-                             stage.hasAttribute('disabled');
-            if (!isLocked) lastClickable = stage;
-        });
+        const selectedStage = findPreferredChoice(stages);
 
-        if (lastClickable) {
-            log('info', '🗼', `Selecting Endless Stage: ${lastClickable.innerText.split('\n')[0]}`);
+        if (selectedStage) {
+            log('info', '🗼', `Selecting Endless Stage: ${selectedStage.innerText.split('\n')[0]}`);
             ensureRunTelemetry('stage select');
             recordRunEvent('stage-select', {
-                label: lastClickable.innerText.split('\n')[0],
+                label: selectedStage.innerText.split('\n')[0],
+                target: getBotControlMapPreference() || null,
                 labels: getProgressLabels()
             });
             resetMapCaptureState('stage select');
-            triggerRealClick(lastClickable);
+            triggerRealClick(selectedStage);
         }
+    }
+
+    function handleHistoryRegionSelect() {
+        const regions = document.querySelectorAll(
+            '#history-region-list .history-region-btn, #history-region-list .region-card, ' +
+            '#region-select-list .history-region-btn, #region-select-list .region-card, ' +
+            '.history-region-btn, .region-card, #history-region-select > *'
+        );
+        if (regions.length === 0) return;
+
+        const selectedRegion = findPreferredChoice(regions);
+        if (!selectedRegion) return;
+
+        ensureRunTelemetry('history-region-select');
+        recordRunEvent('story-region-select', {
+            label: selectedRegion.innerText.split('\n')[0],
+            target: getBotControlMapPreference() || null,
+            labels: getProgressLabels()
+        });
+        resetMapCaptureState('story region select');
+        log('info', '🧭', `Selecting Story region: ${selectedRegion.innerText.split('\n')[0]}`);
+        triggerRealClick(selectedRegion);
     }
 
     // ╔══════════════════════════════════════════════════════════════╗
@@ -6625,7 +7977,7 @@
                 break;
 
             case 'history-region-select':
-                // Story mode — not handled (Battle Tower only)
+                handleHistoryRegionSelect();
                 break;
 
             // --- Fallback / transitions ---
@@ -6647,14 +7999,14 @@
 
     function printBanner() {
         console.log('%c╔══════════════════════════════════════════════════╗', 'color: #00ff88; font-weight: bold');
-        console.log('%c║  🐾 Pokelike Tower Engine v7.0 — Ultimate AI    ║', 'color: #00ff88; font-weight: bold');
+        console.log('%c║  Pokelike Tower Engine v8.7 - Sinnoh Run AI    ║', 'color: #00ff88; font-weight: bold');
         console.log('%c╠══════════════════════════════════════════════════╣', 'color: #00ff88; font-weight: bold');
         console.log('%c║  18-type chart • 15+ screen handlers            ║', 'color: #88ffaa');
         console.log('%c║  Trait-aware drafting • Smart counter-picks     ║', 'color: #88ffaa');
         console.log('%c║  Trade evaluation • Anti-stuck watchdog         ║', 'color: #88ffaa');
         console.log('%c║  Auto-restart • Configurable Eevee evolution    ║', 'color: #88ffaa');
         console.log('%c╚══════════════════════════════════════════════════╝', 'color: #00ff88; font-weight: bold');
-        console.log(`%c  Loop: ${CONFIG.LOOP_SPEED_MS}ms | Eevee: ${CONFIG.EEVEE_EVOLUTION_PREFERENCE} | Restart: ${CONFIG.AUTO_RESTART}`, 'color: #aaaaaa');
+        console.log(`%c  Loop: ${CONFIG.LOOP_SPEED_MS}ms | Eevee: ${CONFIG.EEVEE_EVOLUTION_PREFERENCE} | Restart: ${getBotControlAutoRestartEnabled()}`, 'color: #aaaaaa');
     }
 
     // Stats reporter
