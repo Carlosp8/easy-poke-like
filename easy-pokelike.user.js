@@ -6521,9 +6521,35 @@
     }
 
     // --- PASSIVE SCREEN (Battle Tower passive items) ---
+    function isSelectablePassiveCard(card) {
+        if (!card || !isVisible(card) || isLockedChoice(card)) return false;
+        if (card.querySelector('.starting-item-lock, .choice-lock, .item-lock, [data-locked="true"]')) return false;
+        const style = window.getComputedStyle(card);
+        if (style.pointerEvents === 'none') return false;
+
+        const choices = card.closest('#passive-choices');
+        const tagText = foldText(card.querySelector('.item-tag, .passive-tag, [class*="tag"]')?.innerText || '');
+        if (choices?.classList.contains('is-replace-grid')) {
+            return tagText.includes('replace') || style.cursor === 'pointer';
+        }
+
+        return style.cursor !== 'default';
+    }
+
     function handlePassiveScreen() {
-        const cards = document.querySelectorAll('#passive-choices .item-card, #passive-choices .passive-card');
-        if (cards.length === 0) return;
+        const allCards = Array.from(document.querySelectorAll('#passive-choices .item-card, #passive-choices .passive-card'));
+        const cards = allCards.filter(isSelectablePassiveCard);
+        if (allCards.length > 0 && cards.length < allCards.length) {
+            log('debug', '🧩', `Ignoring ${allCards.length - cards.length} locked/unavailable passive choice(s).`);
+        }
+        if (cards.length === 0) {
+            const skipBtn = document.querySelector('#passive-choices .choice-skip-btn, #passive-choices button');
+            if (skipBtn && isEnabledActionControl(skipBtn)) {
+                log('warn', '🧩', 'No selectable passive choices found. Skipping starting item.');
+                triggerRealClick(skipBtn);
+            }
+            return;
+        }
 
         const team = parseTeamStatus();
         const opponentProfile = detectNextOpponentProfile();
