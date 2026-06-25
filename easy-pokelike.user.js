@@ -97,6 +97,7 @@
         SETTLED_CATCH_MIN_ACCEPT_SCORE: 32,
         TEAM_TARGET_SIZE: 6,
         MAX_CATCHES_PER_MAP: 2,
+        ALLOW_DUPLICATE_CATCHES: false,
         PATH_LOOKAHEAD_DEPTH: 99,
         BOSS_LEAD_WEIGHT: 24,
         BOSS_TEAM_WEIGHT: 8,
@@ -1144,6 +1145,7 @@
         lockedKeys: [],
         panel: { x: 16, y: 128 },
         collapsed: false,
+        duplicateCatches: CONFIG.ALLOW_DUPLICATE_CATCHES,
         starterMode: 'auto',
         autoRestart: CONFIG.AUTO_RESTART,
         starterPreference: ''
@@ -1151,6 +1153,7 @@
     let botControlState = null;
     let botControlPanel = null;
     let botControlLastRenderSignature = '';
+    let botControlInteractingUntil = 0;
     let engineStats = { loops: 0, screens: {}, catches: 0, items: 0, swaps: 0, rerolls: 0 };
 
     // ╔══════════════════════════════════════════════════════════════╗
@@ -1193,6 +1196,7 @@
                 y: Number.isFinite(raw?.panel?.y) ? raw.panel.y : BOT_CONTROL_DEFAULT_STATE.panel.y
             },
             collapsed: Boolean(raw.collapsed),
+            duplicateCatches: raw.duplicateCatches === undefined ? CONFIG.ALLOW_DUPLICATE_CATCHES : Boolean(raw.duplicateCatches),
             paused: Boolean(raw.paused),
             starterMode: ['auto', 'manual', 'preferred'].includes(raw.starterMode)
                 ? raw.starterMode
@@ -1248,6 +1252,10 @@
 
     function getBotControlAutoRestartEnabled() {
         return Boolean(getBotControlState().autoRestart);
+    }
+
+    function getBotControlDuplicateCatchesEnabled() {
+        return Boolean(getBotControlState().duplicateCatches);
     }
 
     function isBotControlLockedKey(key) {
@@ -1318,17 +1326,11 @@
             const spriteHtml = sprite
                 ? `<img class="ec-slot-img" src="${escapeHtml(sprite)}" alt="">`
                 : `<span class="ec-slot-fallback">${escapeHtml((unit.name || '?').slice(0, 2).toUpperCase())}</span>`;
+            const title = `${unit.name || 'unknown'} Lv${unit.level || 0} / ${hp}%${isLocked ? ' - bloqueado' : ''}${isMain ? ' - principal' : ''}`;
             return `
-                <div class="ec-slot${isMain ? ' is-main' : ''}${isLocked ? ' is-locked' : ''}" data-key="${escapeHtml(key)}">
-                    <button class="ec-icon-btn ec-main-btn" data-action="main" data-key="${escapeHtml(key)}" title="Principal">${isMain ? 'M' : '+'}</button>
-                    <div class="ec-avatar">${spriteHtml}</div>
-                    <div class="ec-slot-meta">
-                        <div class="ec-name">${escapeHtml(unit.name || 'unknown')}</div>
-                        <div class="ec-sub">Lv${unit.level || 0} / ${hp}%</div>
-                        <div class="ec-hp"><span style="width:${hp}%"></span></div>
-                    </div>
-                    <button class="ec-icon-btn ec-lock-btn" data-action="lock" data-key="${escapeHtml(key)}" title="No reemplazar">${isLocked ? 'Lock' : 'Free'}</button>
-                </div>
+                <button class="ec-mon${isMain ? ' is-main' : ''}${isLocked ? ' is-locked' : ''}" data-action="lock" data-key="${escapeHtml(key)}" title="${escapeHtml(title)}">
+                    ${spriteHtml}
+                </button>
             `;
         }).join('') || '<div class="ec-empty">Sin equipo visible</div>';
 
@@ -1361,6 +1363,10 @@
                     <input type="checkbox" data-action="auto-restart"${state.autoRestart ? ' checked' : ''}>
                     <span>Restart automatico</span>
                 </label>
+                <label class="ec-check">
+                    <input type="checkbox" data-action="duplicate-catches"${state.duplicateCatches ? ' checked' : ''}>
+                    <span>Permitir duplicados</span>
+                </label>
                 <div class="ec-team">${slots}</div>
             </div>
         `;
@@ -1371,50 +1377,52 @@
         const style = document.createElement('style');
         style.id = 'engine-control-style';
         style.textContent = `
-            #engine-control-panel { position: fixed; z-index: 2147483647; width: min(330px, calc(100vw - 24px)); max-height: min(620px, calc(100vh - 24px)); overflow: hidden; background: rgba(18,24,31,.94); color: #f7fafc; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 14px 36px rgba(0,0,0,.35); border-radius: 8px; font: 12px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+            #engine-control-panel { position: fixed; z-index: 2147483647; width: min(360px, calc(100vw - 24px)); min-width: 224px; max-width: calc(100vw - 12px); min-height: 42px; max-height: min(620px, calc(100vh - 24px)); overflow: hidden; resize: both; background: rgba(18,24,31,.94); color: #f7fafc; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 14px 36px rgba(0,0,0,.35); border-radius: 8px; font: 12px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
             #engine-control-panel.is-collapsed { width: auto; max-width: calc(100vw - 12px); max-height: 42px; }
             #engine-control-panel * { box-sizing: border-box; }
             .ec-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 8px; cursor: move; background: rgba(255,255,255,.08); user-select: none; }
             #engine-control-panel.is-collapsed .ec-head { grid-template-columns: auto auto; gap: 6px; padding: 6px; }
             .ec-head strong { font-size: 13px; letter-spacing: 0; }
             #engine-control-panel.is-collapsed .ec-head strong { display: none; }
-            .ec-body { display: grid; gap: 8px; padding: 8px; overflow: auto; max-height: 560px; }
+            .ec-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; padding: 8px; overflow: auto; max-height: calc(100% - 42px); }
             .ec-field { display: grid; gap: 4px; color: #cbd5e1; }
             .ec-field select { width: 100%; min-height: 30px; color: #f8fafc; background: #111827; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 4px 8px; }
             .ec-check { display: flex; align-items: center; gap: 8px; min-height: 28px; color: #cbd5e1; }
             .ec-check input { width: 16px; height: 16px; accent-color: #74d680; }
-            .ec-team { display: grid; gap: 6px; }
-            .ec-slot { display: grid; grid-template-columns: 32px 38px minmax(0,1fr) 50px; gap: 6px; align-items: center; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: rgba(255,255,255,.05); }
-            .ec-slot.is-main { border-color: #74d680; background: rgba(43,138,62,.18); }
-            .ec-slot.is-locked { box-shadow: inset 3px 0 0 #facc15; }
-            .ec-avatar { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 6px; background: rgba(255,255,255,.08); overflow: hidden; }
-            .ec-slot-img { max-width: 36px; max-height: 36px; object-fit: contain; }
+            .ec-team { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 6px; }
+            .ec-mon { aspect-ratio: 1; min-width: 0; min-height: 42px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.22); border-radius: 7px; background: linear-gradient(180deg, rgba(83,176,91,.95), rgba(42,126,62,.92)); cursor: pointer; padding: 2px; overflow: hidden; }
+            .ec-mon:hover { filter: brightness(1.08); }
+            .ec-mon.is-main { outline: 2px solid #facc15; outline-offset: -2px; }
+            .ec-mon.is-locked { background: linear-gradient(180deg, rgba(210,72,72,.96), rgba(139,38,38,.94)); }
+            .ec-slot-img { width: 100%; height: 100%; max-width: 42px; max-height: 42px; object-fit: contain; }
             .ec-slot-fallback { font-weight: 700; color: #e2e8f0; }
-            .ec-slot-meta { min-width: 0; }
-            .ec-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; }
-            .ec-sub { color: #a7b4c4; font-size: 11px; }
-            .ec-hp { height: 4px; margin-top: 4px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
-            .ec-hp span { display: block; height: 100%; background: #4ade80; }
             .ec-icon-btn { min-width: 30px; min-height: 28px; border: 1px solid rgba(255,255,255,.18); border-radius: 6px; color: #f8fafc; background: rgba(255,255,255,.08); cursor: pointer; font: inherit; }
             .ec-icon-btn:hover { background: rgba(255,255,255,.16); }
             #engine-control-panel.is-collapsed .ec-icon-btn { width: 32px; min-width: 32px; padding: 0; overflow: hidden; white-space: nowrap; }
             #engine-control-panel.is-collapsed .ec-play { font-size: 0; }
             #engine-control-panel.is-collapsed .ec-play::after { content: attr(data-short); font-size: 12px; }
-            .ec-lock-btn { width: 50px; }
             .ec-empty { color: #a7b4c4; padding: 10px; text-align: center; }
             @media (max-width: 520px) {
-                #engine-control-panel { width: min(330px, calc(100vw - 12px)); max-height: calc(100vh - 12px); }
+                #engine-control-panel { width: min(360px, calc(100vw - 12px)); max-height: calc(100vh - 12px); }
                 .ec-body { max-height: calc(100vh - 58px); }
             }
         `;
         document.head?.appendChild(style);
     }
 
+    function holdBotControlRender(ms = 2500) {
+        botControlInteractingUntil = Date.now() + ms;
+    }
+
     function attachBotControlHandlers(panel) {
+        panel.onpointerdown = () => holdBotControlRender(3000);
+        panel.onfocusin = () => holdBotControlRender(3000);
+
         panel.onclick = event => {
             const button = event.target.closest('[data-action]');
             if (!button || !panel.contains(button)) return;
             const action = button.getAttribute('data-action');
+            if (!['pause', 'collapse', 'lock', 'main'].includes(action)) return;
             if (action === 'pause') {
                 updateBotControlState({ paused: !getBotControlState().paused });
             } else if (action === 'collapse') {
@@ -1435,16 +1443,18 @@
             else if (action === 'main-select') updateBotControlState({ mainCarryKey: target.value || '' });
             else if (action === 'starter-mode') updateBotControlState({ starterMode: target.value || 'auto' });
             else if (action === 'auto-restart') updateBotControlState({ autoRestart: Boolean(target.checked) });
+            else if (action === 'duplicate-catches') updateBotControlState({ duplicateCatches: Boolean(target.checked) });
             else if (action === 'starter-input') updateBotControlState({ starterPreference: target.value });
             else if (action === 'map-input') updateBotControlState({ mapPreference: target.value });
             renderBotControlPanel(true);
         };
-        panel.addEventListener('input', event => {
+        panel.oninput = event => {
+            holdBotControlRender(3000);
             const target = event.target;
             const action = target.getAttribute('data-action');
             if (action === 'starter-input') updateBotControlState({ starterPreference: target.value });
             else if (action === 'map-input') updateBotControlState({ mapPreference: target.value });
-        });
+        };
 
         const handle = panel.querySelector('[data-drag-handle]');
         if (!handle) return;
@@ -1476,8 +1486,9 @@
     function renderBotControlPanel(force = false) {
         if (!botControlPanel || !document.body) return;
 
-        const isInteracting = botControlPanel.contains(document.activeElement) &&
-                              ['INPUT', 'SELECT'].includes(document.activeElement?.tagName);
+        const isInteracting = Date.now() < botControlInteractingUntil ||
+                              (botControlPanel.contains(document.activeElement) &&
+                              ['INPUT', 'SELECT'].includes(document.activeElement?.tagName));
 
         if (!force && isInteracting) return;
 
@@ -1522,7 +1533,7 @@
         renderBotControlPanel();
     }
 
-    function triggerRealClick(element) {
+    function triggerRealClick(element, options = {}) {
         if (!element) return false;
         const target = element.querySelector('rect') || element.querySelector('image') || element;
         const rect = target.getBoundingClientRect();
@@ -1531,11 +1542,13 @@
         const cy = rect.top + rect.height / 2;
         const pointerOpts = { view: window, bubbles: true, cancelable: true, buttons: 1, clientX: cx, clientY: cy, pointerId: 1, isPrimary: true };
         const mouseOpts = { view: window, bubbles: true, cancelable: true, buttons: 1, clientX: cx, clientY: cy };
-        const dispatchTargets = [
-            target,
-            element,
-            document.elementFromPoint(cx, cy)
-        ].filter(Boolean);
+        const dispatchTargets = options.singleTarget
+            ? [target]
+            : [
+                target,
+                element,
+                document.elementFromPoint(cx, cy)
+            ].filter(Boolean);
         [...new Set(dispatchTargets)].forEach(clickTarget => {
             clickTarget.dispatchEvent(new PointerEvent('pointerdown', pointerOpts));
             clickTarget.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
@@ -3051,10 +3064,12 @@
 
     function getExpectedCatchCopiesFromOpenSlots(team) {
         const freeSlots = Math.max(0, CONFIG.TEAM_TARGET_SIZE - (team || []).length);
+        if (!getBotControlDuplicateCatchesEnabled()) return freeSlots > 0 ? 1 : 0;
         return Math.min(2, freeSlots);
     }
 
     function getDuplicatePairCatchScore(candidateName, candidateTypes, team, attackTypes = null, bossTypes = null, options = {}) {
+        if (!getBotControlDuplicateCatchesEnabled()) return 0;
         if (!candidateName) return 0;
 
         const expectedCopies = Number.isFinite(options.expectedCatchCopies)
@@ -3104,6 +3119,7 @@
     }
 
     function getDuplicatePairRouteScore(team) {
+        if (!getBotControlDuplicateCatchesEnabled()) return 0;
         if (getExpectedCatchCopiesFromOpenSlots(team) < 2) return 0;
         return hasDuplicatePair(team)
             ? Math.round(CONFIG.DUPLICATE_PAIR_ROUTE_BONUS * 0.3)
@@ -3111,6 +3127,7 @@
     }
 
     function getDuplicateIncomingSwapScore(candidateName, team) {
+        if (!getBotControlDuplicateCatchesEnabled()) return 0;
         const group = getSameNameTeamGroup(team, candidateName);
         if (group.units.length === 1) return CONFIG.DUPLICATE_PAIR_CREATE_SWAP_BONUS;
         if (group.units.length >= 2) return Math.round(CONFIG.DUPLICATE_EXTRA_PAIR_CATCH_BONUS * 0.8);
@@ -3118,6 +3135,7 @@
     }
 
     function getDuplicatePairReplacementProtectionScore(unit, team, incomingName = '') {
+        if (!getBotControlDuplicateCatchesEnabled()) return 0;
         if (!unit?.name) return 0;
 
         const group = getSameNameTeamGroup(team, unit.name);
@@ -5306,6 +5324,7 @@
         }
 
         if (tactic === 'duplicate') {
+            if (!getBotControlDuplicateCatchesEnabled()) return 0;
             if (type === 'catch') return openTeamSlot ? 600 : 180;
             if (type === 'grass') return 260;
             if (type === 'trainer') return 120;
@@ -6041,6 +6060,7 @@
         }
 
         if (tactic === 'duplicate') {
+            if (!getBotControlDuplicateCatchesEnabled()) return 0;
             const duplicateScore = candidate.duplicatePairScore || 0;
             if (duplicateScore > 0) return Math.max(18, duplicateScore);
             return hasOpenTeamSlot(team) ? 6 : 0;
@@ -6185,6 +6205,7 @@
     function handleCatchScreen() {
         const team = parseTeamStatus();
         const openTeamSlot = hasOpenTeamSlot(team);
+        const duplicateCatchesEnabled = getBotControlDuplicateCatchesEnabled();
         if (!currentMapKey) syncMapCaptureState();
         const cards = document.querySelectorAll('#catch-choices .poke-card');
         const opponentProfile = detectNextOpponentProfile();
@@ -6358,6 +6379,7 @@
                 bestSinnohPassivePlanScore: bestCandidate?.sinnohPassivePlanScore || 0,
                 bestSinnohPowerScore: bestCandidate?.sinnohPowerScore || 0,
                 bestTacticScore: bestCandidate?.tacticScore || 0,
+                duplicateCatchesEnabled,
                 expectedCatchCopies,
                 bossTypes,
                 earlyExpansionClosed,
@@ -6541,6 +6563,7 @@
                 sinnohPassivePlanScore: bestCandidate?.sinnohPassivePlanScore || 0,
                 sinnohPowerScore: bestCandidate?.sinnohPowerScore || 0,
                 tacticScore: bestCandidate?.tacticScore || 0,
+                duplicateCatchesEnabled,
                 expectedCatchCopies,
                 level: bestCandidate?.level || 0,
                 projectedAvgLevel: bestCandidate?.projectedAvgLevel ?? null,
@@ -6559,9 +6582,10 @@
                 capturesThisMap
             });
             log('info', '🐾', `${catchReason} (best: ${bestName || 'unknown'} ${bestScore.toFixed(1)})`);
-            triggerRealClick(bestCard);
-            capturesThisMap++;
-            engineStats.catches++;
+            triggerRealClick(bestCard, { singleTarget: !duplicateCatchesEnabled });
+            const countedCopies = duplicateCatchesEnabled ? Math.max(1, expectedCatchCopies || 1) : 1;
+            capturesThisMap += countedCopies;
+            engineStats.catches += countedCopies;
         }
     }
 
