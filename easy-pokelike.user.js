@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Pokelike.xyz Tower Engine 8.7 (Sinnoh Run AI)
+// @name         Easy Pokelike 8.7
 // @namespace    http://tampermonkey.net/
 // @version      8.7
-// @description  Motor de automatización completo para Battle Tower: carry protegido, counters anti-Metagross, final boss prep, masterball scouting, traits, items, y auto-restart.
+// @description  Motor de automatización completo para todos los modos de juego.
 // @match        *://*.pokelike.xyz/*
 // @grant        none
 // @run-at       document-start
@@ -20,7 +20,7 @@
             }
         } catch (e) {
             if (e.name === 'NotFoundError') {
-                console.warn('[Engine7] Swallowed setPointerCapture NotFoundError for pointerId:', pointerId);
+                console.warn('[Engine] Swallowed setPointerCapture NotFoundError for pointerId:', pointerId);
             } else {
                 throw e;
             }
@@ -35,7 +35,7 @@
             }
         } catch (e) {
             if (e.name === 'NotFoundError') {
-                console.warn('[Engine7] Swallowed releasePointerCapture NotFoundError for pointerId:', pointerId);
+                console.warn('[Engine] Swallowed releasePointerCapture NotFoundError for pointerId:', pointerId);
             } else {
                 throw e;
             }
@@ -113,10 +113,10 @@
         TEAM_REORDER_MAX_ATTEMPTS_PER_SIGNATURE: 2,
         TEAM_REORDER_SCORE_TIE_EPSILON: 3,
         TEAM_REORDER_DUPLICATE_EXTRA_MARGIN: 35,
-        RUN_HISTORY_STORAGE_KEY: 'engine7_run_history_v1',
+        RUN_HISTORY_STORAGE_KEY: 'pokelike_run_history',
         RUN_HISTORY_MAX_ENTRIES: 80,
         RUN_EVENT_LOG_MAX_ENTRIES: 160,
-        BOT_CONTROL_STORAGE_KEY: 'engine7_bot_controls_v1',
+        BOT_CONTROL_STORAGE_KEY: 'pokelike_bot_controls',
         BOT_CONTROL_LOCK_KEEP_BONUS: 10000,
 
         // --- Main carry strategy ---
@@ -880,7 +880,7 @@
     const TIER_SCORE = { 'S': 100, 'A': 80, 'B': 60, 'C': 40, 'D': 20, 'F': 5 };
 
     const ITEM_TRANSLATIONS = {
-        // v2.0 additions / ids
+        // Additional item ids
         'loaded dice': 'loaded dice', 'dados cargados': 'loaded dice',
         'sacred ash': 'sacred ash', 'ceniza sagrada': 'sacred ash', 'cenizas sagradas': 'sacred ash',
         'quick claw': 'quick claw', 'garra rapida': 'quick claw',
@@ -1005,7 +1005,7 @@
         'pixie plate': 'Fairy',
     };
 
-    const USABLE_ITEMS = new Set(['rare candy', 'moon stone', 'sacred ash', 'tm normal']);
+    const USABLE_ITEMS = new Set(['rare candy', 'moon stone', 'sacred ash', 'tm normal', 'move tutor']);
     const LOW_VALUE_HELD_ITEMS = new Set([
         'lagging tail', 'kings rock', "king's rock", 'eviolite',
         'focus band', 'focus sash', 'air balloon'
@@ -1161,7 +1161,7 @@
 
     function log(level, emoji, msg) {
         if (LOG_LEVELS[level] >= LOG_LEVELS[CONFIG.LOG_LEVEL]) {
-            console.log(`${emoji} [Engine7] ${msg}`);
+            console.log(`${emoji} [Engine] ${msg}`);
         }
     }
 
@@ -1316,95 +1316,95 @@
             const isLocked = locked.has(key);
             const hp = Math.max(0, Math.min(100, unit.hp || 0));
             const spriteHtml = sprite
-                ? `<img class="e7c-slot-img" src="${escapeHtml(sprite)}" alt="">`
-                : `<span class="e7c-slot-fallback">${escapeHtml((unit.name || '?').slice(0, 2).toUpperCase())}</span>`;
+                ? `<img class="ec-slot-img" src="${escapeHtml(sprite)}" alt="">`
+                : `<span class="ec-slot-fallback">${escapeHtml((unit.name || '?').slice(0, 2).toUpperCase())}</span>`;
             return `
-                <div class="e7c-slot${isMain ? ' is-main' : ''}${isLocked ? ' is-locked' : ''}" data-key="${escapeHtml(key)}">
-                    <button class="e7c-icon-btn e7c-main-btn" data-action="main" data-key="${escapeHtml(key)}" title="Principal">${isMain ? 'M' : '+'}</button>
-                    <div class="e7c-avatar">${spriteHtml}</div>
-                    <div class="e7c-slot-meta">
-                        <div class="e7c-name">${escapeHtml(unit.name || 'unknown')}</div>
-                        <div class="e7c-sub">Lv${unit.level || 0} / ${hp}%</div>
-                        <div class="e7c-hp"><span style="width:${hp}%"></span></div>
+                <div class="ec-slot${isMain ? ' is-main' : ''}${isLocked ? ' is-locked' : ''}" data-key="${escapeHtml(key)}">
+                    <button class="ec-icon-btn ec-main-btn" data-action="main" data-key="${escapeHtml(key)}" title="Principal">${isMain ? 'M' : '+'}</button>
+                    <div class="ec-avatar">${spriteHtml}</div>
+                    <div class="ec-slot-meta">
+                        <div class="ec-name">${escapeHtml(unit.name || 'unknown')}</div>
+                        <div class="ec-sub">Lv${unit.level || 0} / ${hp}%</div>
+                        <div class="ec-hp"><span style="width:${hp}%"></span></div>
                     </div>
-                    <button class="e7c-icon-btn e7c-lock-btn" data-action="lock" data-key="${escapeHtml(key)}" title="No reemplazar">${isLocked ? 'Lock' : 'Free'}</button>
+                    <button class="ec-icon-btn ec-lock-btn" data-action="lock" data-key="${escapeHtml(key)}" title="No reemplazar">${isLocked ? 'Lock' : 'Free'}</button>
                 </div>
             `;
-        }).join('') || '<div class="e7c-empty">Sin equipo visible</div>';
+        }).join('') || '<div class="ec-empty">Sin equipo visible</div>';
 
         return `
-            <div class="e7c-head" data-drag-handle="true">
-                <button class="e7c-icon-btn e7c-play" data-action="pause" data-short="${state.paused ? '>' : '||'}" title="${state.paused ? 'Reanudar' : 'Pausar'}">${state.paused ? 'Play' : 'Pause'}</button>
-                <strong>Engine 7</strong>
-                <button class="e7c-icon-btn" data-action="collapse" title="Plegar">${state.collapsed ? '+' : '-'}</button>
+            <div class="ec-head" data-drag-handle="true">
+                <button class="ec-icon-btn ec-play" data-action="pause" data-short="${state.paused ? '>' : '||'}" title="${state.paused ? 'Reanudar' : 'Pausar'}">${state.paused ? 'Play' : 'Pause'}</button>
+                <strong>Engine</strong>
+                <button class="ec-icon-btn" data-action="collapse" title="Plegar">${state.collapsed ? '+' : '-'}</button>
             </div>
-            <div class="e7c-body"${state.collapsed ? ' hidden' : ''}>
-                <label class="e7c-field">Modo run
+            <div class="ec-body"${state.collapsed ? ' hidden' : ''}>
+                <label class="ec-field">Modo run
                     <select data-action="run-mode">${runModeOptions}</select>
                 </label>
-                <label class="e7c-field">Mapa/region
+                <label class="ec-field">Mapa/region
                     <input type="text" data-action="map-input" value="${escapeHtml(state.mapPreference || '')}" placeholder="Auto o texto (ej: Sinnoh/Lorelei)" style="width:100%;min-height:30px;color:#f8fafc;background:#111827;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:4px 8px;">
                 </label>
-                <label class="e7c-field">Tactica
+                <label class="ec-field">Tactica
                     <select data-action="tactic">${tacticOptions}</select>
                 </label>
-                <label class="e7c-field">Principal
+                <label class="ec-field">Principal
                     <select data-action="main-select">${mainOptions}</select>
                 </label>
-                <label class="e7c-field">Starter
+                <label class="ec-field">Starter
                     <select data-action="starter-mode">${starterModeOptions}</select>
                 </label>
-                <label class="e7c-field">Nombre starter
+                <label class="ec-field">Nombre starter
                     <input type="text" data-action="starter-input" value="${escapeHtml(state.starterPreference || '')}" placeholder="Nombre (ej: Dialga)" style="width:100%;min-height:30px;color:#f8fafc;background:#111827;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:4px 8px;">
                 </label>
-                <label class="e7c-check">
+                <label class="ec-check">
                     <input type="checkbox" data-action="auto-restart"${state.autoRestart ? ' checked' : ''}>
                     <span>Restart automatico</span>
                 </label>
-                <div class="e7c-team">${slots}</div>
+                <div class="ec-team">${slots}</div>
             </div>
         `;
     }
 
     function injectBotControlStyles() {
-        if (document.getElementById('engine7-control-style')) return;
+        if (document.getElementById('engine-control-style')) return;
         const style = document.createElement('style');
-        style.id = 'engine7-control-style';
+        style.id = 'engine-control-style';
         style.textContent = `
-            #engine7-control-panel { position: fixed; z-index: 2147483647; width: min(330px, calc(100vw - 24px)); max-height: min(620px, calc(100vh - 24px)); overflow: hidden; background: rgba(18,24,31,.94); color: #f7fafc; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 14px 36px rgba(0,0,0,.35); border-radius: 8px; font: 12px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-            #engine7-control-panel.is-collapsed { width: auto; max-width: calc(100vw - 12px); max-height: 42px; }
-            #engine7-control-panel * { box-sizing: border-box; }
-            .e7c-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 8px; cursor: move; background: rgba(255,255,255,.08); user-select: none; }
-            #engine7-control-panel.is-collapsed .e7c-head { grid-template-columns: auto auto; gap: 6px; padding: 6px; }
-            .e7c-head strong { font-size: 13px; letter-spacing: 0; }
-            #engine7-control-panel.is-collapsed .e7c-head strong { display: none; }
-            .e7c-body { display: grid; gap: 8px; padding: 8px; overflow: auto; max-height: 560px; }
-            .e7c-field { display: grid; gap: 4px; color: #cbd5e1; }
-            .e7c-field select { width: 100%; min-height: 30px; color: #f8fafc; background: #111827; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 4px 8px; }
-            .e7c-check { display: flex; align-items: center; gap: 8px; min-height: 28px; color: #cbd5e1; }
-            .e7c-check input { width: 16px; height: 16px; accent-color: #74d680; }
-            .e7c-team { display: grid; gap: 6px; }
-            .e7c-slot { display: grid; grid-template-columns: 32px 38px minmax(0,1fr) 50px; gap: 6px; align-items: center; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: rgba(255,255,255,.05); }
-            .e7c-slot.is-main { border-color: #74d680; background: rgba(43,138,62,.18); }
-            .e7c-slot.is-locked { box-shadow: inset 3px 0 0 #facc15; }
-            .e7c-avatar { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 6px; background: rgba(255,255,255,.08); overflow: hidden; }
-            .e7c-slot-img { max-width: 36px; max-height: 36px; object-fit: contain; }
-            .e7c-slot-fallback { font-weight: 700; color: #e2e8f0; }
-            .e7c-slot-meta { min-width: 0; }
-            .e7c-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; }
-            .e7c-sub { color: #a7b4c4; font-size: 11px; }
-            .e7c-hp { height: 4px; margin-top: 4px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
-            .e7c-hp span { display: block; height: 100%; background: #4ade80; }
-            .e7c-icon-btn { min-width: 30px; min-height: 28px; border: 1px solid rgba(255,255,255,.18); border-radius: 6px; color: #f8fafc; background: rgba(255,255,255,.08); cursor: pointer; font: inherit; }
-            .e7c-icon-btn:hover { background: rgba(255,255,255,.16); }
-            #engine7-control-panel.is-collapsed .e7c-icon-btn { width: 32px; min-width: 32px; padding: 0; overflow: hidden; white-space: nowrap; }
-            #engine7-control-panel.is-collapsed .e7c-play { font-size: 0; }
-            #engine7-control-panel.is-collapsed .e7c-play::after { content: attr(data-short); font-size: 12px; }
-            .e7c-lock-btn { width: 50px; }
-            .e7c-empty { color: #a7b4c4; padding: 10px; text-align: center; }
+            #engine-control-panel { position: fixed; z-index: 2147483647; width: min(330px, calc(100vw - 24px)); max-height: min(620px, calc(100vh - 24px)); overflow: hidden; background: rgba(18,24,31,.94); color: #f7fafc; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 14px 36px rgba(0,0,0,.35); border-radius: 8px; font: 12px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+            #engine-control-panel.is-collapsed { width: auto; max-width: calc(100vw - 12px); max-height: 42px; }
+            #engine-control-panel * { box-sizing: border-box; }
+            .ec-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 8px; cursor: move; background: rgba(255,255,255,.08); user-select: none; }
+            #engine-control-panel.is-collapsed .ec-head { grid-template-columns: auto auto; gap: 6px; padding: 6px; }
+            .ec-head strong { font-size: 13px; letter-spacing: 0; }
+            #engine-control-panel.is-collapsed .ec-head strong { display: none; }
+            .ec-body { display: grid; gap: 8px; padding: 8px; overflow: auto; max-height: 560px; }
+            .ec-field { display: grid; gap: 4px; color: #cbd5e1; }
+            .ec-field select { width: 100%; min-height: 30px; color: #f8fafc; background: #111827; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 4px 8px; }
+            .ec-check { display: flex; align-items: center; gap: 8px; min-height: 28px; color: #cbd5e1; }
+            .ec-check input { width: 16px; height: 16px; accent-color: #74d680; }
+            .ec-team { display: grid; gap: 6px; }
+            .ec-slot { display: grid; grid-template-columns: 32px 38px minmax(0,1fr) 50px; gap: 6px; align-items: center; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: rgba(255,255,255,.05); }
+            .ec-slot.is-main { border-color: #74d680; background: rgba(43,138,62,.18); }
+            .ec-slot.is-locked { box-shadow: inset 3px 0 0 #facc15; }
+            .ec-avatar { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 6px; background: rgba(255,255,255,.08); overflow: hidden; }
+            .ec-slot-img { max-width: 36px; max-height: 36px; object-fit: contain; }
+            .ec-slot-fallback { font-weight: 700; color: #e2e8f0; }
+            .ec-slot-meta { min-width: 0; }
+            .ec-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; }
+            .ec-sub { color: #a7b4c4; font-size: 11px; }
+            .ec-hp { height: 4px; margin-top: 4px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
+            .ec-hp span { display: block; height: 100%; background: #4ade80; }
+            .ec-icon-btn { min-width: 30px; min-height: 28px; border: 1px solid rgba(255,255,255,.18); border-radius: 6px; color: #f8fafc; background: rgba(255,255,255,.08); cursor: pointer; font: inherit; }
+            .ec-icon-btn:hover { background: rgba(255,255,255,.16); }
+            #engine-control-panel.is-collapsed .ec-icon-btn { width: 32px; min-width: 32px; padding: 0; overflow: hidden; white-space: nowrap; }
+            #engine-control-panel.is-collapsed .ec-play { font-size: 0; }
+            #engine-control-panel.is-collapsed .ec-play::after { content: attr(data-short); font-size: 12px; }
+            .ec-lock-btn { width: 50px; }
+            .ec-empty { color: #a7b4c4; padding: 10px; text-align: center; }
             @media (max-width: 520px) {
-                #engine7-control-panel { width: min(330px, calc(100vw - 12px)); max-height: calc(100vh - 12px); }
-                .e7c-body { max-height: calc(100vh - 58px); }
+                #engine-control-panel { width: min(330px, calc(100vw - 12px)); max-height: calc(100vh - 12px); }
+                .ec-body { max-height: calc(100vh - 58px); }
             }
         `;
         document.head?.appendChild(style);
@@ -1516,7 +1516,7 @@
         injectBotControlStyles();
         if (!botControlPanel) {
             botControlPanel = document.createElement('div');
-            botControlPanel.id = 'engine7-control-panel';
+            botControlPanel.id = 'engine-control-panel';
             document.body.appendChild(botControlPanel);
         }
         renderBotControlPanel();
@@ -1731,6 +1731,9 @@
         const button = row.querySelector('button:not([disabled])');
         if (button && isVisible(button)) return button;
 
+        const text = foldText(row.innerText || row.textContent || '');
+        if (text.match(/already.?mastered|mastered|disabled|unavailable|not.?eligible|cannot|cant|no valid/i)) return null;
+
         if (row.matches('[disabled], [aria-disabled="true"]')) return null;
 
         const style = window.getComputedStyle(row);
@@ -1740,6 +1743,23 @@
         if (!Number.isNaN(opacity) && opacity < 0.5) return null;
 
         return row;
+    }
+
+    function getItemModalFallbackButton(isUsableModal, equipItemName = '') {
+        if (normalizeItemName(equipItemName) === 'move tutor') {
+            const skipTutorBtn = document.getElementById('btn-skip-tutor');
+            if (skipTutorBtn && isVisible(skipTutorBtn)) return skipTutorBtn;
+        }
+
+        const ids = isUsableModal
+            ? ['btn-cancel-use', 'btn-equip-cancel', 'btn-skip-tutor']
+            : ['btn-equip-cancel', 'btn-equip-to-bag', 'btn-skip-tutor'];
+
+        for (const id of ids) {
+            const btn = document.getElementById(id);
+            if (btn && isVisible(btn)) return btn;
+        }
+        return null;
     }
 
     function parseLevelText(text) {
@@ -4411,7 +4431,7 @@
 
     function exposeRunHistoryHelpers() {
         if (typeof window === 'undefined') return;
-        window.Engine7RunHistory = {
+        window.PokelikeRunHistory = {
             current: () => currentRunTelemetry,
             all: () => getRunHistory(),
             latest: () => getRunHistory().slice(-1)[0] || null,
@@ -6694,10 +6714,11 @@
         const bossTypes = detectBossTypes();
         const bossType = bossTypes.length > 0 ? bossTypes : null;
         const sinnohTraining = getSinnohTowerTrainingContext(team, bossType);
+        const itemActsAsUsable = isUsableModal || USABLE_ITEMS.has(equipItemName);
 
-        log('info', '🎒', `${isUsableModal ? 'Using' : 'Equipping'} item: [${equipItemName}] (Tier ${equipItemTier}, Score ${equipItemScore})`);
+        log('info', '🎒', `${itemActsAsUsable ? 'Using' : 'Equipping'} item: [${equipItemName}] (Tier ${equipItemTier}, Score ${equipItemScore})`);
 
-        if (!isUsableModal && isLowValueHeldItem(equipItemName)) {
+        if (!itemActsAsUsable && isLowValueHeldItem(equipItemName)) {
             const bagBtn = document.getElementById('btn-equip-to-bag');
             if (bagBtn) {
                 log('info', '🎒', `Low-value held item [${equipItemName}] is not worth equipping. Sending to bag.`);
@@ -6707,7 +6728,7 @@
             }
         }
 
-        if (isUsableModal &&
+        if (itemActsAsUsable &&
             equipItemName === 'tm normal' &&
             sinnohTraining.active &&
             !sinnohTraining.needsTm) {
@@ -6737,22 +6758,26 @@
             };
         }).filter(candidate => {
             if (!candidate.target || !candidate.unit) return false;
-            if (isUsableModal && equipItemName === 'sacred ash') return true;
+            if (itemActsAsUsable && equipItemName === 'sacred ash') return true;
             return !candidate.unit.isFainted;
         });
 
         if (candidates.length === 0) {
-            const fallbackBtn = document.getElementById(isUsableModal ? 'btn-cancel-use' : 'btn-equip-cancel') ||
-                                document.getElementById('btn-equip-to-bag');
+            const fallbackBtn = getItemModalFallbackButton(itemActsAsUsable, equipItemName);
             if (fallbackBtn && isVisible(fallbackBtn)) {
                 log('warn', '🎒', `No valid target for [${equipItemName}]. Closing item modal.`);
+                markItemKeptInBag(equipItemName);
+                recordRunEvent('item-skip', {
+                    item: equipItemName,
+                    reason: 'no-valid-target'
+                });
                 triggerRealClick(fallbackBtn);
             }
             return;
         }
 
         const boostType = getItemBoostType(equipItemName);
-        if (!isUsableModal && boostType && !candidates.some(candidate => hasMatchingAttackForItem(candidate.unit, equipItemName))) {
+        if (!itemActsAsUsable && boostType && !candidates.some(candidate => hasMatchingAttackForItem(candidate.unit, equipItemName))) {
             const bagBtn = document.getElementById('btn-equip-to-bag');
             if (bagBtn) {
                 log('info', '🎒', `No real ${boostType} attacker for [${equipItemName}]. Sending to bag.`);
@@ -6768,7 +6793,7 @@
         let bestCandidate = null;
         let bestTargetScore = -999;
         const teamMainCarry = getMainCarry(team);
-        const itemIsCarryPreferred = !isUsableModal && isMainCarryPreferredHeldItem(equipItemName);
+        const itemIsCarryPreferred = !itemActsAsUsable && isMainCarryPreferredHeldItem(equipItemName);
         const mainCarryWouldLikeItem = Boolean(
             teamMainCarry &&
             itemIsCarryPreferred &&
@@ -6785,12 +6810,12 @@
 
             let score = p.hp / 20 + getPokemonCarryScore(p) / 8;
             const candidateIsMainCarry = isMainCarryUnit(p);
-            const mainCarryHealingLock = !isUsableModal &&
+            const mainCarryHealingLock = !itemActsAsUsable &&
                                          candidateIsMainCarry &&
                                          p.heldItem &&
                                          isHealingItem(p.heldItem) &&
                                          !isMainCarryPreferredHeldItem(equipItemName);
-            const healingUpgradeForCarry = !isUsableModal &&
+            const healingUpgradeForCarry = !itemActsAsUsable &&
                                            candidateIsMainCarry &&
                                            isHealingItem(equipItemName) &&
                                            (!p.heldItem || !isHealingItem(p.heldItem));
@@ -6800,7 +6825,7 @@
                     : -CONFIG.MAIN_CARRY_ITEM_RESERVE_PENALTY;
             }
 
-            if (isUsableModal) {
+            if (itemActsAsUsable) {
                 // For consumables, the game decides valid targets via disabled rows.
                 score += scoreConsumableTarget(p, equipItemName);
                 if ((equipItemName === 'tm normal' || equipItemName === 'rare candy') && sinnohTraining.active) {
@@ -6849,7 +6874,7 @@
             const currentScore = targetUnit.heldItem ? scoreHeldItemForPokemon(targetUnit, targetUnit.heldItem, bossType) : 0;
             const newTargetScore = scoreHeldItemForPokemon(targetUnit, equipItemName, bossType);
 
-            if (!isUsableModal &&
+            if (!itemActsAsUsable &&
                 isMainCarryUnit(targetUnit) &&
                 targetUnit.heldItem &&
                 isHealingItem(targetUnit.heldItem) &&
@@ -6863,7 +6888,7 @@
                 }
             }
             
-            if (!isUsableModal && !targetUnit.heldItem && newTargetScore <= 10) {
+            if (!itemActsAsUsable && !targetUnit.heldItem && newTargetScore <= 10) {
                 const bagBtn = document.getElementById('btn-equip-to-bag');
                 if (bagBtn) {
                     log('info', '🎒', `Item [${equipItemName}] is not useful for any empty slot. Sending to bag.`);
@@ -6873,7 +6898,7 @@
                 }
             }
 
-            if (!isUsableModal && targetUnit.heldItem && newTargetScore <= currentScore + 12) {
+            if (!itemActsAsUsable && targetUnit.heldItem && newTargetScore <= currentScore + 12) {
                 const bagBtn = document.getElementById('btn-equip-to-bag');
                 if (bagBtn) {
                     log('info', '🎒', `Item [${equipItemName}] is not an upgrade. Sending to bag.`);
@@ -6883,9 +6908,9 @@
                 }
             }
             
-            log('info', '🎒', `${isUsableModal ? 'Using' : 'Assigning'} [${equipItemName}] on [${targetUnit.name}] (Replacing: [${targetUnit.heldItem || 'none'}])`);
+            log('info', '🎒', `${itemActsAsUsable ? 'Using' : 'Assigning'} [${equipItemName}] on [${targetUnit.name}] (Replacing: [${targetUnit.heldItem || 'none'}])`);
             const targetIsSinnohCarry = Boolean(
-                isUsableModal &&
+                itemActsAsUsable &&
                 equipItemName === 'tm normal' &&
                 sinnohTraining.active &&
                 sinnohTraining.carry &&
@@ -6903,7 +6928,7 @@
             }
             recordRunEvent('item-target', {
                 item: equipItemName,
-                action: isUsableModal ? 'use' : 'equip',
+                action: itemActsAsUsable ? 'use' : 'equip',
                 target: targetUnit.name,
                 targetIndex: bestCandidate.teamIdx,
                 targetScore: Number(bestTargetScore.toFixed(1)),
@@ -7917,7 +7942,7 @@
             }
             const navBtns = document.querySelectorAll(
                 '.btn-next, #btn-stage-continue, .choice-skip-btn, #btn-skip-catch, #btn-skip-trade, ' +
-                '#btn-cancel-swap, #btn-equip-to-bag, #btn-equip-cancel, #btn-cancel-use, #btn-next-map, ' +
+                '#btn-cancel-swap, #btn-equip-to-bag, #btn-equip-cancel, #btn-cancel-use, #btn-skip-tutor, #btn-next-map, ' +
                 '#btn-continue-battle, #btn-auto-battle, #btn-elite-prep-continue, .elite-prep-fight-btn, #btn-retry, #btn-play-again, ' +
                 '#btn-challenges-run, #btn-continue-challenge, #chal-intro, #chal-weekly, #weekly-back, .weekly-sub'
             );
