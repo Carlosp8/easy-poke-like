@@ -1116,6 +1116,10 @@
     let lastTeamReorderSignature = '';
     let lastTeamReorderAt = 0;
     let teamReorderAttemptsBySignature = {};
+    let lastElitePrepBagClickSignature = '';
+    let lastElitePrepBagClickAt = 0;
+    let lastMapBagClickSignature = '';
+    let lastMapBagClickAt = 0;
     const BOT_CONTROL_TACTICS = {
         auto: 'Auto',
         boss: 'Boss prep',
@@ -2070,7 +2074,51 @@
                 });
             }
         });
-        return units;
+        if (units.length > 0) return units;
+
+        const eliteSlots = document.querySelectorAll('#elite-prep-player-side .battle-pokemon');
+        eliteSlots.forEach((slot, fallbackIndex) => {
+            if (!isVisible(slot)) return;
+            const nameText = slot.querySelector('.battle-poke-name, .poke-name, [class*="name"]')?.innerText || '';
+            const name = foldText(nameText.replace(/\b(?:lv|lvl|nivel|nv\.?)\s*\d+\b/i, ''));
+            const sprite = slot.querySelector('img.battle-sprite[alt], .battle-sprite[alt]');
+            const spriteName = sprite?.alt && !foldText(sprite.alt).match(/caught|captur|item|shiny/)
+                ? foldText(sprite.alt)
+                : '';
+            const finalName = name || spriteName;
+            if (!finalName) return;
+
+            const hpInfo = parseCardHp(slot);
+            const hpFill = slot.querySelector('.hp-bar-fill');
+            const hpPercent = hpInfo ? hpInfo.percent : (hpFill ? (parseInt(hpFill.style.width) || 0) : 100);
+            const cachedInfo = getCachedPokemonInfo(finalName);
+            const types = getKnownPokemonTypes(finalName);
+            const indexAttr = Number.parseInt(slot.getAttribute('data-idx'), 10);
+            const index = Number.isFinite(indexAttr) ? indexAttr : fallbackIndex;
+            const isShiny = Boolean(
+                slot.classList.contains('shiny') ||
+                slot.querySelector('[class*="shiny"]') ||
+                (sprite?.src || '').includes('/shiny/')
+            );
+
+            units.push({
+                index,
+                name: finalName,
+                hp: hpPercent,
+                level: parseLevelText(nameText || slot.innerText || ''),
+                isFainted: hpPercent === 0,
+                types,
+                attackTypes: getAttackTypesFromElement(slot, cachedInfo?.attackTypes || types),
+                moves: cachedInfo?.moves || [],
+                baseStats: getPokemonBaseStats(finalName),
+                currentStats: cachedInfo?.currentStats || null,
+                isShiny,
+                heldItem: getHeldItem(slot),
+                element: slot
+            });
+        });
+
+        return units.sort((a, b) => a.index - b.index);
     }
 
     function getBagItems() {
@@ -5574,7 +5622,7 @@
         const bagItems = getBagItems();
         if (bagItems.length > 0) {
             const bestBagItem = pickBestBagItemForTeam(bagItems, team, opponentProfile);
-            if (bestBagItem && shouldEquipBagItem(bestBagItem.name, team, opponentProfile)) {
+            if (bestBagItem && shouldEquipBagItem(bestBagItem.name, team, opponentProfile) && shouldAttemptMapBagItem(bestBagItem.name, team)) {
                 log('info', '🎒', `Found useful bag item: [${bestBagItem.name}]. Opening equip modal.`);
                 lastChosenItemName = bestBagItem.name;
                 triggerRealClick(bestBagItem.element);
@@ -5790,6 +5838,29 @@
 
         const style = window.getComputedStyle(control);
         return style.pointerEvents !== 'none';
+    }
+
+    function shouldAttemptElitePrepBagItem(itemName, team) {
+        const signature = `${itemName}:${(team || []).map(p => `${p.name}:${p.heldItem || '-'}:${p.level || 0}`).join('|')}`;
+        if (signature === lastElitePrepBagClickSignature && Date.now() - lastElitePrepBagClickAt < 8000) {
+            log('warn', '🎒', `Elite prep: skipping repeated bag item [${itemName}] and proceeding to FIGHT.`);
+            return false;
+        }
+        lastElitePrepBagClickSignature = signature;
+        lastElitePrepBagClickAt = Date.now();
+        return true;
+    }
+
+    function shouldAttemptMapBagItem(itemName, team) {
+        const signature = `${currentMapKey || '-'}:${itemName}:${(team || []).map(p => `${p.name}:${p.heldItem || '-'}:${p.level || 0}`).join('|')}`;
+        if (signature === lastMapBagClickSignature && Date.now() - lastMapBagClickAt < 8000) {
+            log('warn', '🎒', `Skipping repeated map bag item [${itemName}] after no progress.`);
+            markItemKeptInBag(itemName);
+            return false;
+        }
+        lastMapBagClickSignature = signature;
+        lastMapBagClickAt = Date.now();
+        return true;
     }
 
     function isRerollControl(control) {
@@ -6607,10 +6678,16 @@
                 }
             }
         }
-        if (!equipItemName && lastChosenItemName) {
-            equipItemName = lastChosenItemName;
+        const expectedItemName = lastChosenItemName;
+        if (!equipItemName && expectedItemName) {
+            equipItemName = expectedItemName;
         }
         lastChosenItemName = '';
+
+        if (expectedItemName && equipItemName && normalizeItemName(expectedItemName) !== normalizeItemName(equipItemName)) {
+            log('warn', '🎒', `Expected item modal [${expectedItemName}] but got [${equipItemName}]. Cooling expected item to avoid loop.`);
+            markItemKeptInBag(expectedItemName);
+        }
 
         const equipItemTier = ITEM_TIERS[equipItemName] || 'D';
         const equipItemScore = TIER_SCORE[equipItemTier] || 10;
@@ -7133,7 +7210,7 @@
 
             const bagItems = getBagItems();
             const bestBagItem = pickBestBagItemForTeam(bagItems, team, prepProfile);
-            if (bestBagItem && shouldEquipBagItem(bestBagItem.name, team, prepProfile)) {
+            if (bestBagItem && shouldEquipBagItem(bestBagItem.name, team, prepProfile) && shouldAttemptElitePrepBagItem(bestBagItem.name, team)) {
                 log('info', '🎒', `Elite prep: equipping/using [${bestBagItem.name}] before FIGHT.`);
                 lastChosenItemName = bestBagItem.name;
                 triggerRealClick(bestBagItem.element);
@@ -7145,8 +7222,8 @@
 
         const playerSide = document.getElementById('elite-prep-player-side');
         if (playerSide && detectedTypes.length > 0) {
-            const slots = Array.from(playerSide.querySelectorAll('.poke-card, .battle-poke'))
-                .filter(slot => isVisible(slot) && !slot.querySelector('.poke-card, .battle-poke'));
+            const slots = Array.from(playerSide.querySelectorAll('.poke-card, .battle-poke, .battle-pokemon'))
+                .filter(slot => isVisible(slot) && !slot.querySelector('.poke-card, .battle-poke, .battle-pokemon'));
             if (slots.length > 1) {
                 // Find best counter among the visible Pokémon
                 let bestSlot = null;
