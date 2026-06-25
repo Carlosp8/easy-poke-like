@@ -1096,6 +1096,7 @@
     let lastLoggedState = '';
     let stuckCounter = 0;
     let lastStateForStuck = '';
+    let lastStuckProgressSignature = '';
     let lastMapDecisionFingerprint = '';
     let lastCatchRerollSignature = '';
     let lastCatchRerollAt = 0;
@@ -3614,10 +3615,40 @@
         return baseMargin;
     }
 
+    function getMapNodeImageElement(node) {
+        if (!node) return null;
+        return node.querySelector('image.map-node-sprite, img.map-node-sprite, image, img');
+    }
+
     function getNodeImageSrc(node) {
-        if (!node) return '';
-        const img = node.querySelector('image, img');
+        const img = getMapNodeImageElement(node);
         return img ? (img.getAttribute('href') || img.getAttribute('xlink:href') || img.src || '').toLowerCase() : '';
+    }
+
+    function getMapNodeSpriteKey(node) {
+        const src = getNodeImageSrc(node);
+        if (!src) return '';
+        const cleanSrc = src.split(/[?#]/)[0].replace(/\\/g, '/');
+        return (cleanSrc.split('/').pop() || '')
+            .replace(/\.[a-z0-9]+$/i, '')
+            .replace(/_/g, '-');
+    }
+
+    function classifyMapNodeBySprite(node) {
+        const key = getMapNodeSpriteKey(node);
+        if (!key) return '';
+
+        if (key.match(/master.?ball|ball.?master|legendary|legendario|legendaria|mythical/)) return 'legendary';
+        if (key.match(/poke.?center|pokecenter|pokemon.?center|center/)) return 'center';
+        if (key.match(/mistery.?trainer|mystery.?trainer|final.?trainer|boss/)) return 'boss';
+        if (key.match(/pokeball|poke.?ball|catch/)) return 'catch';
+        if (key.match(/grass|wild/)) return 'grass';
+        if (key.match(/item|backpack|bag/)) return 'item';
+        if (key.match(/question.?mark|random|unknown|mystery/)) return 'unknown';
+        if (key.match(/scientist|professor|passive|buff/)) return 'buff';
+        if (key.match(/trainer|team.?rocket|old.?guy|gentleman|hiker|fisher|fisherman|swimmer|black.?belt|psychic|bird|sailor|camper|picnic|juggler|burglar|channeler|engineer|rocker|tamer|beauty|cue.?ball|lass|youngster|cooltrainer|ace|super.?nerd|nerd|biker|gambler/)) return 'trainer';
+
+        return '';
     }
 
     function getNodeDescriptorParts(node) {
@@ -3674,6 +3705,7 @@
         const text = (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
         return {
             src: getNodeImageSrc(node).slice(-180),
+            spriteKey: getMapNodeSpriteKey(node),
             className: String(node.getAttribute('class') || '').slice(0, 180),
             ariaLabel: String(node.getAttribute('aria-label') || '').slice(0, 120),
             title: String(node.getAttribute('title') || '').slice(0, 120),
@@ -4967,6 +4999,19 @@
         return false;
     }
 
+    function getMapNodeElements() {
+        const rawNodes = Array.from(document.querySelectorAll('g.map-node, .map-node--clickable'));
+        const seen = new Set();
+        return rawNodes.filter(node => {
+            if (!node || seen.has(node)) return false;
+            seen.add(node);
+            const className = String(node.getAttribute('class') || '');
+            if (className.includes('map-node-sprite')) return false;
+            return node.classList.contains('map-node') ||
+                   node.classList.contains('map-node--clickable');
+        });
+    }
+
     function getCurrentMapKey() {
         const mapInfo = foldText(document.getElementById('map-info')?.innerText || '');
         const stageInfo = foldText([
@@ -4980,7 +5025,7 @@
             return `${stageInfo || 'stage'}::${mapInfo || 'map'}`;
         }
 
-        const nodes = Array.from(document.querySelectorAll('.map-node, [class*="map-node"]')).map(node => {
+        const nodes = getMapNodeElements().map(node => {
             return `${node.getAttribute('transform') || ''}:${getNodeImageSrc(node)}`;
         }).join('|');
 
@@ -5004,6 +5049,7 @@
         capturesThisMap = 0;
         lastMapDecisionFingerprint = '';
         lastMapClickSignature = '';
+        lastStuckProgressSignature = '';
         repeatedMapClickCount = 0;
         lastCatchRerollSignature = '';
         lastCatchRerollAt = 0;
@@ -5095,16 +5141,19 @@
     }
 
     function classifyMapNode(node) {
+        const spriteType = classifyMapNodeBySprite(node);
+        if (spriteType) return spriteType;
+
         const text = getNodeClassificationText(node);
 
         if (text.match(/master.?ball|ball.?master|\bmaster\b|legendary[-_ ]?encounter|legendary.?pokemon|legendary|legendario|legendaria|mythical|mitico|mitica|legend.?battle|boss.?legend/)) return 'legendary';
         if (text.match(/poke.?center|pokecenter|center|heal/)) return 'center';
-        if (text.match(/final.?boss|boss|gym|elite|leader|champion|campeon/)) return 'boss';
-        if (text.match(/trainer|versus|battle|fisher|fisherman|hiker|swimmer|black.?belt|psychic|bird|sailor|camper|picnic|juggler|burglar|channeler|engineer|rocker|tamer|beauty|cue.?ball|lass|youngster|cooltrainer|ace|gentleman|super.?nerd|nerd|biker|gambler/)) return 'trainer';
+        if (text.match(/mistery.?trainer|mystery.?trainer|final.?boss|boss|gym|elite|leader|champion|campeon/)) return 'boss';
         if (text.match(/pokeball|poke-ball|catch/)) return 'catch';
         if (text.match(/grass|wild/)) return 'grass';
         if (text.match(/item|backpack|bag/)) return 'item';
         if (text.match(/scientist|professor|passive|buff/)) return 'buff';
+        if (text.match(/trainer|versus|battle|fisher|fisherman|hiker|swimmer|black.?belt|psychic|bird|sailor|camper|picnic|juggler|burglar|channeler|engineer|rocker|tamer|beauty|cue.?ball|lass|youngster|cooltrainer|ace|gentleman|super.?nerd|nerd|biker|gambler/)) return 'trainer';
         if (text.match(/trade|npc/)) return 'trade';
         return 'unknown';
     }
@@ -5122,7 +5171,7 @@
 
     function parseMapTree() {
         const mapSvg = document.getElementById('map-svg') || document.querySelector('#map-container svg');
-        const rawNodes = Array.from(document.querySelectorAll('.map-node, [class*="map-node"]'));
+        const rawNodes = getMapNodeElements();
         const seen = new Set();
         let nodes = rawNodes.filter(node => {
             if (!node || seen.has(node)) return false;
@@ -5143,7 +5192,7 @@
         // Sort from top to bottom, left to right
         nodes.sort((a, b) => (a.y - b.y) || (a.x - b.x));
         
-        // Re-assign index so that 0 is top-most (Boss) and 22 is bottom-most (Start)
+        // Re-assign index so that 0 is top-most/current and 22 is bottom-most/final
         nodes.forEach((node, idx) => {
             node.index = idx;
         });
@@ -5153,30 +5202,32 @@
 
         // Exact known 23-node map structure
         if (nodes.length === 23) {
+            nodes[22].type = 'boss';
+
             const HARDCODED_MAP_ADJACENCY = {
-                22: [20, 21],
-                20: [17, 18],
-                21: [18, 19],
-                17: [13, 14],
-                18: [14, 15],
-                19: [15, 16],
-                13: [10],
-                14: [10, 11],
-                15: [11, 12],
-                16: [12],
-                10: [6, 7],
-                11: [7, 8],
-                12: [8, 9],
-                6: [3],
-                7: [3, 4],
-                8: [4, 5],
-                9: [5],
-                3: [1],
-                4: [1, 2],
-                5: [2],
-                1: [0],
-                2: [0],
-                0: []
+                0: [1, 2],
+                1: [3, 4],
+                2: [4, 5],
+                3: [6, 7],
+                4: [7, 8],
+                5: [8, 9],
+                6: [10],
+                7: [10, 11],
+                8: [11, 12],
+                9: [12],
+                10: [13, 14],
+                11: [14, 15],
+                12: [15, 16],
+                13: [17],
+                14: [17, 18],
+                15: [18, 19],
+                16: [19],
+                17: [20],
+                18: [20, 21],
+                19: [21],
+                20: [22],
+                21: [22],
+                22: []
             };
 
             nodes.forEach(node => {
@@ -5187,7 +5238,7 @@
                 });
             });
 
-            return { nodes, edges, adjacency, hasRealEdges: true };
+            return { nodes, edges, adjacency, hasRealEdges: true, edgeSource: 'known-23-node-graph' };
         }
 
         // Fallback for maps of different sizes
@@ -5226,7 +5277,13 @@
             });
         }
 
-        return { nodes, edges, adjacency, hasRealEdges: edges.length > 0 };
+        return {
+            nodes,
+            edges,
+            adjacency,
+            hasRealEdges: edges.length > 0,
+            edgeSource: edges.length > 0 ? 'svg-lines' : 'layer-fallback'
+        };
     }
 
     function getNextMapLayerNodes(tree, node) {
@@ -5495,7 +5552,7 @@
         return ['item', 'buff', 'catch', 'grass', 'trainer', 'trade', 'legendary'].includes(type);
     }
 
-    function getBestPathSummary(mapNode, tree, context, depth = CONFIG.PATH_LOOKAHEAD_DEPTH) {
+    function getBestRouteFromNode(mapNode, tree, context, depth = CONFIG.PATH_LOOKAHEAD_DEPTH) {
         const path = [];
         const seen = new Set();
         let current = mapNode;
@@ -5503,7 +5560,7 @@
         let routeItemCount = 0;
 
         while (current && remaining > 0 && !seen.has(current.index)) {
-            path.push(current.type);
+            path.push(current);
             seen.add(current.index);
             routeItemCount += current.type === 'item' ? 1 : 0;
             const nextNodes = getNextMapLayerNodes(tree, current);
@@ -5514,7 +5571,57 @@
             remaining--;
         }
 
-        return path.join(' > ');
+        return path;
+    }
+
+    function getBestPathSummary(mapNode, tree, context, depth = CONFIG.PATH_LOOKAHEAD_DEPTH) {
+        return getBestRouteFromNode(mapNode, tree, context, depth)
+            .map(node => node.type)
+            .join(' > ');
+    }
+
+    function getMapRouteIndexes(route) {
+        return (route || [])
+            .map(node => Number.isFinite(node.index) ? node.index : '?')
+            .join('-');
+    }
+
+    function getMapRouteTypeSummary(route) {
+        return (route || [])
+            .map(node => `${Number.isFinite(node.index) ? node.index : '?'}:${node.type || 'unknown'}`)
+            .join(' > ');
+    }
+
+    function getMapGraphLabel(tree) {
+        if (!tree) return 'sin grafo';
+        if (tree.hasRealEdges) {
+            return `${tree.edgeSource || 'real graph'} ${tree.edges.length} edges`;
+        }
+        return tree.edgeSource || 'layer fallback';
+    }
+
+    function getMapRouteKnowledgeLabel(tree, route) {
+        if (!tree || !route || route.length === 0) return 'sin ruta';
+        const lastNode = route[route.length - 1];
+        const reachesTerminal = getNextMapLayerNodes(tree, lastNode).length === 0;
+        if (tree.hasRealEdges && reachesTerminal) return 'ruta completa conocida';
+        if (tree.hasRealEdges) return 'ruta parcial conocida';
+        return 'ruta estimada por capas';
+    }
+
+    function getMapStrategyLabel(context = {}, chosenNode = null) {
+        const tactic = getBotControlTactic();
+        if (tactic && tactic !== 'auto') {
+            return `control:${BOT_CONTROL_TACTICS[tactic] || tactic}`;
+        }
+        if (context.sinnohTraining?.active) return 'entrenamiento Sinnoh';
+        if (context.earlyLevelingPriority) return 'subir nivel temprano';
+        if (context.bossPrepStatus && !context.bossPrepStatus.ready) {
+            return `preparacion boss ${context.bossPrepStatus.targets?.reason || ''}`.trim();
+        }
+        if (chosenNode?.type === 'center') return 'curacion';
+        if (context.captureCapReached) return 'cap capturas';
+        return 'auto';
     }
 
     // ╔══════════════════════════════════════════════════════════════╗
@@ -5731,6 +5838,17 @@
             return { node, mapNode, score };
         }).sort((a, b) => b.score - a.score);
 
+        if (mapChangedSinceLastDecision) {
+            const availableSummary = candidates
+                .map(candidate => `${candidate.mapNode.index}:${candidate.mapNode.type}`)
+                .join(', ');
+            log('info', 'map', `Nodos disponibles: ${availableSummary || 'ninguno'}`);
+            candidates.forEach(candidate => {
+                const route = getBestRouteFromNode(candidate.mapNode, mapTree, context, CONFIG.PATH_LOOKAHEAD_DEPTH);
+                log('debug', '🧭', `Nodo candidato ${candidate.mapNode.index}:${candidate.mapNode.type} score=${candidate.score.toFixed(1)} ruta=${getMapRouteIndexes(route)} | ${getMapRouteTypeSummary(route)}`);
+            });
+        }
+
         const preferredCandidate = (() => {
             for (const candidate of candidates) {
                 const signature = `${currentMapKey || '-'}:${candidate.mapNode.index}:${candidate.mapNode.type}:${Math.round(candidate.mapNode.x)}:${Math.round(candidate.mapNode.y)}`;
@@ -5783,8 +5901,14 @@
             if (nextProfile && shouldReorderForNode && optimizeTeamOrder(team, nextProfile, bossPrepStatus)) return;
             if (nextProfile && shouldReorderForNode && ensureLeadHasHeldItem(team, nextProfile)) return;
 
-            const pathSummary = getBestPathSummary(bestMapNode, mapTree, context, CONFIG.PATH_LOOKAHEAD_DEPTH);
-            const edgeMode = mapTree.hasRealEdges ? `real graph ${mapTree.edges.length} edges` : 'layer fallback';
+            const chosenRoute = getBestRouteFromNode(bestMapNode, mapTree, context, CONFIG.PATH_LOOKAHEAD_DEPTH);
+            const pathSummary = chosenRoute.map(node => node.type).join(' > ');
+            const routeIndexes = getMapRouteIndexes(chosenRoute);
+            const routeTypes = getMapRouteTypeSummary(chosenRoute);
+            const routeKnowledge = getMapRouteKnowledgeLabel(mapTree, chosenRoute);
+            const routeStrategy = getMapStrategyLabel(context, bestMapNode);
+            const edgeMode = getMapGraphLabel(mapTree);
+            const clickSignature = `${currentMapKey || '-'}:${bestMapNode.index}:${bestMapNode.type}:${Math.round(bestMapNode.x)}:${Math.round(bestMapNode.y)}`;
             const allMapNodes = mapTree.nodes;
             const clickableMapNodes = allMapNodes.filter(node => node.clickable);
             const visibleLegendaryNodes = mapTree.nodes.filter(node => node.type === 'legendary').length;
@@ -5814,6 +5938,10 @@
                     unknownNodeHints,
                     score: Number(highestScore.toFixed(1)),
                     path: pathSummary,
+                    routeIndexes,
+                    routeTypes,
+                    routeKnowledge,
+                    routeStrategy,
                     edgeMode,
                     nextOpponent: compactOpponentProfile(nextProfile),
                     teamSize: team.length,
@@ -5844,8 +5972,10 @@
                 currentRunTelemetry.best.mapSteps = Math.max(currentRunTelemetry.best.mapSteps, currentRunTelemetry.events.filter(event => event.type === 'map-choice').length);
                 currentRunTelemetry.best.battles = Math.max(currentRunTelemetry.best.battles, getRunBattleCount(currentRunTelemetry));
             }
+            if (mapChangedSinceLastDecision || clickSignature !== lastMapClickSignature || repeatedMapClickCount <= 1) {
+                log('info', '🧭', `Ruta decidida según estrategia ${routeStrategy}: ${routeIndexes} | ${routeKnowledge} | ${edgeMode} | ${routeTypes}`);
+            }
             log('debug', '🗺️', `Map reevaluated ${clickableNodes.length} clickable options over ${allMapNodes.length} total nodes (${mapChangedSinceLastDecision ? 'fresh state' : 'repeat'}). ${edgeMode}. Path=${pathSummary}. Captures=${capturesThisMap}/${CONFIG.MAX_CATCHES_PER_MAP} target=${bossPrepTargets.reason}:${bossPrepTargets.avgLevel}/${bossPrepTargets.leadLevel} training=${trainingCore} earlyExpansionClosed=${earlyExpansionClosed} avgLv=${avgLevel.toFixed(1)} leadLv=${leadLevel}. Score=${highestScore.toFixed(1)}`);
-            const clickSignature = `${currentMapKey || '-'}:${bestMapNode.index}:${bestMapNode.type}:${Math.round(bestMapNode.x)}:${Math.round(bestMapNode.y)}`;
             if (clickSignature === lastMapClickSignature) repeatedMapClickCount++;
             else {
                 lastMapClickSignature = clickSignature;
@@ -7935,12 +8065,34 @@
     // ║          🛡️ ANTI-STUCK WATCHDOG                             ║
     // ╚══════════════════════════════════════════════════════════════╝
 
+    function getAntiStuckProgressSignature(currentState) {
+        try {
+            if (currentState === 'map-screen') {
+                const mapKey = currentMapKey || getCurrentMapKey() || '';
+                const clickableSignature = getClickableMapNodes()
+                    .map(node => getMapNodeClickSignature(node))
+                    .sort()
+                    .join('|');
+                const teamSignature = parseTeamStatus()
+                    .map(p => `${p.name}:${p.hp || 0}:${p.level || 0}:${p.heldItem || '-'}:${p.isFainted ? 'F' : 'A'}`)
+                    .join('|');
+                return `${currentState}:${mapKey}:${clickableSignature}:${teamSignature}`;
+            }
+        } catch (e) {
+            log('debug', 'watchdog', `Anti-stuck signature failed: ${e.message}`);
+        }
+
+        return currentState;
+    }
+
     function antiStuckCheck(currentState) {
-        if (currentState === lastStateForStuck) {
+        const progressSignature = getAntiStuckProgressSignature(currentState);
+        if (currentState === lastStateForStuck && progressSignature === lastStuckProgressSignature) {
             stuckCounter++;
         } else {
             stuckCounter = 0;
             lastStateForStuck = currentState;
+            lastStuckProgressSignature = progressSignature;
         }
 
         if (stuckCounter >= CONFIG.STUCK_PANIC_THRESHOLD) {
