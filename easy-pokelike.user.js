@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Easy Pokelike 9.4 Fusion
+// @name         Easy Pokelike 9.5
 // @namespace    http://tampermonkey.net/
-// @version      9.4
-// @description  Fusión de Easy Pokelike 8.7 y Tower Engine 9.3: historia, desafíos, shiny, duplicados, items, MT, anti-stuck y auto-restart.
+// @version      9.5
+// @description  Easy Pokelike 9.5: historia, desafíos, shiny, duplicados, items, MT, anti-stuck y auto-restart.
 // @match        *://*.pokelike.xyz/*
 // @grant        none
 // @run-at       document-start
@@ -20,7 +20,7 @@
             }
         } catch (e) {
             if (e.name === 'NotFoundError') {
-                console.warn('[Engine7] Swallowed setPointerCapture NotFoundError for pointerId:', pointerId);
+                console.warn('[Engine] Swallowed setPointerCapture NotFoundError for pointerId:', pointerId);
             } else {
                 throw e;
             }
@@ -35,7 +35,7 @@
             }
         } catch (e) {
             if (e.name === 'NotFoundError') {
-                console.warn('[Engine7] Swallowed releasePointerCapture NotFoundError for pointerId:', pointerId);
+                console.warn('[Engine] Swallowed releasePointerCapture NotFoundError for pointerId:', pointerId);
             } else {
                 throw e;
             }
@@ -166,11 +166,11 @@
         TEAM_REORDER_MAX_ATTEMPTS_PER_SIGNATURE: 2,
         TEAM_REORDER_SCORE_TIE_EPSILON: 3,
         TEAM_REORDER_DUPLICATE_EXTRA_MARGIN: 35,
-        RUN_HISTORY_STORAGE_KEY: 'engine7_run_history_v1',
+        RUN_HISTORY_STORAGE_KEY: 'Engine_run_history_v1',
         RUN_HISTORY_LEGACY_STORAGE_KEY: 'pokelike_run_history',
         RUN_HISTORY_MAX_ENTRIES: 80,
         RUN_EVENT_LOG_MAX_ENTRIES: 160,
-        BOT_CONTROL_STORAGE_KEY: 'engine7_bot_controls_v1',
+        BOT_CONTROL_STORAGE_KEY: 'Engine_bot_controls_v1',
         BOT_CONTROL_LEGACY_STORAGE_KEY: 'pokelike_bot_controls',
         BOT_CONTROL_LOCK_KEEP_BONUS: 10000,
 
@@ -1704,6 +1704,10 @@
     let catchScreenSessionActive = false;
     let catchRerollsThisEncounter = 0;
     let sinnohCarryKnownTmTiers = {};
+    let lastElitePrepBagClickSignature = '';
+    let lastElitePrepBagClickAt = 0;
+    let lastMapBagClickSignature = '';
+    let lastMapBagClickAt = 0;
     let lastChosenItemName = '';
     let baggedItemCooldowns = {};
     let blockedItemAssignmentKeys = {};
@@ -1745,7 +1749,7 @@
         lockedKeys: [],
         panel: { x: 16, y: 128 },
         collapsed: false,
-        duplicateCatches: CONFIG.ALLOW_DUPLICATE_CATCHES,
+        duplicateCatches: false,
         starterMode: 'auto',
         autoRestart: CONFIG.AUTO_RESTART,
         starterPreference: ''
@@ -1764,7 +1768,7 @@
 
     function log(level, emoji, msg) {
         if (LOG_LEVELS[level] >= LOG_LEVELS[CONFIG.LOG_LEVEL]) {
-            console.log(`${emoji} [Engine7] ${msg}`);
+            console.log(`${emoji} [Engine] ${msg}`);
         }
     }
 
@@ -1796,7 +1800,7 @@
                 y: Number.isFinite(raw?.panel?.y) ? raw.panel.y : BOT_CONTROL_DEFAULT_STATE.panel.y
             },
             collapsed: Boolean(raw.collapsed),
-            duplicateCatches: raw.duplicateCatches === undefined ? CONFIG.ALLOW_DUPLICATE_CATCHES : Boolean(raw.duplicateCatches),
+            duplicateCatches: raw.tactic === 'duplicate',
             paused: Boolean(raw.paused),
             starterMode: ['auto', 'manual', 'preferred'].includes(raw.starterMode)
                 ? raw.starterMode
@@ -1859,7 +1863,7 @@
 
     function getBotControlDuplicateCatchesEnabled() {
         const state = getBotControlState();
-        return Boolean(state.duplicateCatches || state.tactic === 'duplicate');
+        return state.tactic === 'duplicate';
     }
 
     function isDuplicatePriorityMode() {
@@ -1971,19 +1975,18 @@
             const isMain = mainKey ? mainKey === key : isMainCarryUnit(unit);
             const isLocked = locked.has(key);
             const hp = Math.max(0, Math.min(100, unit.hp || 0));
+            const hpClass = unit.isFainted || hp <= 0 ? ' is-fainted' : (hp < CONFIG.LOW_HP_THRESHOLD ? ' is-low' : '');
             const spriteHtml = sprite
                 ? `<img class="e7c-slot-img" src="${escapeHtml(sprite)}" alt="">`
                 : `<span class="e7c-slot-fallback">${escapeHtml((unit.name || '?').slice(0, 2).toUpperCase())}</span>`;
+            const title = `${unit.name || 'unknown'} Lv${unit.level || 0} / ${hp}%${isLocked ? ' - bloqueado' : ''}${isMain ? ' - principal' : ''}`;
             return `
-                <div class="e7c-slot${isMain ? ' is-main' : ''}${isLocked ? ' is-locked' : ''}" data-key="${escapeHtml(key)}">
-                    <button class="e7c-icon-btn e7c-main-btn" data-action="main" data-key="${escapeHtml(key)}" title="Principal">${isMain ? 'M' : '+'}</button>
-                    <div class="e7c-avatar">${spriteHtml}</div>
-                    <div class="e7c-slot-meta">
-                        <div class="e7c-name">${escapeHtml(unit.name || 'unknown')}</div>
-                        <div class="e7c-sub">Lv${unit.level || 0} / ${hp}%</div>
-                        <div class="e7c-hp"><span style="width:${hp}%"></span></div>
-                    </div>
-                    <button class="e7c-icon-btn e7c-lock-btn" data-action="lock" data-key="${escapeHtml(key)}" title="No reemplazar">${isLocked ? 'Lock' : 'Free'}</button>
+                <div class="e7c-mon${isMain ? ' is-main' : ''}${isLocked ? ' is-locked' : ''}${hpClass}" data-key="${escapeHtml(key)}" title="${escapeHtml(title)}">
+                    <button class="e7c-mon-main" data-action="main" data-key="${escapeHtml(key)}" title="Marcar como principal">${isMain ? 'M' : '+'}</button>
+                    <button class="e7c-mon-lock" data-action="lock" data-key="${escapeHtml(key)}" title="Bloquear o liberar reemplazo">
+                        ${spriteHtml}
+                    </button>
+                    <span class="e7c-mon-hp" aria-hidden="true"><span style="width:${hp}%"></span></span>
                 </div>
             `;
         }).join('') || '<div class="e7c-empty">Sin equipo visible</div>';
@@ -2017,53 +2020,53 @@
                     <input type="checkbox" data-action="auto-restart"${state.autoRestart ? ' checked' : ''}>
                     <span>Restart automatico</span>
                 </label>
-                <label class="e7c-check">
-                    <input type="checkbox" data-action="duplicate-catches"${state.duplicateCatches ? ' checked' : ''}>
-                    <span>Permitir duplicados</span>
-                </label>
                 <div class="e7c-team">${slots}</div>
             </div>
         `;
     }
 
     function injectBotControlStyles() {
-        if (document.getElementById('engine7-control-style')) return;
+        if (document.getElementById('Engine-control-style')) return;
         const style = document.createElement('style');
-        style.id = 'engine7-control-style';
+        style.id = 'Engine-control-style';
         style.textContent = `
-            #engine7-control-panel { position: fixed; z-index: 2147483647; width: min(330px, calc(100vw - 24px)); max-height: min(620px, calc(100vh - 24px)); overflow: hidden; background: rgba(18,24,31,.94); color: #f7fafc; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 14px 36px rgba(0,0,0,.35); border-radius: 8px; font: 12px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-            #engine7-control-panel.is-collapsed { width: auto; max-width: calc(100vw - 12px); max-height: 42px; }
-            #engine7-control-panel * { box-sizing: border-box; }
+            #Engine-control-panel { position: fixed; z-index: 2147483647; width: min(360px, calc(100vw - 24px)); min-width: 224px; max-width: calc(100vw - 12px); min-height: 42px; max-height: min(620px, calc(100vh - 24px)); overflow: hidden; resize: both; background: rgba(18,24,31,.94); color: #f7fafc; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 14px 36px rgba(0,0,0,.35); border-radius: 8px; font: 12px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+            #Engine-control-panel.is-collapsed { width: auto; max-width: calc(100vw - 12px); max-height: 42px; }
+            #Engine-control-panel * { box-sizing: border-box; }
             .e7c-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 8px; cursor: move; background: rgba(255,255,255,.08); user-select: none; }
-            #engine7-control-panel.is-collapsed .e7c-head { grid-template-columns: auto auto; gap: 6px; padding: 6px; }
+            #Engine-control-panel.is-collapsed .e7c-head { grid-template-columns: auto auto; gap: 6px; padding: 6px; }
             .e7c-head strong { font-size: 13px; letter-spacing: 0; }
-            #engine7-control-panel.is-collapsed .e7c-head strong { display: none; }
-            .e7c-body { display: grid; gap: 8px; padding: 8px; overflow: auto; max-height: 560px; }
+            #Engine-control-panel.is-collapsed .e7c-head strong { display: none; }
+            .e7c-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; padding: 8px; overflow: auto; max-height: calc(100% - 42px); }
             .e7c-field { display: grid; gap: 4px; color: #cbd5e1; }
             .e7c-field select { width: 100%; min-height: 30px; color: #f8fafc; background: #111827; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 4px 8px; }
             .e7c-check { display: flex; align-items: center; gap: 8px; min-height: 28px; color: #cbd5e1; }
             .e7c-check input { width: 16px; height: 16px; accent-color: #74d680; }
-            .e7c-team { display: grid; gap: 6px; }
-            .e7c-slot { display: grid; grid-template-columns: 32px 38px minmax(0,1fr) 50px; gap: 6px; align-items: center; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: rgba(255,255,255,.05); }
-            .e7c-slot.is-main { border-color: #74d680; background: rgba(43,138,62,.18); }
-            .e7c-slot.is-locked { box-shadow: inset 3px 0 0 #facc15; }
-            .e7c-avatar { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 6px; background: rgba(255,255,255,.08); overflow: hidden; }
-            .e7c-slot-img { max-width: 36px; max-height: 36px; object-fit: contain; }
+            .e7c-team { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 6px; }
+            .e7c-mon { position: relative; aspect-ratio: 1; min-width: 0; min-height: 42px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.22); border-radius: 7px; background: linear-gradient(180deg, rgba(83,176,91,.95), rgba(42,126,62,.92)); padding: 2px; overflow: hidden; }
+            .e7c-mon:hover { filter: brightness(1.08); }
+            .e7c-mon.is-main { outline: 2px solid #facc15; outline-offset: -2px; }
+            .e7c-mon.is-locked { background: linear-gradient(180deg, rgba(210,72,72,.96), rgba(139,38,38,.94)); }
+            .e7c-mon.is-low:not(.is-locked) { background: linear-gradient(180deg, rgba(224,151,54,.96), rgba(151,92,29,.94)); }
+            .e7c-mon.is-fainted { filter: grayscale(.8) brightness(.78); }
+            .e7c-mon-lock { position: absolute; inset: 0; display: grid; place-items: center; border: 0; background: transparent; cursor: pointer; padding: 2px; }
+            .e7c-mon-main { position: absolute; z-index: 2; top: 3px; left: 3px; width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.42); border-radius: 5px; color: #f8fafc; background: rgba(17,24,39,.64); cursor: pointer; font: 700 10px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; padding: 0; }
+            .e7c-mon-main:hover { background: rgba(255,255,255,.18); }
+            .e7c-mon.is-main .e7c-mon-main { color: #111827; background: #facc15; border-color: transparent; }
+            .e7c-slot-img { width: 100%; height: 100%; max-width: 42px; max-height: 42px; object-fit: contain; }
             .e7c-slot-fallback { font-weight: 700; color: #e2e8f0; }
-            .e7c-slot-meta { min-width: 0; }
-            .e7c-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; }
-            .e7c-sub { color: #a7b4c4; font-size: 11px; }
-            .e7c-hp { height: 4px; margin-top: 4px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
-            .e7c-hp span { display: block; height: 100%; background: #4ade80; }
+            .e7c-mon-hp { position: absolute; z-index: 2; left: 4px; right: 4px; bottom: 4px; height: 4px; border-radius: 4px; background: rgba(0,0,0,.35); overflow: hidden; pointer-events: none; }
+            .e7c-mon-hp span { display: block; height: 100%; border-radius: inherit; background: #bbf7d0; }
+            .e7c-mon.is-low .e7c-mon-hp span { background: #fde68a; }
+            .e7c-mon.is-fainted .e7c-mon-hp span { background: #fecaca; }
             .e7c-icon-btn { min-width: 30px; min-height: 28px; border: 1px solid rgba(255,255,255,.18); border-radius: 6px; color: #f8fafc; background: rgba(255,255,255,.08); cursor: pointer; font: inherit; }
             .e7c-icon-btn:hover { background: rgba(255,255,255,.16); }
-            #engine7-control-panel.is-collapsed .e7c-icon-btn { width: 32px; min-width: 32px; padding: 0; overflow: hidden; white-space: nowrap; }
-            #engine7-control-panel.is-collapsed .e7c-play { font-size: 0; }
-            #engine7-control-panel.is-collapsed .e7c-play::after { content: attr(data-short); font-size: 12px; }
-            .e7c-lock-btn { width: 50px; }
-            .e7c-empty { color: #a7b4c4; padding: 10px; text-align: center; }
+            #Engine-control-panel.is-collapsed .e7c-icon-btn { width: 32px; min-width: 32px; padding: 0; overflow: hidden; white-space: nowrap; }
+            #Engine-control-panel.is-collapsed .e7c-play { font-size: 0; }
+            #Engine-control-panel.is-collapsed .e7c-play::after { content: attr(data-short); font-size: 12px; }
+            .e7c-empty { grid-column: 1 / -1; color: #a7b4c4; padding: 10px; text-align: center; }
             @media (max-width: 520px) {
-                #engine7-control-panel { width: min(330px, calc(100vw - 12px)); max-height: calc(100vh - 12px); }
+                #Engine-control-panel { width: min(360px, calc(100vw - 12px)); max-height: calc(100vh - 12px); }
                 .e7c-body { max-height: calc(100vh - 58px); }
             }
         `;
@@ -2102,7 +2105,6 @@
             else if (action === 'main-select') updateBotControlState({ mainCarryKey: target.value || '' });
             else if (action === 'starter-mode') updateBotControlState({ starterMode: target.value || 'auto' });
             else if (action === 'auto-restart') updateBotControlState({ autoRestart: Boolean(target.checked) });
-            else if (action === 'duplicate-catches') updateBotControlState({ duplicateCatches: Boolean(target.checked) });
             else if (action === 'starter-input') updateBotControlState({ starterPreference: target.value });
             else if (action === 'map-input') updateBotControlState({ mapPreference: target.value });
             renderBotControlPanel(true);
@@ -2186,7 +2188,7 @@
         injectBotControlStyles();
         if (!botControlPanel) {
             botControlPanel = document.createElement('div');
-            botControlPanel.id = 'engine7-control-panel';
+            botControlPanel.id = 'Engine-control-panel';
             document.body.appendChild(botControlPanel);
         }
         renderBotControlPanel();
@@ -2557,6 +2559,25 @@
         return null;
     }
 
+    function getItemModalFallbackButton(isUsableModal, equipItemName = '') {
+        const normalized = normalizeItemName(equipItemName);
+        if (normalized === 'move tutor' || normalized === 'tm normal') {
+            const skipTutorBtn = document.getElementById('btn-skip-tutor');
+            if (skipTutorBtn && isEnabledActionControl(skipTutorBtn)) return skipTutorBtn;
+        }
+
+        const legacyIds = isUsableModal
+            ? ['btn-cancel-use', 'btn-equip-cancel', 'btn-skip-tutor']
+            : ['btn-equip-cancel', 'btn-equip-to-bag', 'btn-skip-tutor'];
+
+        for (const id of legacyIds) {
+            const btn = document.getElementById(id);
+            if (btn && isEnabledActionControl(btn)) return btn;
+        }
+
+        return findItemModalExitControl(getActiveItemModal(), !isUsableModal);
+    }
+
     function closeUnavailableItemModal(modal, itemName, reason, options = {}) {
         const normalized = normalizeItemName(itemName || lastChosenItemName || '');
         if (normalized) {
@@ -2573,7 +2594,8 @@
             modal: modal?.id || 'item-modal'
         });
 
-        const exit = findItemModalExitControl(modal, options.preferBag !== false);
+        const exit = findItemModalExitControl(modal, options.preferBag !== false) ||
+                     getItemModalFallbackButton(options.preferBag === false, normalized || itemName || '');
         if (exit) {
             log('info', '🎒', `Skipping [${normalized || itemName || 'unknown'}] (${reason}). Closing item modal.`);
             triggerRealClick(exit);
@@ -5324,10 +5346,40 @@
         return baseMargin;
     }
 
+    function getMapNodeImageElement(node) {
+        if (!node) return null;
+        return node.querySelector('image.map-node-sprite, img.map-node-sprite, image, img');
+    }
+
     function getNodeImageSrc(node) {
-        if (!node) return '';
-        const img = node.querySelector('image, img');
+        const img = getMapNodeImageElement(node);
         return img ? (img.getAttribute('href') || img.getAttribute('xlink:href') || img.src || '').toLowerCase() : '';
+    }
+
+    function getMapNodeSpriteKey(node) {
+        const src = getNodeImageSrc(node);
+        if (!src) return '';
+        const cleanSrc = src.split(/[?#]/)[0].replace(/\\/g, '/');
+        return (cleanSrc.split('/').pop() || '')
+            .replace(/\.[a-z0-9]+$/i, '')
+            .replace(/_/g, '-');
+    }
+
+    function classifyMapNodeBySprite(node) {
+        const key = getMapNodeSpriteKey(node);
+        if (!key) return '';
+
+        if (key.match(/master.?ball|ball.?master|legendary|legendario|legendaria|mythical/)) return 'legendary';
+        if (key.match(/poke.?center|pokecenter|pokemon.?center|center/)) return 'center';
+        if (key.match(/mistery.?trainer|mystery.?trainer|final.?trainer|boss/)) return 'boss';
+        if (key.match(/pokeball|poke.?ball|catch/)) return 'catch';
+        if (key.match(/grass|wild/)) return 'grass';
+        if (key.match(/item|backpack|bag/)) return 'item';
+        if (key.match(/question.?mark|random|unknown|mystery/)) return 'unknown';
+        if (key.match(/scientist|professor|passive|buff/)) return 'buff';
+        if (key.match(/trainer|team.?rocket|old.?guy|gentleman|hiker|fisher|fisherman|swimmer|black.?belt|psychic|bird|sailor|camper|picnic|juggler|burglar|channeler|engineer|rocker|tamer|beauty|cue.?ball|lass|youngster|cooltrainer|ace|super.?nerd|nerd|biker|gambler/)) return 'trainer';
+
+        return '';
     }
 
     function getNodeDescriptorParts(node) {
@@ -6178,7 +6230,7 @@
 
     function exposeRunHistoryHelpers() {
         if (typeof window === 'undefined') return;
-        window.Engine7RunHistory = {
+        window.EngineRunHistory = {
             current: () => currentRunTelemetry,
             all: () => getRunHistory(),
             latest: () => getRunHistory().slice(-1)[0] || null,
@@ -6761,6 +6813,19 @@
         return false;
     }
 
+    function getMapNodeElements() {
+        const rawNodes = Array.from(document.querySelectorAll('g.map-node, .map-node--clickable'));
+        const seen = new Set();
+        return rawNodes.filter(node => {
+            if (!node || seen.has(node)) return false;
+            seen.add(node);
+            const className = String(node.getAttribute('class') || '');
+            if (className.includes('map-node-sprite')) return false;
+            return node.classList.contains('map-node') ||
+                   node.classList.contains('map-node--clickable');
+        });
+    }
+
     function getCurrentMapKey() {
         const mapInfo = foldText(document.getElementById('map-info')?.innerText || '');
         const stageInfo = foldText([
@@ -6774,7 +6839,7 @@
             return `${stageInfo || 'stage'}::${mapInfo || 'map'}`;
         }
 
-        const nodes = Array.from(document.querySelectorAll('.map-node, [class*="map-node"]')).map(node => {
+        const nodes = getMapNodeElements().map(node => {
             return `${node.getAttribute('transform') || ''}:${getNodeImageSrc(node)}`;
         }).join('|');
 
@@ -6799,6 +6864,8 @@
         lastMapDecisionFingerprint = '';
         lastMapClickSignature = '';
         lastStuckProgressSignature = '';
+        lastMapBagClickSignature = '';
+        lastMapBagClickAt = 0;
         repeatedMapClickCount = 0;
         lastCatchRerollSignature = '';
         lastCatchRerollAt = 0;
@@ -6890,6 +6957,8 @@
     }
 
     function classifyMapNode(node) {
+        const spriteType = classifyMapNodeBySprite(node);
+        if (spriteType) return spriteType;
         const text = getNodeClassificationText(node);
 
         if (text.match(/master.?ball|ball.?master|\bmaster\b|legendary[-_ ]?encounter|legendary.?pokemon|legendary|legendario|legendaria|mythical|mitico|mitica|legend.?battle|boss.?legend/)) return 'legendary';
@@ -6918,7 +6987,7 @@
 
     function parseMapTree() {
         const mapSvg = document.getElementById('map-svg') || document.querySelector('#map-container svg');
-        const rawNodes = Array.from(document.querySelectorAll('.map-node, [class*="map-node"]'));
+        const rawNodes = getMapNodeElements();
         const seen = new Set();
         let nodes = rawNodes.filter(node => {
             if (!node || seen.has(node)) return false;
@@ -6939,7 +7008,7 @@
         // Sort from top to bottom, left to right
         nodes.sort((a, b) => (a.y - b.y) || (a.x - b.x));
         
-        // Re-assign index so that 0 is top-most (Boss) and 22 is bottom-most (Start)
+        // Re-assign index so that 0 is top-most/current and 22 is bottom-most/final.
         nodes.forEach((node, idx) => {
             node.index = idx;
         });
@@ -6949,30 +7018,32 @@
 
         // Exact known 23-node map structure
         if (nodes.length === 23) {
+            nodes[22].type = 'boss';
+
             const HARDCODED_MAP_ADJACENCY = {
-                22: [20, 21],
-                20: [17, 18],
-                21: [18, 19],
-                17: [13, 14],
-                18: [14, 15],
-                19: [15, 16],
-                13: [10],
-                14: [10, 11],
-                15: [11, 12],
-                16: [12],
-                10: [6, 7],
-                11: [7, 8],
-                12: [8, 9],
-                6: [3],
-                7: [3, 4],
-                8: [4, 5],
-                9: [5],
-                3: [1],
-                4: [1, 2],
-                5: [2],
-                1: [0],
-                2: [0],
-                0: []
+                0: [1, 2],
+                1: [3, 4],
+                2: [4, 5],
+                3: [6, 7],
+                4: [7, 8],
+                5: [8, 9],
+                6: [10],
+                7: [10, 11],
+                8: [11, 12],
+                9: [12],
+                10: [13, 14],
+                11: [14, 15],
+                12: [15, 16],
+                13: [17],
+                14: [17, 18],
+                15: [18, 19],
+                16: [19],
+                17: [20],
+                18: [20, 21],
+                19: [21],
+                20: [22],
+                21: [22],
+                22: []
             };
 
             nodes.forEach(node => {
@@ -6983,7 +7054,7 @@
                 });
             });
 
-            return { nodes, edges, adjacency, hasRealEdges: true };
+            return { nodes, edges, adjacency, hasRealEdges: true, edgeSource: 'known 23-node graph' };
         }
 
         // Fallback for maps of different sizes
@@ -7022,7 +7093,13 @@
             });
         }
 
-        return { nodes, edges, adjacency, hasRealEdges: edges.length > 0 };
+        return {
+            nodes,
+            edges,
+            adjacency,
+            hasRealEdges: edges.length > 0,
+            edgeSource: edges.length > 0 ? 'svg line graph' : 'layer fallback'
+        };
     }
 
     function getNextMapLayerNodes(tree, node) {
@@ -7469,8 +7546,8 @@
         return ['item', 'buff', 'catch', 'grass', 'unknown', 'trainer', 'trade', 'legendary'].includes(type);
     }
 
-    function getBestPathSummary(mapNode, tree, context, depth = CONFIG.PATH_LOOKAHEAD_DEPTH) {
-        const path = [];
+    function getBestRouteFromNode(mapNode, tree, context, depth = CONFIG.PATH_LOOKAHEAD_DEPTH) {
+        const route = [];
         const seen = new Set();
         let current = mapNode;
         let remaining = depth;
@@ -7478,7 +7555,7 @@
         let routeScoutCount = 0;
 
         while (current && remaining > 0 && !seen.has(current.index)) {
-            path.push(current.type);
+            route.push(current);
             seen.add(current.index);
             routeItemCount += current.type === 'item' ? 1 : 0;
             routeScoutCount = isTrainingMapNodeType(current.type)
@@ -7492,7 +7569,60 @@
             remaining--;
         }
 
-        return path.join(' > ');
+        return route;
+    }
+
+    function getBestPathSummary(mapNode, tree, context, depth = CONFIG.PATH_LOOKAHEAD_DEPTH) {
+        return getBestRouteFromNode(mapNode, tree, context, depth)
+            .map(node => node.type)
+            .join(' > ');
+    }
+
+    function getMapRouteIndexes(route) {
+        return (route || [])
+            .map(node => Number.isFinite(node.index) ? node.index : '?')
+            .join('-');
+    }
+
+    function getMapRouteTypeSummary(route) {
+        return (route || [])
+            .map(node => `${Number.isFinite(node.index) ? node.index : '?'}:${node.type || 'unknown'}`)
+            .join(' > ');
+    }
+
+    function getMapGraphLabel(tree) {
+        if (!tree) return 'sin grafo';
+        if (tree.hasRealEdges) {
+            return `${tree.edgeSource || 'real graph'} ${tree.edges.length} edges`;
+        }
+        return tree.edgeSource || 'layer fallback';
+    }
+
+    function getMapRouteKnowledgeLabel(tree, route) {
+        if (!tree || !route || route.length === 0) return 'sin ruta';
+        const lastNode = route[route.length - 1];
+        const reachesTerminal = getNextMapLayerNodes(tree, lastNode).length === 0;
+        if (tree.hasRealEdges && reachesTerminal) return 'ruta completa conocida';
+        if (tree.hasRealEdges) return 'ruta parcial conocida';
+        return 'ruta estimada por capas';
+    }
+
+    function getMapStrategyLabel(context = {}, chosenNode = null) {
+        const tactic = getBotControlTactic();
+        if (tactic && tactic !== 'auto') {
+            return `control:${BOT_CONTROL_TACTICS[tactic] || tactic}`;
+        }
+        if (context.storyStrategy?.active) return `historia:${context.storyStrategy.region || 'region'}`;
+        if (context.challengeStrategy?.active) return 'desafio';
+        if (context.shinyRoute?.tacticActive) return 'shiny';
+        if (context.sinnohTraining?.active) return 'entrenamiento Sinnoh';
+        if (context.earlyLevelingPriority) return 'subir nivel temprano';
+        if (context.bossPrepStatus && !context.bossPrepStatus.ready) {
+            return `preparacion boss ${context.bossPrepStatus.targets?.reason || ''}`.trim();
+        }
+        if (chosenNode?.type === 'center') return 'curacion';
+        if (context.captureCapReached) return 'cap capturas';
+        return 'auto';
     }
 
     // ╔══════════════════════════════════════════════════════════════╗
@@ -7661,7 +7791,7 @@
         const bagItems = getBagItems();
         if (bagItems.length > 0) {
             const bestBagItem = pickBestBagItemForTeam(bagItems, team, opponentProfile);
-            if (bestBagItem && shouldEquipBagItem(bestBagItem.name, team, opponentProfile)) {
+            if (bestBagItem && shouldEquipBagItem(bestBagItem.name, team, opponentProfile) && shouldAttemptMapBagItem(bestBagItem.name, team)) {
                 log('info', '🎒', `Found useful bag item: [${bestBagItem.name}]. Opening equip modal.`);
                 lastChosenItemName = bestBagItem.name;
                 triggerRealClick(bestBagItem.element);
@@ -7736,6 +7866,17 @@
             return { node, mapNode, score };
         }).sort((a, b) => b.score - a.score);
 
+        if (mapChangedSinceLastDecision) {
+            const availableSummary = candidates
+                .map(candidate => `${candidate.mapNode.index}:${candidate.mapNode.type}`)
+                .join(', ');
+            log('info', 'map', `Nodos disponibles: ${availableSummary || 'ninguno'}`);
+            candidates.forEach(candidate => {
+                const route = getBestRouteFromNode(candidate.mapNode, mapTree, context, CONFIG.PATH_LOOKAHEAD_DEPTH);
+                log('debug', '🧭', `Nodo candidato ${candidate.mapNode.index}:${candidate.mapNode.type} score=${candidate.score.toFixed(1)} ruta=${getMapRouteIndexes(route)} | ${getMapRouteTypeSummary(route)}`);
+            });
+        }
+
         const preferredCandidate = (() => {
             for (const candidate of candidates) {
                 const signature = `${currentMapKey || '-'}:${candidate.mapNode.index}:${candidate.mapNode.type}:${Math.round(candidate.mapNode.x)}:${Math.round(candidate.mapNode.y)}`;
@@ -7784,12 +7925,25 @@
             const shouldReorderForNode = bestMapNode.type === 'boss' ||
                                          bestMapNode.type === 'legendary' ||
                                          (bestMapNode.type === 'trainer' && (isNodeSpecificOpponentProfile(nextProfile) || isBossOpponentProfile(nextProfile)));
+            const duplicateOrderProfile = isDuplicatePriorityMode() &&
+                                          hasDuplicatePair(team) &&
+                                          ['trainer', 'boss', 'legendary'].includes(bestMapNode.type) &&
+                                          !nextProfile
+                ? makeOpponentProfile({ name: 'duplicate-order', types: [], sourceConfidence: 'duplicate-order' })
+                : null;
+            const orderProfile = nextProfile || duplicateOrderProfile;
             if (['trainer', 'boss', 'legendary'].includes(bestMapNode.type) && ensureLeadMeetsBattleLevel(team, bossPrepStatus, nextProfile)) return;
-            if (nextProfile && shouldReorderForNode && optimizeTeamOrder(team, nextProfile, bossPrepStatus)) return;
+            if (orderProfile && (shouldReorderForNode || duplicateOrderProfile) && optimizeTeamOrder(team, orderProfile, bossPrepStatus)) return;
             if (nextProfile && shouldReorderForNode && ensureLeadHasHeldItem(team, nextProfile)) return;
 
-            const pathSummary = getBestPathSummary(bestMapNode, mapTree, context, CONFIG.PATH_LOOKAHEAD_DEPTH);
-            const edgeMode = mapTree.hasRealEdges ? `real graph ${mapTree.edges.length} edges` : 'layer fallback';
+            const chosenRoute = getBestRouteFromNode(bestMapNode, mapTree, context, CONFIG.PATH_LOOKAHEAD_DEPTH);
+            const pathSummary = chosenRoute.map(node => node.type).join(' > ');
+            const routeIndexes = getMapRouteIndexes(chosenRoute);
+            const routeTypes = getMapRouteTypeSummary(chosenRoute);
+            const routeKnowledge = getMapRouteKnowledgeLabel(mapTree, chosenRoute);
+            const routeStrategy = getMapStrategyLabel(context, bestMapNode);
+            const edgeMode = getMapGraphLabel(mapTree);
+            const clickSignature = `${currentMapKey || '-'}:${bestMapNode.index}:${bestMapNode.type}:${Math.round(bestMapNode.x)}:${Math.round(bestMapNode.y)}`;
             const allMapNodes = mapTree.nodes;
             const clickableMapNodes = allMapNodes.filter(node => node.clickable);
             const visibleLegendaryNodes = mapTree.nodes.filter(node => node.type === 'legendary').length;
@@ -7819,6 +7973,10 @@
                     unknownNodeHints,
                     score: Number(highestScore.toFixed(1)),
                     path: pathSummary,
+                    routeIndexes,
+                    routeTypes,
+                    routeKnowledge,
+                    routeStrategy,
                     edgeMode,
                     nextOpponent: compactOpponentProfile(nextProfile),
                     teamSize: team.length,
@@ -7866,8 +8024,10 @@
                 currentRunTelemetry.best.mapSteps = Math.max(currentRunTelemetry.best.mapSteps, currentRunTelemetry.events.filter(event => event.type === 'map-choice').length);
                 currentRunTelemetry.best.battles = Math.max(currentRunTelemetry.best.battles, getRunBattleCount(currentRunTelemetry));
             }
+            if (mapChangedSinceLastDecision || clickSignature !== lastMapClickSignature || repeatedMapClickCount <= 1) {
+                log('info', '🧭', `Ruta decidida según estrategia ${routeStrategy}: ${routeIndexes} | ${routeKnowledge} | ${edgeMode} | ${routeTypes}`);
+            }
             log('debug', '🗺️', `Map reevaluated ${clickableNodes.length} clickable options over ${allMapNodes.length} total nodes (${mapChangedSinceLastDecision ? 'fresh state' : 'repeat'}). ${edgeMode}. Path=${pathSummary}. Captures=${capturesThisMap}/${CONFIG.MAX_CATCHES_PER_MAP} target=${bossPrepTargets.reason}:${bossPrepTargets.avgLevel}/${bossPrepTargets.leadLevel} training=${trainingCore} earlyExpansionClosed=${earlyExpansionClosed} avgLv=${avgLevel.toFixed(1)} leadLv=${leadLevel}. Score=${highestScore.toFixed(1)}`);
-            const clickSignature = `${currentMapKey || '-'}:${bestMapNode.index}:${bestMapNode.type}:${Math.round(bestMapNode.x)}:${Math.round(bestMapNode.y)}`;
             if (clickSignature === lastMapClickSignature) repeatedMapClickCount++;
             else {
                 lastMapClickSignature = clickSignature;
@@ -7890,6 +8050,29 @@
             recordRunEvent('battle-auto', { team: compactTeamSnapshot(parseTeamStatus(), detectNextOpponentProfile()) });
             triggerRealClick(skipBtn);
         }
+    }
+
+    function shouldAttemptElitePrepBagItem(itemName, team) {
+        const signature = `${itemName}:${(team || []).map(p => `${p.name}:${p.heldItem || '-'}:${p.level || 0}`).join('|')}`;
+        if (signature === lastElitePrepBagClickSignature && Date.now() - lastElitePrepBagClickAt < 8000) {
+            log('warn', '🎒', `Elite prep: skipping repeated bag item [${itemName}] and proceeding to FIGHT.`);
+            return false;
+        }
+        lastElitePrepBagClickSignature = signature;
+        lastElitePrepBagClickAt = Date.now();
+        return true;
+    }
+
+    function shouldAttemptMapBagItem(itemName, team) {
+        const signature = `${currentMapKey || '-'}:${itemName}:${(team || []).map(p => `${p.name}:${p.heldItem || '-'}:${p.level || 0}`).join('|')}`;
+        if (signature === lastMapBagClickSignature && Date.now() - lastMapBagClickAt < 8000) {
+            log('warn', '🎒', `Skipping repeated map bag item [${itemName}] after no progress.`);
+            markItemKeptInBag(itemName, { team, reason: 'repeated-map-bag-item', blockAssignment: true });
+            return false;
+        }
+        lastMapBagClickSignature = signature;
+        lastMapBagClickAt = Date.now();
+        return true;
     }
 
     function isEnabledActionControl(control) {
@@ -8860,12 +9043,12 @@
         const allCards = Array.from(document.querySelectorAll('#passive-choices .item-card, #passive-choices .passive-card'));
         const cards = allCards.filter(isSelectablePassiveCard);
         if (allCards.length > 0 && cards.length < allCards.length) {
-            log('debug', 'ðŸ§©', `Ignoring ${allCards.length - cards.length} locked/unavailable passive choice(s).`);
+            log('debug', '🧩', `Ignoring ${allCards.length - cards.length} locked/unavailable passive choice(s).`);
         }
         if (cards.length === 0) {
             const skipBtn = document.querySelector('#passive-choices .choice-skip-btn, #passive-choices button');
             if (skipBtn && isEnabledActionControl(skipBtn)) {
-                log('warn', 'ðŸ§©', 'No selectable passive choices found. Skipping passive choice.');
+                log('warn', '🧩', 'No selectable passive choices found. Skipping passive choice.');
                 triggerRealClick(skipBtn);
             }
             return;
@@ -9562,7 +9745,7 @@
 
             const bagItems = getBagItems();
             const bestBagItem = pickBestBagItemForTeam(bagItems, team, prepProfile);
-            if (bestBagItem && shouldEquipBagItem(bestBagItem.name, team, prepProfile)) {
+            if (bestBagItem && shouldEquipBagItem(bestBagItem.name, team, prepProfile) && shouldAttemptElitePrepBagItem(bestBagItem.name, team)) {
                 log('info', '🎒', `Elite prep: equipping/using [${bestBagItem.name}] before FIGHT.`);
                 lastChosenItemName = bestBagItem.name;
                 triggerRealClick(bestBagItem.element);
@@ -10562,12 +10745,12 @@
 
     function printBanner() {
         console.log('%c╔══════════════════════════════════════════════════╗', 'color: #00ff88; font-weight: bold');
-        console.log('%c║  Pokelike Tower Engine v8.8 - Story League AI  ║', 'color: #00ff88; font-weight: bold');
+        console.log('%c║  Easy Pokelike v9.5 - Fusion Engine            ║', 'color: #00ff88; font-weight: bold');
         console.log('%c╠══════════════════════════════════════════════════╣', 'color: #00ff88; font-weight: bold');
-        console.log('%c║  18-type chart • 15+ screen handlers            ║', 'color: #88ffaa');
+        console.log('%c║  Story • Tower • Challenge • Weekly modes       ║', 'color: #88ffaa');
+        console.log('%c║  Shiny, duplicate, item, MT and route tactics   ║', 'color: #88ffaa');
         console.log('%c║  Trait-aware drafting • Smart counter-picks     ║', 'color: #88ffaa');
-        console.log('%c║  Trade evaluation • Anti-stuck watchdog         ║', 'color: #88ffaa');
-        console.log('%c║  Auto-restart • Configurable Eevee evolution    ║', 'color: #88ffaa');
+        console.log('%c║  Telemetry • Anti-stuck • Auto-restart          ║', 'color: #88ffaa');
         console.log('%c╚══════════════════════════════════════════════════╝', 'color: #00ff88; font-weight: bold');
         console.log(`%c  Loop: ${CONFIG.LOOP_SPEED_MS}ms | Eevee: ${CONFIG.EEVEE_EVOLUTION_PREFERENCE} | Restart: ${getBotControlAutoRestartEnabled()}`, 'color: #aaaaaa');
     }
