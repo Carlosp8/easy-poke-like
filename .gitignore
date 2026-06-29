@@ -1,7 +1,12 @@
 .agents/
+node_modules/
+*.tsbuildinfo
 
 # Local extracted/generated artifacts
+bundle*.js
 pokelike-bundle.*.js
+pokelike-bundle*.js
+js/bundle*.js
 pokelike-*-extracted.json
 
 # OS/editor noise

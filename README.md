@@ -5,6 +5,7 @@ Userscript de Tampermonkey para automatizar runs de Pokelike. La version 9.5 fus
 ## Indice
 
 - [Instalacion](#instalacion)
+- [Desarrollo](#desarrollo)
 - [Panel de control](#panel-de-control)
 - [Tacticas](#tacticas)
 - [Modos de run](#modos-de-run)
@@ -30,6 +31,65 @@ El userscript se ejecuta con:
 - `@match *://*.pokelike.xyz/*`
 - `@run-at document-start`
 - `@grant none`
+
+## Desarrollo
+
+El userscript final se genera desde `src/`. No edites `easy-pokelike.user.js` a mano salvo para una prueba puntual: es un artefacto de build.
+
+- `src/userscript.meta.js`: cabecera Tampermonkey.
+- `src/core/manifest.json`: orden de concatenacion del motor.
+- `src/core/parts/`: secciones del motor dentro del mismo IIFE.
+- `src/core/types.d.ts`: vocabulario TypeScript para estado, Pokemon, nodos y metadata.
+- `src/data/generated/`: datos normalizados extraidos del bundle de Pokelike.
+- `scripts/*.ts`: tooling en TypeScript para build y extraccion.
+- `tests/*.mjs`: tests de build, extractor y resolucion de bundles.
+
+Comandos:
+
+- Requisito: Node 22 o superior para ejecutar TypeScript directo con `--experimental-strip-types`.
+- `npm run extract:bundle`: autodetecta el bundle local mas reciente (`bundle*.js`, `pokelike-bundle*.js` o `js/bundle*.js`) y regenera `src/data/generated/`.
+- `npm run extract:bundle -- bundle.xxxxx.js`: usa un bundle concreto sin depender del hash.
+- `npm run extract:bundle -- index.html`: lee el `<script src="...bundle....js">` de un HTML local y resuelve el JS referenciado.
+- `npm run build`: recompone `easy-pokelike.user.js` desde `src/` y ejecuta `node --check`.
+- `npm test`: valida extractor y build.
+- `npm run typecheck`: ejecuta TypeScript (`tsc`) cuando las dependencias de desarrollo esten instaladas.
+
+Los scripts TypeScript se ejecutan directamente con Node 22 usando `--experimental-strip-types`, asi que `build`, `test` y `extract:bundle` no necesitan un paso de compilacion. Para typecheck real instala dependencias (`npm install`) y usa `npm run typecheck`.
+
+### Arquitectura modular
+
+El core esta partido por responsabilidad, pero sigue compartiendo un unico scope de Tampermonkey:
+
+- `00-runtime-hooks.js`: arranque del IIFE y guards de eventos sinteticos.
+- `01-config-data.js`: configuracion, type chart y datos estaticos.
+- `02-controls-state.js`: estado mutable, controles persistidos y panel.
+- `03-detection-strategy.js`: parseo del DOM, deteccion de pantalla y heuristicas.
+- `04-scoring-routing.js`: scoring de matchups, orden de equipo y rutas.
+- `05-screen-handlers.js`: handlers por pantalla visible.
+- `06-initialization.js`: banner, timers y cierre del IIFE.
+
+El orden esta en `src/core/manifest.json`; si cambias ese orden cambias el comportamiento.
+
+### Extractor de bundle
+
+El extractor no depende del hash del archivo. Localiza por estructura:
+
+- `function x()` para la tabla de strings;
+- `function C(...)` para el decoder;
+- el bucle de rotacion inicial;
+- constantes logicas como `MOVE_POOL`, `ITEM_POOL`, `PASSIVE_ITEM_POOL`, `CHALLENGES`, `WEEKLY_CHALLENGES`, `NODE_TYPES`, evoluciones y abilities Gen 3.
+
+El resultado actual desde `bundle.e9e84cb924.js` queda registrado en `src/data/generated/bundle-meta.json` con:
+
+- Pokédex: 649;
+- moves: 18;
+- items: 33;
+- pasivos: 128;
+- challenges: 12;
+- node types: 14;
+- warnings: 0.
+
+Los bundles minificados locales no se trackean en git. Solo se guardan los datos normalizados y `src/data/generated/bundle-meta.json`, que incluye nombre del bundle fuente, SHA-256, fecha, conteos y warnings.
 
 ## Panel de control
 
@@ -280,13 +340,16 @@ El motor maneja:
 
 ## Datos incluidos
 
-El script incluye:
+El proyecto combina datos manuales del motor con datos generados desde el bundle:
 
 - tabla de efectividad de 18 tipos;
 - sistema de traits por tipo y tier;
 - base de Pokemon conocida;
 - overrides de stats y tipo de ataque principal;
 - pools de movimientos por tipo;
+- `ITEM_POOL`, `PASSIVE_ITEM_POOL` y `USABLE_ITEM_POOL` extraidos;
+- challenges, weekly challenges y node types extraidos;
+- evoluciones, branching evolutions, legendarios y abilities Gen 3 extraidos;
 - base de bosses de Kanto, Johto, Hoenn, Sinnoh y Unova;
 - planes especiales de Sinnoh para Arceus y Cynthia;
 - tier list de items;

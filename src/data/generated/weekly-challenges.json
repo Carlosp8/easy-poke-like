@@ -1,0 +1,39 @@
+[
+  {
+    "id": "hoenn-abilities",
+    "seq": 2,
+    "name": "Hoenn Ability Challenge",
+    "trainer": "Steven",
+    "eliteLevelMod": 0,
+    "desc": "A Hoenn-only Battle Tower run — only Gen 3 Pokémon as starters, in catch nodes, legendaries and mystery encounters — and every Pokémon battles with its Ability.",
+    "subs": [
+      {
+        "id": "medium",
+        "name": "Norman",
+        "tier": "Medium",
+        "gen3": true,
+        "levelMult": 1,
+        "reward": 2000,
+        "repeat": 1000
+      },
+      {
+        "id": "difficult",
+        "name": "Wallace",
+        "tier": "Difficult",
+        "gen3": true,
+        "levelMult": 1.1,
+        "reward": 5000,
+        "repeat": 1500
+      },
+      {
+        "id": "impossible",
+        "name": "Steven",
+        "tier": "Impossible",
+        "gen3": true,
+        "levelMult": 1.2,
+        "reward": 10000,
+        "repeat": 2000
+      }
+    ]
+  }
+]

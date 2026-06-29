@@ -1,0 +1,22 @@
+{
+  "1": {
+    "minGenId": 1,
+    "maxGenId": 151
+  },
+  "2": {
+    "minGenId": 152,
+    "maxGenId": 251
+  },
+  "3": {
+    "minGenId": 252,
+    "maxGenId": 386
+  },
+  "4": {
+    "minGenId": 387,
+    "maxGenId": 493
+  },
+  "5": {
+    "minGenId": 494,
+    "maxGenId": 649
+  }
+}

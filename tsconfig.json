@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [
+    "scripts/**/*.ts",
+    "tests/**/*.mjs",
+    "src/**/*.js",
+    "src/**/*.json"
+  ],
+  "exclude": [
+    "easy-pokelike.user.js",
+    "bundle*.js",
+    "pokelike-bundle*.js",
+    "pokelike-*-extracted.json",
+    "node_modules"
+  ]
+}
