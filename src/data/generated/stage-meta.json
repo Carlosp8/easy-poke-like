@@ -1,0 +1,33 @@
+[
+  null,
+  {
+    "label": "Kanto",
+    "gens": "Gen 1",
+    "color": "#e8503a"
+  },
+  {
+    "label": "Johto",
+    "gens": "Gen 2",
+    "color": "#c0a050"
+  },
+  {
+    "label": "Hoenn",
+    "gens": "Gen 3",
+    "color": "#60a878"
+  },
+  {
+    "label": "Sinnoh",
+    "gens": "Gen 4",
+    "color": "#7878c8"
+  },
+  {
+    "label": "Unova",
+    "gens": "Gen 5",
+    "color": "#808080"
+  },
+  {
+    "label": "Challenge Stage",
+    "gens": "All Gens",
+    "color": "#d4af37"
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "name": "easy-pokelike",
+  "version": "9.5.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "extract:bundle": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/extract-pokelike-bundle.ts",
+    "build": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/build-userscript.ts && node --check easy-pokelike.user.js",
+    "test": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}

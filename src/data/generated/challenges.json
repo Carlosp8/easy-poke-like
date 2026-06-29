@@ -1,0 +1,75 @@
+[
+  {
+    "id": "monotype",
+    "name": "Monotype",
+    "mon": 133,
+    "submenu": "monotype",
+    "desc": "Pick a type — catch nodes only ever offer Pokémon of that type. Clear the stage with each type."
+  },
+  {
+    "id": "starpiece",
+    "name": "Wish Upon a Star",
+    "mon": 385,
+    "desc": "Start with Star Piece active — your team is replaced with random Pokémon after every boss."
+  },
+  {
+    "id": "trickroom",
+    "name": "Trick Room",
+    "mon": 437,
+    "desc": "Speed is reversed — the slower Pokémon attacks first in every clash."
+  },
+  {
+    "id": "suddendeath",
+    "name": "Nuzlocke",
+    "mon": 94,
+    "desc": "Permadeath — any Pokémon that faints is lost for the rest of the run."
+  },
+  {
+    "id": "inverse",
+    "name": "Inverse World",
+    "mon": 487,
+    "desc": "The type chart is inverted — weaknesses become resistances and vice-versa."
+  },
+  {
+    "id": "legendary",
+    "name": "Legendary Opposition",
+    "mon": 150,
+    "desc": "Every enemy trainer fields a team of legendary Pokémon matching the map's type."
+  },
+  {
+    "id": "maptype",
+    "name": "Arena Floors",
+    "mon": 352,
+    "desc": "On each map you can only catch Pokémon (catches & shinies) of that map's boss type."
+  },
+  {
+    "id": "noreplace",
+    "name": "Ride or Die",
+    "mon": 58,
+    "desc": "Catch up to six — but you can never release or replace a Pokémon."
+  },
+  {
+    "id": "noevo",
+    "name": "Little League",
+    "mon": 172,
+    "desc": "Your Pokémon can never evolve. Win the stage with their first forms."
+  },
+  {
+    "id": "noheal",
+    "name": "Walk It Off",
+    "mon": 66,
+    "desc": "No Pokémon Centers, and no free heals between battles. Manage your HP."
+  },
+  {
+    "id": "onlyfight",
+    "name": "Wanted",
+    "mon": 560,
+    "desc": "After the first layer, every node but the boss is a trainer battle — and every enemy trainer fights at +50% level."
+  },
+  {
+    "id": "ultimate",
+    "name": "Ultimate Challenge",
+    "mon": 493,
+    "desc": "Nuzlocke, no heals and no evolutions — all at once. The true test of mastery."
+  }
+]

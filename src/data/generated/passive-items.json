@@ -1,0 +1,1026 @@
+[
+  {
+    "id": "power_bracer",
+    "name": "Power Bracer",
+    "desc": "Your Pokémon deal +20% damage",
+    "icon": "💪",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png"
+  },
+  {
+    "id": "spa_specs",
+    "name": "Wise Glasses",
+    "desc": "+35% Sp.ATK / −35% Sp.DEF",
+    "icon": "🥽",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wise-glasses.png"
+  },
+  {
+    "id": "atk_band",
+    "name": "Black Belt",
+    "desc": "+35% ATK / −35% DEF",
+    "icon": "🥋",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/black-belt.png"
+  },
+  {
+    "id": "all_half",
+    "name": "Pretty Wing",
+    "desc": "Your Pokémon deal 50% less damage and take 50% less damage",
+    "icon": "🪶",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pretty-wing.png"
+  },
+  {
+    "id": "all_more",
+    "name": "Life Orb",
+    "desc": "Your Pokémon deal 50% more damage and take 50% more damage",
+    "icon": "🌑",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/life-orb.png"
+  },
+  {
+    "id": "normal_heal",
+    "name": "Shoal Salt",
+    "desc": "Normal Pokémon heal 10% max HP each turn",
+    "icon": "⚪",
+    "hook": "normal",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shoal-salt.png"
+  },
+  {
+    "id": "normal_grow",
+    "name": "Lucky Punch",
+    "desc": "On KO: Normal Pokémon gain +10% max HP (for this fight) and full-heal",
+    "icon": "🥚",
+    "hook": "normal",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lucky-punch.png"
+  },
+  {
+    "id": "normal_bulk",
+    "name": "Bright Powder",
+    "desc": "Normal Pokémon get 10% of HP as DEF & Sp.DEF",
+    "icon": "✨",
+    "hook": "normal",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/bright-powder.png"
+  },
+  {
+    "id": "maxhp_strike",
+    "name": "Body Plate",
+    "desc": "Normal Pokémon deal an extra 5% of their max HP on hit",
+    "icon": "🔨",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zap-plate.png"
+  },
+  {
+    "id": "dmg_cap",
+    "name": "Light Clay",
+    "desc": "Your Pokémon deal +5% damage for each different type on your team",
+    "icon": "🦺",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/light-clay.png"
+  },
+  {
+    "id": "elec_chain",
+    "name": "Electirizer",
+    "desc": "When an Electric Pokémon attacks, it gains +1 Speed for the rest of the run",
+    "icon": "🧲",
+    "hook": "electric",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/electirizer.png"
+  },
+  {
+    "id": "elec_lead",
+    "name": "Cell Battery",
+    "desc": "At fight start, the first Electric Pokémon in your team makes one bonus attack",
+    "icon": "🔋",
+    "hook": "electric",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/cell-battery.png"
+  },
+  {
+    "id": "elec_double",
+    "name": "Electric Seed",
+    "desc": "Electric Pokémon trigger on-attack traits and items twice",
+    "icon": "⚡",
+    "hook": "electric",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/electric-seed.png"
+  },
+  {
+    "id": "rand_boost",
+    "name": "Yache Berry",
+    "desc": "Pokémon get a random stat boost after every attack (max 6 per fight)",
+    "icon": "🍇",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/yache-berry.png"
+  },
+  {
+    "id": "rand_nerf",
+    "name": "Sticky Barb",
+    "desc": "Pokémon you hit get a random stat nerf after every attack",
+    "icon": "🌿",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sticky-barb.png"
+  },
+  {
+    "id": "half_twice",
+    "name": "Macho Brace",
+    "desc": "Your Pokémon deal half damage but attack twice",
+    "icon": "🏋️",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/macho-brace.png"
+  },
+  {
+    "id": "grass_drain",
+    "name": "Leaf Stone",
+    "desc": "Grass Pokémon deal 10% of enemy max HP and heal the same each turn",
+    "icon": "🍃",
+    "hook": "grass",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/leaf-stone.png"
+  },
+  {
+    "id": "grass_spore",
+    "name": "Tiny Mushroom",
+    "desc": "Grass Pokémon use Spore instead of attacking (puts enemy to sleep, 50% wake/turn)",
+    "icon": "😴",
+    "hook": "grass",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tiny-mushroom.png"
+  },
+  {
+    "id": "grass_burst",
+    "name": "Big Mushroom",
+    "desc": "When a Grass Pokémon heals, deal that much damage to all enemy Pokémon",
+    "icon": "🍄",
+    "hook": "grass",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-mushroom.png"
+  },
+  {
+    "id": "heal_boost",
+    "name": "Sitrus Berry",
+    "desc": "All healing on your Pokémon is doubled",
+    "icon": "❤️",
+    "hook": "healing",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sitrus-berry.png"
+  },
+  {
+    "id": "heal_boost_stat",
+    "name": "Aspear Berry",
+    "desc": "When your Pokémon heals, it gets a random stat boost per 50 HP healed",
+    "icon": "🍑",
+    "hook": "healing",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/aspear-berry.png"
+  },
+  {
+    "id": "lifesteal",
+    "name": "Big Root",
+    "desc": "Your Pokémon heal 20% of all damage inflicted on enemy Pokémon",
+    "icon": "🦷",
+    "hook": "healing",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-root.png"
+  },
+  {
+    "id": "splash_more",
+    "name": "Mind Plate",
+    "desc": "Psychic splash damage deals +50%",
+    "icon": "🧠",
+    "hook": "psychic",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mind-plate.png"
+  },
+  {
+    "id": "splash_crit",
+    "name": "Lansat Berry",
+    "desc": "Psychic splash damage can crit",
+    "icon": "🔍",
+    "hook": "psychic",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lansat-berry.png"
+  },
+  {
+    "id": "fragile_status",
+    "name": "Smoke Ball",
+    "desc": "Enemy Pokémon take +50% damage from non-attack sources (splash/poison/hazards)",
+    "icon": "💨",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/smoke-ball.png"
+  },
+  {
+    "id": "hp_priority",
+    "name": "Adrenaline Orb",
+    "desc": "The Pokémon with more % max HP attacks first (ties → speed)",
+    "icon": "🦞",
+    "hook": "speed",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/adrenaline-orb.png"
+  },
+  {
+    "id": "execute_dmg",
+    "name": "Weakness Policy",
+    "desc": "+35% damage to already-damaged Pokémon",
+    "icon": "🥋",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/weakness-policy.png"
+  },
+  {
+    "id": "ghost_heal",
+    "name": "Spooky Plate",
+    "desc": "Ghost Pokémon heal equal to execution damage",
+    "icon": "👻",
+    "hook": "ghost",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/spooky-plate.png"
+  },
+  {
+    "id": "ghost_curse",
+    "name": "Dread Plate",
+    "desc": "When Ghost executes a target, all other enemies get two random stat nerfs",
+    "icon": "💀",
+    "hook": "ghost",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dread-plate.png"
+  },
+  {
+    "id": "ghost_revenge",
+    "name": "Reaper Cloth",
+    "desc": "Once per fight, when a Ghost Pokémon faints, the enemy active Pokémon gets executed",
+    "icon": "🪦",
+    "hook": "ghost",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/reaper-cloth.png"
+  },
+  {
+    "id": "sturdy",
+    "name": "Focus Sash",
+    "desc": "Each Pokémon survives a KO once per fight with 1 HP",
+    "icon": "🎽",
+    "hook": "defense",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-sash.png"
+  },
+  {
+    "id": "ko_boost",
+    "name": "Black Sludge",
+    "desc": "When an enemy faints, your active Pokémon gets 3 random stat boosts",
+    "icon": "⚫",
+    "hook": "ghost",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/black-sludge.png"
+  },
+  {
+    "id": "flying_dodge",
+    "name": "Air Balloon",
+    "desc": "Flying Pokémon can dodge incoming attacks (more often the faster they are)",
+    "icon": "🎈",
+    "hook": "flying",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/air-balloon.png"
+  },
+  {
+    "id": "flying_speed",
+    "name": "Sky Plate",
+    "desc": "Flying Pokémon deal bonus damage based on how much faster they are (up to +50%)",
+    "icon": "🌫️",
+    "hook": "flying",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sky-plate.png"
+  },
+  {
+    "id": "flying_legacy",
+    "name": "Pretty Feather",
+    "desc": "When a Flying Pokémon faints, the whole party gets +2 Speed",
+    "icon": "🕊️",
+    "hook": "flying",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pretty-wing.png"
+  },
+  {
+    "id": "speed_diff",
+    "name": "Float Stone",
+    "desc": "If you're faster: on-hit deal % bonus damage that scales with the % Speed gap",
+    "icon": "🪨",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/float-stone.png"
+  },
+  {
+    "id": "lead_speed",
+    "name": "Quick Powder",
+    "desc": "The first Pokémon in your party gets +2 Speed (stage)",
+    "icon": "✨",
+    "hook": "speed",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/quick-powder.png"
+  },
+  {
+    "id": "bug_relevel",
+    "name": "Silver Powder",
+    "desc": "When a Bug Pokémon levels up, 30% chance to level up again",
+    "icon": "🪲",
+    "hook": "bug",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/silver-powder.png"
+  },
+  {
+    "id": "bug_critlvl",
+    "name": "Insect Plate",
+    "desc": "When a Bug Pokémon crits, it gains +20 levels for the rest of the combat",
+    "icon": "🐞",
+    "hook": "bug",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/insect-plate.png"
+  },
+  {
+    "id": "bug_strip",
+    "name": "Shed Shell",
+    "desc": "Bug Pokémon attacks reduce the enemy's level by 5 for the fight",
+    "icon": "🐛",
+    "hook": "bug",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shed-shell.png"
+  },
+  {
+    "id": "lvl_overpower",
+    "name": "Cleanse Tag",
+    "desc": "+10% damage per level your Pokémon has over the target",
+    "icon": "🏷️",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/cleanse-tag.png"
+  },
+  {
+    "id": "post_combat_lvl",
+    "name": "Stardust",
+    "desc": "Your Pokémon have a 10% chance to level up after each combat",
+    "icon": "✨",
+    "hook": "levelup",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/stardust.png"
+  },
+  {
+    "id": "poison_double",
+    "name": "Toxic Plate",
+    "desc": "When a Poison Pokémon hits a poisoned target, stacks are doubled",
+    "icon": "☠️",
+    "hook": "poison",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/toxic-plate.png"
+  },
+  {
+    "id": "poison_pass",
+    "name": "Toxic Orb",
+    "desc": "When a poisoned Pokémon faints, half its stacks pass to the next",
+    "icon": "🟣",
+    "hook": "poison",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/toxic-orb.png"
+  },
+  {
+    "id": "poison_drain",
+    "name": "Pecha Berry",
+    "desc": "Your Poison Pokémon heal 2× the damage dealt by poison ticks",
+    "icon": "🍑",
+    "hook": "poison",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pecha-berry.png"
+  },
+  {
+    "id": "poison_armor",
+    "name": "Kebia Berry",
+    "desc": "Your Pokémon take 5% less damage per stack of poison on the enemy (max 60%)",
+    "icon": "🍇",
+    "hook": "poison",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/kebia-berry.png"
+  },
+  {
+    "id": "dark_lvlcrit",
+    "name": "Stealth Goggles",
+    "desc": "Dark Pokémon gain crit chance equal to two-thirds of their level (%)",
+    "icon": "🕶️",
+    "hook": "crit",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/safety-goggles.png"
+  },
+  {
+    "id": "crit_overflow",
+    "name": "Razor Claw",
+    "desc": "+35% crit chance. Crit chance above 100% becomes crit damage",
+    "icon": "🪒",
+    "hook": "crit",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-claw.png"
+  },
+  {
+    "id": "dark_splash",
+    "name": "Dark Stone",
+    "desc": "Excessive damage from Dark Pokémon splashes to the next enemy",
+    "icon": "🌑",
+    "hook": "dark",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dark-stone.png"
+  },
+  {
+    "id": "crit_lifesteal",
+    "name": "Oran Berry",
+    "desc": "+10% crit chance. Heal 100% of damage inflicted on critical hits",
+    "icon": "🫐",
+    "hook": "crit",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/oran-berry.png"
+  },
+  {
+    "id": "crit_boost",
+    "name": "Muscle Band",
+    "desc": "+10% crit chance. On crit: +1 Speed and +1 ATK/Sp.ATK",
+    "icon": "🦾",
+    "hook": "crit",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/muscle-band.png"
+  },
+  {
+    "id": "crit_flinch",
+    "name": "Razor Fang",
+    "desc": "+10% crit chance. Crits have a 50% chance to flinch the opponent",
+    "icon": "🦷",
+    "hook": "crit",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-fang.png"
+  },
+  {
+    "id": "fire_amp",
+    "name": "Flame Plate",
+    "desc": "Fire Pokémon benefit +50% from ATK/Sp.ATK stages",
+    "icon": "🔥",
+    "hook": "fire",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/flame-plate.png"
+  },
+  {
+    "id": "fire_share",
+    "name": "Heat Rock",
+    "desc": "Fire Pokémon share half their ATK/Sp.ATK boosts with their party",
+    "icon": "🪨",
+    "hook": "fire",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heat-rock.png"
+  },
+  {
+    "id": "fire_legacy",
+    "name": "Magmarizer",
+    "desc": "When a Fire Pokémon faints, half its current ATK/Sp.ATK buffs pass to a random Fire ally",
+    "icon": "🌋",
+    "hook": "fire",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/magmarizer.png"
+  },
+  {
+    "id": "rand_start",
+    "name": "Lum Berry",
+    "desc": "Your Pokémon get two random stat boosts at fight start. Their stat stages are uncapped",
+    "icon": "🌟",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lum-berry.png"
+  },
+  {
+    "id": "sof_double",
+    "name": "Soothe Bell",
+    "desc": "Start-of-fight traits and effects trigger twice",
+    "icon": "🔔",
+    "hook": "startfight",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/soothe-bell.png"
+  },
+  {
+    "id": "mirror_atk",
+    "name": "Destiny Knot",
+    "desc": "When a Pokémon gains ATK/Sp.ATK, the active enemy loses the same amount",
+    "icon": "🎗️",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/destiny-knot.png"
+  },
+  {
+    "id": "ice_shatter_double",
+    "name": "Never-Melt Ice",
+    "desc": "Frozen-shatter damage is increased by 50%",
+    "icon": "🧊",
+    "hook": "ice",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/never-melt-ice.png"
+  },
+  {
+    "id": "ice_refreeze",
+    "name": "Icy Rock",
+    "desc": "After a shatter, re-freeze the target at the trait's freeze chance",
+    "icon": "❄️",
+    "hook": "ice",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/icy-rock.png"
+  },
+  {
+    "id": "ice_freeze_chance",
+    "name": "Snowball",
+    "desc": "+50% chance to freeze opponents",
+    "icon": "⛄",
+    "hook": "ice",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/snowball.png"
+  },
+  {
+    "id": "ice_onhit_double",
+    "name": "Casteliacone",
+    "desc": "On-hit effects against enemies trigger twice",
+    "icon": "🍦",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/casteliacone.png"
+  },
+  {
+    "id": "water_def_debuff",
+    "name": "Sea Incense",
+    "desc": "Water trait also lowers the enemy's DEF & Sp.DEF",
+    "icon": "🌊",
+    "hook": "water",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sea-incense.png"
+  },
+  {
+    "id": "water_retaliate",
+    "name": "Luminous Moss",
+    "desc": "When a Water Pokémon is hit, it triggers the Water trait on the attacker",
+    "icon": "💧",
+    "hook": "water",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/luminous-moss.png"
+  },
+  {
+    "id": "water_mirror_stage",
+    "name": "Mystic Water",
+    "desc": "Your active Water Pokémon gains DOUBLE the ATK/Sp.ATK stages the enemy active loses",
+    "icon": "🔱",
+    "hook": "water",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mystic-water.png"
+  },
+  {
+    "id": "stat_carryover",
+    "name": "Eject Button",
+    "desc": "When the enemy active faints, 50% of its negative stat stages carry to the next",
+    "icon": "↪️",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/eject-button.png"
+  },
+  {
+    "id": "fighting_faint_speed",
+    "name": "Focus Band",
+    "desc": "When your Pokémon faints, your Fighting Pokémon get +1 Speed",
+    "icon": "🥊",
+    "hook": "fighting",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-band.png"
+  },
+  {
+    "id": "fighting_ko_trigger",
+    "name": "Fist Plate",
+    "desc": "When a Fighting Pokémon KOs an enemy, it triggers the Fighting trait",
+    "icon": "👊",
+    "hook": "fighting",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fist-plate.png"
+  },
+  {
+    "id": "fighting_survive",
+    "name": "Protective Pads",
+    "desc": "A Fighting Pokémon survives a KO at 1 HP once per fight (triggers the Fighting trait)",
+    "icon": "🛡️",
+    "hook": "fighting",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protective-pads.png"
+  },
+  {
+    "id": "no_heal_revive",
+    "name": "Revival Herb",
+    "desc": "Your Pokémon can't heal during combat, but fainted teammates start each fight at 1 HP",
+    "icon": "⛑️",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/revival-herb.png"
+  },
+  {
+    "id": "ground_outspeed_dmg",
+    "name": "Soft Sand",
+    "desc": "When a Ground Pokémon outspeeds its target, it deals 50% more damage",
+    "icon": "🏜️",
+    "hook": "ground",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/soft-sand.png"
+  },
+  {
+    "id": "ground_def_as_spdef",
+    "name": "Earth Plate",
+    "desc": "Ground Pokémon use their DEF in place of Sp.DEF when attacked",
+    "icon": "🟤",
+    "hook": "ground",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/earth-plate.png"
+  },
+  {
+    "id": "enemy_slow_dmg",
+    "name": "Iron Ball",
+    "desc": "Enemies deal 10% less damage for each Speed stage they are missing",
+    "icon": "⚫",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron-ball.png"
+  },
+  {
+    "id": "debuff_mirror_buff",
+    "name": "Mirror Herb",
+    "desc": "When you debuff the enemy active, your active gains the same stat stage",
+    "icon": "🪞",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mental-herb.png"
+  },
+  {
+    "id": "rock_explode",
+    "name": "Custap Berry",
+    "desc": "When a Rock Pokémon faints, it explodes — dealing 25% of its move's damage to every enemy",
+    "icon": "💥",
+    "hook": "rock",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/custap-berry.png"
+  },
+  {
+    "id": "rock_sturdy",
+    "name": "Hard Stone",
+    "desc": "Your Rock Pokémon become Sturdy — survive a KO at 1 HP once per fight",
+    "icon": "🪨",
+    "hook": "rock",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hard-stone.png"
+  },
+  {
+    "id": "rock_def_amp",
+    "name": "Rock Incense",
+    "desc": "Rock Pokémon benefit +50% from DEF & Sp.DEF stages",
+    "icon": "⛰️",
+    "hook": "rock",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rock-incense.png"
+  },
+  {
+    "id": "def_stage_dmg",
+    "name": "Protector",
+    "desc": "Your Pokémon deal +10% damage per positive DEF stage",
+    "icon": "🛡️",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protector.png"
+  },
+  {
+    "id": "spdef_stage_speed",
+    "name": "Metal Powder",
+    "desc": "Your Pokémon are 10% faster per positive Sp.DEF stage",
+    "icon": "🥏",
+    "hook": "speed",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/metal-powder.png"
+  },
+  {
+    "id": "dragon_first_crit",
+    "name": "Dragon Fang",
+    "desc": "The first Dragon attack each combat always crits",
+    "icon": "🐲",
+    "hook": "dragon",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dragon-fang.png"
+  },
+  {
+    "id": "dragon_first_faint_trigger",
+    "name": "Dragon Scale",
+    "desc": "The first Dragon Pokémon to faint triggers the Dragon trait",
+    "icon": "🐉",
+    "hook": "dragon",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dragon-scale.png"
+  },
+  {
+    "id": "dragon_first_double",
+    "name": "Draco Plate",
+    "desc": "The first Dragon attack each combat strikes twice",
+    "icon": "🐊",
+    "hook": "dragon",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/draco-plate.png"
+  },
+  {
+    "id": "steel_reflect",
+    "name": "Metal Coat",
+    "desc": "Damage the Steel trait blocks is reflected to the enemy active",
+    "icon": "🪙",
+    "hook": "steel",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/metal-coat.png"
+  },
+  {
+    "id": "steel_def_onhit",
+    "name": "Metal Alloy",
+    "desc": "When a Steel Pokémon is attacked, it gains +1 DEF and +1 Sp.DEF",
+    "icon": "⚙️",
+    "hook": "steel",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/assault-vest.png"
+  },
+  {
+    "id": "team_hp_pool",
+    "name": "Binding Band",
+    "desc": "Party slot 1 gains 50% of your team's total HP — but if it faints, the fight is over",
+    "icon": "🫀",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/binding-band.png"
+  },
+  {
+    "id": "team_damage_spread",
+    "name": "Eject Pack",
+    "desc": "Damage your active Pokémon takes is spread across your whole team",
+    "icon": "🔗",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-card.png"
+  },
+  {
+    "id": "fairy_attract",
+    "name": "Pink Bow",
+    "desc": "A Fairy Pokémon's attack has a 30% chance to attract (flinch) the target",
+    "icon": "💞",
+    "hook": "fairy",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fairy-gem.png"
+  },
+  {
+    "id": "fairy_hit_two",
+    "name": "Pixie Plate",
+    "desc": "A Fairy Pokémon's attack also hits the 2nd Pokémon in the enemy party for 30% damage",
+    "icon": "🧚",
+    "hook": "fairy",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pixie-plate.png"
+  },
+  {
+    "id": "fairy_opening_volley",
+    "name": "Misty Seed",
+    "desc": "At combat start, all your Fairy Pokémon fire one 10%-power attack",
+    "icon": "✨",
+    "hook": "fairy",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/misty-seed.png"
+  },
+  {
+    "id": "super_immune",
+    "name": "Iron Plate",
+    "desc": "Your Pokémon take 50% less damage if they are slower than the attacker",
+    "icon": "🛡️",
+    "hook": "defense",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron-plate.png"
+  },
+  {
+    "id": "nerf_punish",
+    "name": "Damp Rock",
+    "desc": "+10% damage per negative stat stage on the enemy",
+    "icon": "🪨",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/damp-rock.png"
+  },
+  {
+    "id": "team_reroll",
+    "name": "Star Piece",
+    "desc": "After every boss, replace your team with random Pokémon. They count as +1 for traits (not added to Pokédex or Hall of Fame).",
+    "icon": "🌠",
+    "hook": "team",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/star-piece.png"
+  },
+  {
+    "id": "team_upgrade",
+    "name": "Comet Shard",
+    "desc": "On pickup: replace your team with random Pokémon 10 levels higher",
+    "icon": "☄️",
+    "hook": "team",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/comet-shard.png"
+  },
+  {
+    "id": "no_item_buff",
+    "name": "Pure Incense",
+    "desc": "+10% damage per held-item slot left empty on your team",
+    "icon": "☯️",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pure-incense.png"
+  },
+  {
+    "id": "def_onhit_all",
+    "name": "Rocky Helmet",
+    "desc": "When your Pokémon takes damage, it gains +1 DEF and +1 Sp.DEF",
+    "icon": "🛡️",
+    "hook": "defense",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rocky-helmet.png"
+  },
+  {
+    "id": "slow_armor",
+    "name": "Lagging Tail",
+    "desc": "If your Pokémon is slower, it takes % less damage equal to the Speed gap (up to 60%)",
+    "icon": "🐌",
+    "hook": "defense",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lagging-tail.png"
+  },
+  {
+    "id": "poison_onhit",
+    "name": "Poison Barb",
+    "desc": "Your attacks apply +2 Poison stacks",
+    "icon": "☠️",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poison-barb.png"
+  },
+  {
+    "id": "neutralize",
+    "name": "Ring Target",
+    "desc": "All moves are neutrally effective (yours and the enemy's)",
+    "icon": "🎯",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ring-target.png"
+  },
+  {
+    "id": "ko_maxhp",
+    "name": "HP Up",
+    "desc": "When your Pokémon defeats an enemy, it gains +2 max HP for the rest of the run",
+    "icon": "💚",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hp-up.png"
+  },
+  {
+    "id": "elec_paralyze",
+    "name": "Wacan Berry",
+    "desc": "When an Electric Pokémon attacks, 20% chance to paralyze the enemy (skips its next turn)",
+    "icon": "⚡",
+    "hook": "electric",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wacan-berry.png"
+  },
+  {
+    "id": "grass_bulk",
+    "name": "Grassy Seed",
+    "desc": "At fight start, Grass Pokémon gain +100% max HP but begin at 50% HP",
+    "icon": "🌱",
+    "hook": "grass",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/grassy-seed.png"
+  },
+  {
+    "id": "ghost_dodge",
+    "name": "Kasib Berry",
+    "desc": "After a Ghost Pokémon defeats an enemy, it has a 50% chance to dodge the next attack",
+    "icon": "👻",
+    "hook": "ghost",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/kasib-berry.png"
+  },
+  {
+    "id": "flying_stage_dmg",
+    "name": "Coba Berry",
+    "desc": "Your Pokémon deal +10% damage per positive Speed stage they have",
+    "icon": "🕊️",
+    "hook": "flying",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/coba-berry.png"
+  },
+  {
+    "id": "bug_legacy",
+    "name": "Tanga Berry",
+    "desc": "When a Bug Pokémon faints, your other Bug Pokémon each gain 20% of its level for the combat",
+    "icon": "🐛",
+    "hook": "bug",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tanga-berry.png"
+  },
+  {
+    "id": "dark_dodge",
+    "name": "Colbur Berry",
+    "desc": "+10% crit chance. Your Pokémon gain dodge chance equal to half their crit chance",
+    "icon": "🕶️",
+    "hook": "crit",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/colbur-berry.png"
+  },
+  {
+    "id": "fire_start_atk",
+    "name": "Occa Berry",
+    "desc": "Fire Pokémon gain +2 ATK and +2 Sp.ATK at the start of the fight",
+    "icon": "🔥",
+    "hook": "fire",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/occa-berry.png"
+  },
+  {
+    "id": "ice_ko_freeze",
+    "name": "Chilan Berry",
+    "desc": "When an Ice Pokémon defeats an enemy, 50% chance the enemy's next Pokémon enters frozen",
+    "icon": "❄️",
+    "hook": "ice",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/chilan-berry.png"
+  },
+  {
+    "id": "fight_revive",
+    "name": "Chople Berry",
+    "desc": "When a Fighting Pokémon defeats an enemy, all fainted Fighting Pokémon revive at 1 HP (the first becomes active)",
+    "icon": "🥊",
+    "hook": "fighting",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/chople-berry.png"
+  },
+  {
+    "id": "ground_slow_onhit",
+    "name": "Shuca Berry",
+    "desc": "Enemy Pokémon lose 1 Speed stage when attacked",
+    "icon": "🏜️",
+    "hook": "ground",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shuca-berry.png"
+  },
+  {
+    "id": "ground_ko_boost",
+    "name": "Smooth Rock",
+    "desc": "When a Ground Pokémon defeats an enemy, it gains random stat boosts equal to twice the enemy's missing Speed stages",
+    "icon": "⏳",
+    "hook": "ground",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/smooth-rock.png"
+  },
+  {
+    "id": "rock_overcap",
+    "name": "Charti Berry",
+    "desc": "When your Pokémon reaches +10 DEF and +10 Sp.DEF, it also gains +10 Speed, ATK and Sp.ATK",
+    "icon": "🪨",
+    "hook": "rock",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/charti-berry.png"
+  },
+  {
+    "id": "rock_legacy",
+    "name": "Everstone",
+    "desc": "When a Rock Pokémon faints, it spreads its DEF and Sp.DEF stages across its team",
+    "icon": "🗿",
+    "hook": "rock",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/everstone.png"
+  },
+  {
+    "id": "dragon_ko_speed",
+    "name": "Haban Berry",
+    "desc": "When a Dragon Pokémon defeats an enemy, it gains +2 Speed",
+    "icon": "🐉",
+    "hook": "dragon",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/haban-berry.png"
+  },
+  {
+    "id": "steel_team_armor",
+    "name": "Babiri Berry",
+    "desc": "Your Pokémon take 10% less damage per Steel type on your team (max 40%)",
+    "icon": "⚙️",
+    "hook": "steel",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/babiri-berry.png"
+  },
+  {
+    "id": "fairy_speed_steal",
+    "name": "Roseli Berry",
+    "desc": "Fairy Pokémon gain the negative Speed stages of Pokémon they defeat",
+    "icon": "🧚",
+    "hook": "fairy",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/roseli-berry.png"
+  },
+  {
+    "id": "shiny_dmg",
+    "name": "Shiny Power",
+    "desc": "Your Pokémon deal +10% damage for each shiny on your team",
+    "icon": "✨",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shiny-stone.png"
+  },
+  {
+    "id": "shiny_def",
+    "name": "Shiny Guard",
+    "desc": "Your Pokémon take 10% less damage for each shiny on your team",
+    "icon": "✨",
+    "hook": "defense",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dawn-stone.png"
+  },
+  {
+    "id": "shiny_rate",
+    "name": "Shiny Hunter",
+    "desc": "Your shiny rate is doubled for the rest of the run",
+    "icon": "✨",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shiny-charm.png"
+  },
+  {
+    "id": "shiny_first",
+    "name": "Lead Sparkle",
+    "desc": "At the start of combat, your first Pokémon becomes shiny (counts +1 for traits)",
+    "icon": "✨",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dusk-stone.png"
+  },
+  {
+    "id": "legend_replace",
+    "name": "Legend's Call",
+    "desc": "On pickup, replace your team with random non-shiny legendaries",
+    "icon": "🌟",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png"
+  },
+  {
+    "id": "legend_dmg",
+    "name": "Legend Might",
+    "desc": "Your Pokémon deal +20% damage for each legendary on your team",
+    "icon": "🌟",
+    "hook": "damage",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/soul-dew.png"
+  },
+  {
+    "id": "legend_def",
+    "name": "Legend Aegis",
+    "desc": "Your Pokémon take 10% less damage for each legendary on your team",
+    "icon": "🌟",
+    "hook": "defense",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/adamant-orb.png"
+  },
+  {
+    "id": "legend_traits",
+    "name": "Resonance",
+    "desc": "Legendary Pokémon count twice for traits",
+    "icon": "🌟",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lustrous-orb.png"
+  },
+  {
+    "id": "legend_catch",
+    "name": "Legend Lure",
+    "desc": "From now on, every catch node is a legendary catch node",
+    "icon": "🌟",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/griseous-orb.png"
+  },
+  {
+    "id": "stat_amp",
+    "name": "Power Lens",
+    "desc": "Your stat boosts are 30% more effective",
+    "icon": "💪",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-lens.png"
+  },
+  {
+    "id": "enemy_recoil",
+    "name": "Iron Thorns",
+    "desc": "Enemy Pokémon take 20% of their attack as recoil",
+    "icon": "🌵",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rocky-helmet.png"
+  },
+  {
+    "id": "speed_start",
+    "name": "Quick Claw",
+    "desc": "Your Pokémon gain +1 Speed stage at the start of combat",
+    "icon": "⚡",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/quick-claw.png"
+  },
+  {
+    "id": "nonattack_amp",
+    "name": "Hazard Lens",
+    "desc": "Your non-attack damage (splash, poison) deals 30% more",
+    "icon": "☢️",
+    "hook": "global",
+    "iconUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/smoke-ball.png"
+  }
+]

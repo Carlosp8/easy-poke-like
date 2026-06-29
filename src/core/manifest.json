@@ -1,0 +1,11 @@
+{
+  "parts": [
+    "parts/00-runtime-hooks.js",
+    "parts/01-config-data.js",
+    "parts/02-controls-state.js",
+    "parts/03-detection-strategy.js",
+    "parts/04-scoring-routing.js",
+    "parts/05-screen-handlers.js",
+    "parts/06-initialization.js"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "START": "start",
+  "BATTLE": "battle",
+  "CATCH": "catch",
+  "ITEM": "item",
+  "QUESTION": "question",
+  "BOSS": "boss",
+  "POKECENTER": "pokecenter",
+  "TRAINER": "trainer",
+  "LEGENDARY": "legendary",
+  "MOVE_TUTOR": "move_tutor",
+  "TRADE": "trade",
+  "SILVER": "silver",
+  "MAGMA": "magma",
+  "AQUA": "aqua"
+}

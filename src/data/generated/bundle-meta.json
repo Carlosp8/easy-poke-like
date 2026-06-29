@@ -1,0 +1,34 @@
+{
+  "sourceBundle": "bundle.e9e84cb924.js",
+  "sourcePath": "bundle.e9e84cb924.js",
+  "sha256": "f16c7dcdb4030248c270d117f0d76c7c2aa89ca280059ae8ac268995c650b16e",
+  "extractedAt": "2026-06-29T11:37:43.998Z",
+  "bundleMtime": "2026-06-29T10:13:17.617Z",
+  "decoder": {
+    "offset": 201,
+    "rotations": 240,
+    "stringCount": 31076
+  },
+  "counts": {
+    "pokedex": 649,
+    "moves": 18,
+    "items": 33,
+    "passives": 128,
+    "usableItems": 4,
+    "challenges": 12,
+    "weeklyChallenges": 1,
+    "nodeTypes": 14,
+    "evolutions": 298,
+    "branchingEvolutions": 10,
+    "legendaryIds": 48,
+    "gen3Abilities": 138
+  },
+  "warnings": [],
+  "inputResolution": {
+    "mode": "autodetect",
+    "rel": "bundle.e9e84cb924.js",
+    "candidates": [
+      "bundle.e9e84cb924.js"
+    ]
+  }
+}
