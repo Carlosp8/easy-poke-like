@@ -20,6 +20,10 @@ test('builds a Tampermonkey userscript from src modules', async () => {
   assert.ok(output.includes('(function()'));
   assert.equal(output.includes('\nimport '), false);
   assert.ok(output.includes('var EasyPokelikeStrategyUtils = (() => {'));
+  assert.ok(output.includes('return EasyPokelikeStrategyUtils.foldText(text);'));
+  assert.ok(
+    output.includes('return EasyPokelikeStrategyUtils.normalizeItemName(name, ITEM_TRANSLATIONS);'),
+  );
   assert.ok(output.includes('return EasyPokelikeStrategyUtils.normalizeTypeList(types);'));
   assert.ok(
     output.indexOf('var EasyPokelikeStrategyUtils = (() => {') <

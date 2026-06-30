@@ -1415,26 +1415,11 @@
     };
 
     function foldText(text) {
-        return (text || '')
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
+        return EasyPokelikeStrategyUtils.foldText(text);
     }
 
     function normalizeItemName(name) {
-        if (!name) return '';
-        let clean = name.toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
-        if (ITEM_TRANSLATIONS[clean]) {
-            clean = ITEM_TRANSLATIONS[clean];
-        } else {
-            const folded = foldText(clean);
-            if (ITEM_TRANSLATIONS[folded]) {
-                clean = ITEM_TRANSLATIONS[folded];
-            }
-        }
-        return clean;
+        return EasyPokelikeStrategyUtils.normalizeItemName(name, ITEM_TRANSLATIONS);
     }
 
     function getItemNameFromElement(element) {

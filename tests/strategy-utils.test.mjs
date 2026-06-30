@@ -12,8 +12,10 @@ import {
 } from '../src/core/lib/strategy-utils.ts';
 
 test('normalizes text and item names without locale-sensitive surprises', () => {
-  assert.equal(foldText('Desafíos Pokémon'), 'desafios pokemon');
+  assert.equal(foldText('  Desafios   Pokemon  '), 'desafios pokemon');
   assert.equal(normalizeItemName('  Never-Melt Ice!! '), 'never melt ice');
+  assert.equal(normalizeItemName('MT_Normal', { 'mt normal': 'tm normal' }), 'tm normal');
+  assert.equal(normalizeItemName('quick-claw', { 'quick claw': 'quick claw' }), 'quick claw');
 });
 
 test('scores offensive and defensive type matchups with the core weights', () => {
