@@ -1,6 +1,7 @@
 .agents/
 node_modules/
 *.tsbuildinfo
+easy-pokelike.user.js
 
 # Local extracted/generated artifacts
 bundle*.js

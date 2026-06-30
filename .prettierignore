@@ -1,0 +1,7 @@
+node_modules/
+easy-pokelike.user.js
+bundle*.js
+pokelike-bundle*.js
+pokelike-*-extracted.json
+src/data/generated/
+src/core/parts/

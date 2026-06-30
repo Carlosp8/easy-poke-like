@@ -1,10 +1,5 @@
 import { createHash } from 'node:crypto';
-import {
-  existsSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-} from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -40,10 +35,9 @@ const OUTPUT_FILES = {
   gen3MapLevelRanges: 'gen3-map-level-ranges.json',
 };
 
-type JsonPrimitive = string | number | boolean | null;
-type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 type BundleResolutionMode = 'explicit' | 'html' | 'autodetect';
 type UnknownRecord = Record<string, unknown>;
+type ElementStub = UnknownRecord & ((..._args: unknown[]) => ElementStub);
 
 interface BundleCandidate {
   path: string;
@@ -181,7 +175,8 @@ function formatJson(value: unknown): string {
 }
 
 function parseInteger(value: string | number): number {
-  return String(value).startsWith('0x') ? Number.parseInt(value, 16) : Number(value);
+  const normalized = String(value);
+  return normalized.startsWith('0x') ? Number.parseInt(normalized, 16) : Number(normalized);
 }
 
 function sha256(source: string): string {
@@ -205,7 +200,11 @@ function isLocalBundleCandidate(filePath: string, rootDir: string): boolean {
   );
 }
 
-function statCandidate(filePath: string, rootDir: string, source: BundleCandidate['source']): BundleCandidate {
+function statCandidate(
+  filePath: string,
+  rootDir: string,
+  source: BundleCandidate['source'],
+): BundleCandidate {
   const stat = statSync(filePath);
   return {
     path: filePath,
@@ -240,7 +239,8 @@ function resolvePathMaybeRelative(inputPath: string, rootDir = ROOT_DIR): string
 
 function parseBundleFromHtml(htmlPath: string, rootDir = ROOT_DIR): string {
   const html = readFileSync(htmlPath, 'utf8');
-  const scriptRe = /<script\b[^>]*\bsrc\s*=\s*["']([^"']*bundle[^"']*\.js(?:[?#][^"']*)?)["'][^>]*>/gi;
+  const scriptRe =
+    /<script\b[^>]*\bsrc\s*=\s*["']([^"']*bundle[^"']*\.js(?:[?#][^"']*)?)["'][^>]*>/gi;
   const matches = [...html.matchAll(scriptRe)].map((match) => match[1]);
   if (!matches.length) {
     throw new Error(`No bundle script tag was found in ${htmlPath}`);
@@ -412,7 +412,10 @@ function findMatchingBrace(source: string, openIndex: number): number {
   throw new Error(`Could not find matching brace at index ${openIndex}`);
 }
 
-function findFunctionBlock(source: string, name: string): Required<Pick<SourceRange, 'start' | 'end' | 'code'>> {
+function findFunctionBlock(
+  source: string,
+  name: string,
+): Required<Pick<SourceRange, 'start' | 'end' | 'code'>> {
   const functionRe = new RegExp(`function\\s+${name}\\s*\\(`);
   const match = functionRe.exec(source);
   if (!match) throw new Error(`Could not locate function ${name}() in bundle`);
@@ -434,9 +437,7 @@ function decodeBundledString(value: string): string {
   for (
     let block = 0, buffer, charIndex, sourceIndex = 0;
     (charIndex = value.charAt(sourceIndex++));
-    ~charIndex &&
-    ((buffer = block % 4 ? buffer * 64 + charIndex : charIndex),
-    block++ % 4)
+    ~charIndex && ((buffer = block % 4 ? buffer * 64 + charIndex : charIndex), block++ % 4)
       ? (output +=
           guard.charCodeAt(sourceIndex + 10) - 10 !== 0
             ? String.fromCharCode(0xff & (buffer >> ((-2 * block) & 6)))
@@ -447,7 +448,7 @@ function decodeBundledString(value: string): string {
   }
 
   for (let index = 0; index < output.length; index += 1) {
-    percentEncoded += `%${(`00${output.charCodeAt(index).toString(16)}`).slice(-2)}`;
+    percentEncoded += `%${`00${output.charCodeAt(index).toString(16)}`.slice(-2)}`;
   }
   return decodeURIComponent(percentEncoded);
 }
@@ -499,7 +500,8 @@ function rotateStringTable(
   let rotations = 0;
 
   while (rotations < strings.length + 10_000) {
-    const decodeAt = (index: number | string) => decodeBundledString(strings[Number(index) - offset]);
+    const decodeAt = (index: number | string) =>
+      decodeBundledString(strings[Number(index) - offset]);
     let value;
     try {
       value = calculate(decodeAt);
@@ -523,13 +525,16 @@ function replaceRanges(source: string, ranges: SourceRange[]): string {
   return [...ranges]
     .sort((a, b) => b.start - a.start)
     .reduce(
-      (current, range) => `${current.slice(0, range.start)}${range.replacement ?? ''}${current.slice(range.end)}`,
+      (current, range) =>
+        `${current.slice(0, range.start)}${range.replacement ?? ''}${current.slice(range.end)}`,
       source,
     );
 }
 
 function safeJsonForJavaScript(value: unknown): string {
-  return JSON.stringify(value).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  return JSON.stringify(value)
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }
 
 export function buildTransformedBundle(
@@ -639,11 +644,11 @@ function createClassListStub(): ClassListStub {
   };
 }
 
-function createElementStub(): any {
+function createElementStub(): ElementStub {
   const classList = createClassListStub();
   const style: UnknownRecord = {};
-  let element: any;
-  const target = function elementStub() {};
+  const target = function elementStub() {} as ElementStub;
+  let element = target;
   element = new Proxy(target, {
     get(_target, property) {
       if (property === Symbol.iterator) return function* iterator() {};
@@ -726,7 +731,7 @@ function createVmSandbox(): UnknownRecord {
     search: '',
     hash: '',
   };
-  const window: any = {
+  const window: UnknownRecord = {
     document,
     location,
     localStorage: storage,
@@ -750,7 +755,7 @@ function createVmSandbox(): UnknownRecord {
 
   // The extractor only needs declarations to run. DOM APIs intentionally
   // return inert stubs so the game UI cannot start doing real browser work.
-  const sandbox: any = {
+  const sandbox: UnknownRecord = {
     window,
     self: window,
     document,
@@ -923,11 +928,19 @@ function buildWarnings(counts: BundleCounts): string[] {
     .map(([name]) => `Missing or empty section: ${name}`);
 }
 
-export function extractBundle(bundlePath: string, options: ExtractBundleOptions = {}): ExtractBundleResult {
+export function extractBundle(
+  bundlePath: string,
+  options: ExtractBundleOptions = {},
+): ExtractBundleResult {
   const rootDir = options.rootDir || ROOT_DIR;
   const source = readFileSync(bundlePath, 'utf8').replace(/^\uFEFF/, '');
   const decoded = decodeBundleStringTable(source);
-  const transformed = buildTransformedBundle(source, decoded.strings, decoded.offset, decoded.blocks);
+  const transformed = buildTransformedBundle(
+    source,
+    decoded.strings,
+    decoded.offset,
+    decoded.blocks,
+  );
   const program = buildExtractionProgram(transformed);
   const sandbox = createVmSandbox();
 
@@ -962,10 +975,17 @@ export function extractBundle(bundlePath: string, options: ExtractBundleOptions 
   };
 }
 
-export async function writeGeneratedData(result: ExtractBundleResult, outDir = GENERATED_DIR): Promise<void> {
+export async function writeGeneratedData(
+  result: ExtractBundleResult,
+  outDir = GENERATED_DIR,
+): Promise<void> {
   await mkdir(outDir, { recursive: true });
   const writes = Object.entries(OUTPUT_FILES).map(([key, fileName]) =>
-    writeFile(path.join(outDir, fileName), formatJson(result.data[key as keyof ExtractedData]), 'utf8'),
+    writeFile(
+      path.join(outDir, fileName),
+      formatJson(result.data[key as keyof ExtractedData]),
+      'utf8',
+    ),
   );
   writes.push(writeFile(path.join(outDir, 'bundle-meta.json'), formatJson(result.meta), 'utf8'));
   await Promise.all(writes);

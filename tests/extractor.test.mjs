@@ -4,11 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import {
-  ROOT_DIR,
-  extractBundle,
-  resolveBundleInput,
-} from '../scripts/extract-pokelike-bundle.ts';
+import { ROOT_DIR, extractBundle, resolveBundleInput } from '../scripts/extract-pokelike-bundle.ts';
 
 const CURRENT_BUNDLE = path.join(ROOT_DIR, 'bundle.e9e84cb924.js');
 const PREVIOUS_BUNDLE = path.join(ROOT_DIR, 'pokelike-bundle.08c8a0de1a.js');
@@ -52,10 +48,7 @@ test('resolves an explicit HTML script reference without relying on the hash', (
   mkdirSync(jsDir);
   writeFileSync(path.join(jsDir, 'bundle.anyhash123.js'), 'console.log("bundle");\n');
   const htmlPath = path.join(tempRoot, 'index.html');
-  writeFileSync(
-    htmlPath,
-    '<!doctype html><script defer src="js/bundle.anyhash123.js"></script>',
-  );
+  writeFileSync(htmlPath, '<!doctype html><script defer src="js/bundle.anyhash123.js"></script>');
 
   const resolved = resolveBundleInput([htmlPath], tempRoot);
   assert.equal(path.basename(resolved.bundlePath), 'bundle.anyhash123.js');

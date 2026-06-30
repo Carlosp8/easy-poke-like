@@ -1,18 +1,7 @@
 export type RunMode =
-  | 'battleTower'
-  | 'story'
-  | 'weeklyChallenges'
-  | 'challengeMode'
-  | 'auto'
-  | 'manual';
+  'battleTower' | 'story' | 'weeklyChallenges' | 'challengeMode' | 'auto' | 'manual';
 
-export type BotTactic =
-  | 'auto'
-  | 'boss'
-  | 'capture'
-  | 'shiny'
-  | 'xp'
-  | 'duplicate';
+export type BotTactic = 'auto' | 'boss' | 'capture' | 'shiny' | 'xp' | 'duplicate';
 
 export type StarterMode = 'auto' | 'preferred' | 'manual';
 
@@ -26,7 +15,8 @@ export interface BotControlState {
   starterMode: StarterMode;
   starterPreference: string;
   autoRestart: boolean;
-  lockedPokemonKeys: string[];
+  lockedKeys: string[];
+  duplicateCatches: boolean;
   panel: {
     x: number;
     y: number;
@@ -37,6 +27,7 @@ export interface PokemonUnit {
   index?: number;
   name: string;
   level?: number;
+  hp?: number;
   hpPercent?: number;
   currentHp?: number;
   maxHp?: number;
@@ -70,6 +61,56 @@ export interface MapNode {
   type: MapNodeType;
   element?: Element;
   score?: number;
+}
+
+export interface RuntimeState {
+  lastLoggedState: string;
+  stuckCounter: number;
+  currentMapKey: string;
+  capturesThisMap: number;
+  activeAutoRunMode: RunMode | null;
+  activeChallengeContext: unknown;
+  engineStats: EngineStats;
+}
+
+export interface EngineStats {
+  loops: number;
+  screens: Record<string, number>;
+  catches: number;
+  items: number;
+  swaps: number;
+  rerolls: number;
+}
+
+export interface ScoredDecision<TDetails = Record<string, unknown>> {
+  id: string;
+  score: number;
+  reason: string;
+  details: TDetails;
+}
+
+export interface OpponentProfile {
+  name: string;
+  leadTypes: string[];
+  teamTypes: string[];
+  sourceConfidence: string;
+}
+
+export interface RunProgressSnapshot {
+  at: string;
+  reason: string;
+  screen: string;
+  labels: string[];
+  mapKey: string;
+  capturesThisMap: number;
+  teamSize: number;
+  aliveCount: number;
+  avgHP: number;
+  avgLevel: number;
+  leadLevel: number;
+  opponent: OpponentProfile | null;
+  bossPrep: unknown;
+  team: PokemonUnit[];
 }
 
 export interface GeneratedBundleMeta {

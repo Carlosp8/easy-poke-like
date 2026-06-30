@@ -21,10 +21,11 @@ Userscript de Tampermonkey para automatizar runs de Pokelike. La version 9.5 fus
 ## Instalacion
 
 1. Instala Tampermonkey o un gestor compatible de userscripts.
-2. Crea un nuevo userscript.
-3. Pega el contenido de [`easy-pokelike.user.js`](easy-pokelike.user.js).
-4. Guarda el script y abre `pokelike.xyz`.
-5. Comprueba que aparece el panel flotante `Engine 7`.
+2. Genera el artefacto local con `npm ci` y `npm run build`, o descarga `easy-pokelike.user.js` desde una release.
+3. Crea un nuevo userscript.
+4. Pega el contenido de `easy-pokelike.user.js`.
+5. Guarda el script y abre `pokelike.xyz`.
+6. Comprueba que aparece el panel flotante `Engine 7`.
 
 El userscript se ejecuta con:
 
@@ -34,15 +35,16 @@ El userscript se ejecuta con:
 
 ## Desarrollo
 
-El userscript final se genera desde `src/`. No edites `easy-pokelike.user.js` a mano salvo para una prueba puntual: es un artefacto de build.
+El userscript final se genera desde `src/`. No edites `easy-pokelike.user.js` a mano salvo para una prueba puntual: es un artefacto local de build o de release, no la fuente de verdad.
 
 - `src/userscript.meta.js`: cabecera Tampermonkey.
 - `src/core/manifest.json`: orden de concatenacion del motor.
-- `src/core/parts/`: secciones del motor dentro del mismo IIFE.
+- `src/core/parts/`: secciones del motor dentro del IIFE que genera el build.
+- `src/core/lib/`: primeras utilidades puras extraidas para tests y migracion gradual.
 - `src/core/types.d.ts`: vocabulario TypeScript para estado, Pokemon, nodos y metadata.
 - `src/data/generated/`: datos normalizados extraidos del bundle de Pokelike.
 - `scripts/*.ts`: tooling en TypeScript para build y extraccion.
-- `tests/*.mjs`: tests de build, extractor y resolucion de bundles.
+- `tests/*.mjs`: tests de build, extractor, contratos de datos, DOM runtime y scoring puro.
 
 Comandos:
 
@@ -51,24 +53,27 @@ Comandos:
 - `npm run extract:bundle -- bundle.xxxxx.js`: usa un bundle concreto sin depender del hash.
 - `npm run extract:bundle -- index.html`: lee el `<script src="...bundle....js">` de un HTML local y resuelve el JS referenciado.
 - `npm run build`: recompone `easy-pokelike.user.js` desde `src/` y ejecuta `node --check`.
+- `npm run lint`: valida scripts, tests y librerias nuevas con ESLint.
+- `npm run format:check`: valida formato con Prettier sin reescribir archivos.
+- `npm run check`: ejecuta formato, lint, typecheck, tests y build.
 - `npm test`: valida extractor y build.
 - `npm run typecheck`: ejecuta TypeScript (`tsc`) cuando las dependencias de desarrollo esten instaladas.
 
-Los scripts TypeScript se ejecutan directamente con Node 22 usando `--experimental-strip-types`, asi que `build`, `test` y `extract:bundle` no necesitan un paso de compilacion. Para typecheck real instala dependencias (`npm install`) y usa `npm run typecheck`.
+Los scripts TypeScript se ejecutan directamente con Node 22 usando `--experimental-strip-types`, asi que `build`, `test` y `extract:bundle` no necesitan un paso de compilacion. Para desarrollo completo instala dependencias con `npm ci` y usa `npm run check`.
 
 ### Arquitectura modular
 
-El core esta partido por responsabilidad, pero sigue compartiendo un unico scope de Tampermonkey:
+El core esta partido por responsabilidad, pero sigue compartiendo un unico scope de Tampermonkey generado por `scripts/build-userscript.ts`:
 
-- `00-runtime-hooks.js`: arranque del IIFE y guards de eventos sinteticos.
+- `00-runtime-hooks.js`: guards de runtime y eventos sinteticos.
 - `01-config-data.js`: configuracion, type chart y datos estaticos.
 - `02-controls-state.js`: estado mutable, controles persistidos y panel.
 - `03-detection-strategy.js`: parseo del DOM, deteccion de pantalla y heuristicas.
 - `04-scoring-routing.js`: scoring de matchups, orden de equipo y rutas.
 - `05-screen-handlers.js`: handlers por pantalla visible.
-- `06-initialization.js`: banner, timers y cierre del IIFE.
+- `06-initialization.js`: banner, timers y arranque del loop.
 
-El orden esta en `src/core/manifest.json`; si cambias ese orden cambias el comportamiento.
+El orden esta en `src/core/manifest.json`; si cambias ese orden cambias el comportamiento. Cada parte debe seguir siendo JS parseable por si sola, y el IIFE se aplica solo al generar `easy-pokelike.user.js`.
 
 ### Extractor de bundle
 
@@ -81,7 +86,7 @@ El extractor no depende del hash del archivo. Localiza por estructura:
 
 El resultado actual desde `bundle.e9e84cb924.js` queda registrado en `src/data/generated/bundle-meta.json` con:
 
-- Pokédex: 649;
+- Pokedex: 649;
 - moves: 18;
 - items: 33;
 - pasivos: 128;

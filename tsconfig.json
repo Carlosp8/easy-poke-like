@@ -13,12 +13,7 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": [
-    "scripts/**/*.ts",
-    "tests/**/*.mjs",
-    "src/**/*.js",
-    "src/**/*.json"
-  ],
+  "include": ["scripts/**/*.ts", "tests/**/*.mjs", "src/**/*.js", "src/**/*.json"],
   "exclude": [
     "easy-pokelike.user.js",
     "bundle*.js",
