@@ -95,6 +95,7 @@ export const TYPE_CHART: TypeChart = {
 const TYPE_SET = new Set<string>(POKELIKE_TYPES);
 const LOW_VALUE_HELD_ITEMS = new Set([
   'lagging tail',
+  'kings rock',
   "king's rock",
   'eviolite',
   'focus band',
@@ -107,9 +108,15 @@ const TYPE_BOOST_ITEMS = new Map<string, PokelikeType>([
   ['black glasses', 'Dark'],
   ['charcoal', 'Fire'],
   ['magnet', 'Electric'],
+  ['hard stone', 'Rock'],
+  ['dragon fang', 'Dragon'],
+  ['metal coat', 'Steel'],
+  ['silk scarf', 'Normal'],
+  ['pixie plate', 'Fairy'],
   ['miracle seed', 'Grass'],
   ['mystic water', 'Water'],
   ['never melt ice', 'Ice'],
+  ['never-melt ice', 'Ice'],
   ['poison barb', 'Poison'],
   ['sharp beak', 'Flying'],
   ['silver powder', 'Bug'],
@@ -117,6 +124,18 @@ const TYPE_BOOST_ITEMS = new Map<string, PokelikeType>([
   ['spell tag', 'Ghost'],
   ['twisted spoon', 'Psychic'],
 ]);
+
+export type ItemNameCollection = Iterable<string> & {
+  has?: (_value: string) => boolean;
+};
+
+export type ItemTypeMatch =
+  ReadonlyMap<string, PokelikeType | string> | Record<string, PokelikeType | string>;
+
+export interface ItemMatchOptions {
+  itemTypeMatch?: ItemTypeMatch;
+  getAttackTypes?: (_unit: PokemonUnit) => unknown;
+}
 
 export function foldText(text: unknown): string {
   return String(text ?? '')
@@ -152,6 +171,95 @@ export function normalizeTypeList(types: unknown): PokelikeType[] {
       list.filter((type): type is PokelikeType => typeof type === 'string' && TYPE_SET.has(type)),
     ),
   ];
+}
+
+function normalizedCollectionHas(items: ItemNameCollection, itemName: unknown): boolean {
+  const normalizedItem = normalizeItemName(itemName);
+  if (!normalizedItem) return false;
+
+  if (items.has?.(normalizedItem)) return true;
+  for (const item of items) {
+    if (normalizeItemName(item) === normalizedItem) return true;
+  }
+  return false;
+}
+
+function isItemTypeMatchMap(
+  itemTypeMatch: ItemTypeMatch,
+): itemTypeMatch is ReadonlyMap<string, PokelikeType | string> {
+  const maybeMap = itemTypeMatch as { get?: unknown; entries?: unknown };
+  return typeof maybeMap.get === 'function' && typeof maybeMap.entries === 'function';
+}
+
+function getItemTypeMatchValue(itemName: unknown, itemTypeMatch: ItemTypeMatch): unknown {
+  const normalizedItem = normalizeItemName(itemName);
+  if (!normalizedItem) return null;
+
+  if (isItemTypeMatchMap(itemTypeMatch)) {
+    const directValue = itemTypeMatch.get(normalizedItem);
+    if (directValue) return directValue;
+    for (const [key, value] of itemTypeMatch.entries()) {
+      if (normalizeItemName(key) === normalizedItem) return value;
+    }
+    return null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(itemTypeMatch, normalizedItem)) {
+    return itemTypeMatch[normalizedItem];
+  }
+  for (const [key, value] of Object.entries(itemTypeMatch)) {
+    if (normalizeItemName(key) === normalizedItem) return value;
+  }
+  return null;
+}
+
+export function isLowValueHeldItem(
+  itemName: unknown,
+  lowValueItems: ItemNameCollection = LOW_VALUE_HELD_ITEMS,
+): boolean {
+  return normalizedCollectionHas(lowValueItems, itemName);
+}
+
+export function isHealingItem(
+  itemName: unknown,
+  healingItems: ItemNameCollection = HEALING_ITEMS,
+): boolean {
+  return normalizedCollectionHas(healingItems, itemName);
+}
+
+export function getItemBoostType(
+  itemName: unknown,
+  itemTypeMatch: ItemTypeMatch = TYPE_BOOST_ITEMS,
+): PokelikeType | null {
+  const [boostType] = normalizeTypeList(getItemTypeMatchValue(itemName, itemTypeMatch));
+  return boostType ?? null;
+}
+
+export function hasMatchingAttackForItem(
+  unit: PokemonUnit | null | undefined,
+  itemName: unknown,
+  options: ItemMatchOptions = {},
+): boolean {
+  if (!unit) return false;
+
+  const matchingType = getItemBoostType(itemName, options.itemTypeMatch);
+  if (!matchingType) return false;
+
+  const attackTypeSource =
+    options.getAttackTypes?.(unit) ??
+    (unit.attackTypes && unit.attackTypes.length > 0 ? unit.attackTypes : unit.types);
+
+  return normalizeTypeList(attackTypeSource).includes(matchingType);
+}
+
+export function isTypeBoostItemUsefulForTeam(
+  itemName: unknown,
+  team: PokemonUnit[] = [],
+  options: ItemMatchOptions = {},
+): boolean {
+  const matchingType = getItemBoostType(itemName, options.itemTypeMatch);
+  if (!matchingType) return true;
+  return team.some((unit) => !unit?.isFainted && hasMatchingAttackForItem(unit, itemName, options));
 }
 
 export function getAttackTypeScoreAgainstDefenders(
@@ -259,18 +367,18 @@ export function scoreHeldItemFit(unit: PokemonUnit, itemName: string): ScoredDec
   let score = 0;
   const reasons: string[] = [];
 
-  if (LOW_VALUE_HELD_ITEMS.has(normalizedItem)) {
+  if (isLowValueHeldItem(normalizedItem)) {
     score -= 50;
     reasons.push('low-value');
   }
-  if (HEALING_ITEMS.has(normalizedItem)) {
+  if (isHealingItem(normalizedItem)) {
     score += unit.isFainted ? 0 : 35;
     reasons.push('sustain');
   }
 
-  const boostType = TYPE_BOOST_ITEMS.get(normalizedItem);
+  const boostType = getItemBoostType(normalizedItem);
   const attackTypes = normalizeTypeList(unit.attackTypes?.length ? unit.attackTypes : unit.types);
-  if (boostType && attackTypes.includes(boostType)) {
+  if (hasMatchingAttackForItem(unit, normalizedItem)) {
     score += 45;
     reasons.push('matching-attack-type');
   }

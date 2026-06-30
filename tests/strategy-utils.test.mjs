@@ -5,6 +5,11 @@ import {
   foldText,
   getAttackCoverageScore,
   getDefensiveScoreAgainstAttack,
+  getItemBoostType,
+  hasMatchingAttackForItem,
+  isHealingItem,
+  isLowValueHeldItem,
+  isTypeBoostItemUsefulForTeam,
   normalizeItemName,
   scoreCatchDraftSignals,
   scoreHeldItemFit,
@@ -54,6 +59,34 @@ test('scores held item fit for useful, neutral and low-value items', () => {
   assert.equal(scoreHeldItemFit(charizard, 'Charcoal').score, 45);
   assert.equal(scoreHeldItemFit(charizard, 'Leftovers').score, 35);
   assert.equal(scoreHeldItemFit(charizard, 'Lagging Tail').score, -50);
+});
+
+test('classifies held item utility with normalized item names', () => {
+  assert.equal(isLowValueHeldItem('Kings Rock'), true);
+  assert.equal(isLowValueHeldItem('Leftovers'), false);
+  assert.equal(isHealingItem('Leftovers'), true);
+  assert.equal(isHealingItem('Charcoal'), false);
+});
+
+test('matches type boost items against attack coverage', () => {
+  const charizard = {
+    name: 'Charizard',
+    types: ['Fire', 'Flying'],
+    attackTypes: ['Fire'],
+  };
+  const blastoise = {
+    name: 'Blastoise',
+    types: ['Water'],
+    attackTypes: ['Water'],
+  };
+
+  assert.equal(getItemBoostType('Never-Melt Ice'), 'Ice');
+  assert.equal(getItemBoostType('Hard Stone'), 'Rock');
+  assert.equal(hasMatchingAttackForItem(charizard, 'Charcoal'), true);
+  assert.equal(hasMatchingAttackForItem(blastoise, 'Charcoal'), false);
+  assert.equal(isTypeBoostItemUsefulForTeam('Charcoal', [blastoise]), false);
+  assert.equal(isTypeBoostItemUsefulForTeam('Charcoal', [blastoise, charizard]), true);
+  assert.equal(isTypeBoostItemUsefulForTeam('Leftovers', [blastoise]), true);
 });
 
 test('scores route lookahead with decayed future value', () => {

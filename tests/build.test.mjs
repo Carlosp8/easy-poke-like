@@ -26,6 +26,21 @@ test('builds a Tampermonkey userscript from src modules', async () => {
   );
   assert.ok(output.includes('return EasyPokelikeStrategyUtils.normalizeTypeList(types);'));
   assert.ok(
+    output.includes(
+      'return EasyPokelikeStrategyUtils.getItemBoostType(normalizeItemName(itemName), ITEM_TYPE_MATCH);',
+    ),
+  );
+  assert.ok(
+    output.includes(
+      'return EasyPokelikeStrategyUtils.isHealingItem(normalizeItemName(itemName), MAIN_CARRY_SUSTAIN_ITEMS);',
+    ),
+  );
+  assert.ok(
+    output.includes(
+      'return EasyPokelikeStrategyUtils.isLowValueHeldItem(normalizeItemName(itemName), LOW_VALUE_HELD_ITEMS);',
+    ),
+  );
+  assert.ok(
     output.indexOf('var EasyPokelikeStrategyUtils = (() => {') <
       output.indexOf('function normalizeTypeList(types)'),
   );

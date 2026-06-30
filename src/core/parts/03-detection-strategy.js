@@ -2036,7 +2036,7 @@
     }
 
     function getItemBoostType(itemName) {
-        return ITEM_TYPE_MATCH[normalizeItemName(itemName)] || null;
+        return EasyPokelikeStrategyUtils.getItemBoostType(normalizeItemName(itemName), ITEM_TYPE_MATCH);
     }
 
     function getPrimaryAttackTypeFromPokedexEntry(entry) {
@@ -2134,15 +2134,17 @@
     }
 
     function hasMatchingAttackForItem(unit, itemName) {
-        const matchingType = getItemBoostType(itemName);
-        if (!matchingType || !unit) return false;
-        return getConfirmedUnitAttackTypes(unit).includes(matchingType);
+        return EasyPokelikeStrategyUtils.hasMatchingAttackForItem(unit, normalizeItemName(itemName), {
+            itemTypeMatch: ITEM_TYPE_MATCH,
+            getAttackTypes: getConfirmedUnitAttackTypes
+        });
     }
 
     function isTypeBoostItemUsefulForTeam(itemName, team) {
-        const matchingType = getItemBoostType(itemName);
-        if (!matchingType) return true;
-        return getAliveTeam(team).some(p => hasMatchingAttackForItem(p, itemName));
+        return EasyPokelikeStrategyUtils.isTypeBoostItemUsefulForTeam(normalizeItemName(itemName), getAliveTeam(team), {
+            itemTypeMatch: ITEM_TYPE_MATCH,
+            getAttackTypes: getConfirmedUnitAttackTypes
+        });
     }
 
     function getConfiguredMainCarryKeys() {
@@ -2355,11 +2357,11 @@
     }
 
     function isHealingItem(itemName) {
-        return ['shell bell', 'leftovers'].includes(normalizeItemName(itemName));
+        return EasyPokelikeStrategyUtils.isHealingItem(normalizeItemName(itemName), MAIN_CARRY_SUSTAIN_ITEMS);
     }
 
     function isLowValueHeldItem(itemName) {
-        return LOW_VALUE_HELD_ITEMS.has(normalizeItemName(itemName));
+        return EasyPokelikeStrategyUtils.isLowValueHeldItem(normalizeItemName(itemName), LOW_VALUE_HELD_ITEMS);
     }
 
     function isMainCarryPreferredHeldItem(itemName) {
