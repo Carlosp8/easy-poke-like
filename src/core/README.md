@@ -21,7 +21,8 @@ toward stronger TypeScript coverage.
 - `06-initialization.js`: banner, reporting timers and loop startup.
 - `types.d.ts`: domain contracts for controls, Pokemon units and map nodes.
 - `lib/`: pure utilities extracted as the first migration target for stronger
-  tests and future module boundaries.
+  tests and future module boundaries. The build transpiles these modules into a
+  local userscript helper before concatenating the legacy parts.
 
 ## Editing Rules
 

@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { transform } from 'esbuild';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = path.resolve(SCRIPT_DIR, '..');
@@ -15,6 +16,7 @@ export interface BuildUserscriptOptions {
   metaPath?: string;
   manifestPath?: string;
   corePath?: string;
+  strategyUtilsPath?: string;
   outPath?: string;
 }
 
@@ -43,15 +45,30 @@ async function readCoreSource(rootDir: string, options: BuildUserscriptOptions):
 
   const manifest = parseCoreManifest(await readFile(manifestPath, 'utf8'), manifestPath);
   const manifestDir = path.dirname(manifestPath);
+  const strategyUtilsPath =
+    options.strategyUtilsPath || path.join(rootDir, 'src', 'core', 'lib', 'strategy-utils.ts');
 
   // The parts share one generated IIFE scope, so ordering is a behavioral contract.
-  const chunks = await Promise.all(
-    manifest.parts.map(async (partPath) => {
+  const [strategyUtils, ...chunks] = await Promise.all([
+    readBrowserStrategyUtils(strategyUtilsPath),
+    ...manifest.parts.map(async (partPath) => {
       const fullPath = path.resolve(manifestDir, partPath);
       return (await readFile(fullPath, 'utf8')).trimEnd();
     }),
-  );
-  return `${chunks.join('\n')}\n`;
+  ]);
+  return `${strategyUtils}\n${chunks.join('\n')}\n`;
+}
+
+async function readBrowserStrategyUtils(strategyUtilsPath: string): Promise<string> {
+  const source = await readFile(strategyUtilsPath, 'utf8');
+  const result = await transform(source, {
+    loader: 'ts',
+    format: 'iife',
+    globalName: 'EasyPokelikeStrategyUtils',
+    target: 'es2022',
+    legalComments: 'none',
+  });
+  return result.code.trimEnd();
 }
 
 function looksLikeWrappedIife(source: string): boolean {

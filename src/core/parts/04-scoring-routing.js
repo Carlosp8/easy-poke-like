@@ -3,8 +3,7 @@
 
     // Shared scoring primitives for matchups, team order and map routing.
     function normalizeTypeList(types) {
-        const list = Array.isArray(types) ? types : (types ? [types] : []);
-        return [...new Set(list.filter(type => TYPES.includes(type)))];
+        return EasyPokelikeStrategyUtils.normalizeTypeList(types);
     }
 
     function getUnitAttackTypes(unit) {
@@ -18,38 +17,15 @@
     }
 
     function getAttackTypeScoreAgainstDefenders(attackType, defenderTypes) {
-        const chart = TYPE_CHART[attackType];
-        if (!chart) return 0;
-
-        let score = 0;
-        normalizeTypeList(defenderTypes).forEach(defType => {
-            if (chart.immune.includes(defType)) score -= 12;
-            if (chart.strong.includes(defType)) score += 5;
-            if (chart.weak.includes(defType)) score -= 3;
-        });
-        return score;
+        return EasyPokelikeStrategyUtils.getAttackTypeScoreAgainstDefenders(attackType, defenderTypes);
     }
 
     function getAttackCoverageScore(attackerTypes, defenderTypes) {
-        const attacks = normalizeTypeList(attackerTypes);
-        const defenders = normalizeTypeList(defenderTypes);
-        if (attacks.length === 0 || defenders.length === 0) return 0;
-        return Math.max(...attacks.map(attackType => getAttackTypeScoreAgainstDefenders(attackType, defenders)));
+        return EasyPokelikeStrategyUtils.getAttackCoverageScore(attackerTypes, defenderTypes);
     }
 
     function getDefensiveScoreAgainstAttack(defenderTypes, attackType) {
-        const chart = TYPE_CHART[attackType];
-        if (!chart) return 0;
-
-        let score = 0;
-        normalizeTypeList(defenderTypes).forEach(defType => {
-            if (chart.immune.includes(defType)) score += 8;
-            else {
-                if (chart.strong.includes(defType)) score -= 4;
-                if (chart.weak.includes(defType)) score += 2;
-            }
-        });
-        return score;
+        return EasyPokelikeStrategyUtils.getDefensiveScoreAgainstAttack(defenderTypes, attackType);
     }
 
     function getDefensiveMatchupScore(defenderTypes, attackerTypes) {
