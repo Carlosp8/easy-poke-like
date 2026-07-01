@@ -591,16 +591,16 @@
     function scoreKnownBossNode(profile, context) {
         const lead = getAliveTeam(context.team)[0];
         const prep = getBossPrepStatus(context.team, profile);
-        const deficitPenalty = prep.avgDeficit * 150 + prep.leadDeficit * 110;
-
-        let score = context.avgHP > CONFIG.LOW_HP_THRESHOLD ? 320 : -850;
-        if (profile && lead) score += scoreLeadCandidate(lead, profile) / 4;
-        if (context.leadNeedsItem) score -= prep.ready ? 280 : 520;
-        if (context.earlyLevelingPriority && !prep.ready) score -= 1400;
-        if (!prep.ready) score -= 900 + deficitPenalty;
-        else score += 620;
-
-        return score;
+        return EasyPokelikeStrategyUtils.scoreBossRouteNode({
+            avgHP: context.avgHP,
+            leadMatchupScore: profile && lead ? scoreLeadCandidate(lead, profile) / 4 : 0,
+            leadNeedsItem: context.leadNeedsItem,
+            earlyLevelingPriority: context.earlyLevelingPriority,
+            prep,
+            config: {
+                lowHpThreshold: CONFIG.LOW_HP_THRESHOLD
+            }
+        }).score;
     }
 
     function scoreLegendaryNode(context) {
@@ -608,28 +608,27 @@
         const alive = getAliveTeam(team);
         const lead = alive[0];
         const prep = context.bossPrepStatus || getBossPrepStatus(team);
-        const prepPressure = (prep.avgDeficit || 0) + (prep.leadDeficit || 0);
-        let score = CONFIG.LEGENDARY_NODE_BASE_SCORE + CONFIG.LEGENDARY_NODE_ROUTE_BONUS;
-
-        if (context.hasFainted) score -= 1500;
-        if (context.avgHP < CONFIG.CRITICAL_HP_THRESHOLD) score -= CONFIG.LEGENDARY_NODE_LOW_HP_PENALTY;
-        else if (context.avgHP < CONFIG.LOW_HP_THRESHOLD) score -= Math.round(CONFIG.LEGENDARY_NODE_LOW_HP_PENALTY * 0.45);
-        if (alive.length < 3) score -= 900;
-        if (prep.ready) score += CONFIG.LEGENDARY_NODE_READY_BONUS;
-        else score -= Math.min(
-            CONFIG.LEGENDARY_NODE_MAX_UNDERLEVEL_PENALTY,
-            prepPressure * CONFIG.LEGENDARY_NODE_UNDERLEVEL_PENALTY
-        );
-
-        if (lead) {
-            score += getPokemonCarryScore(lead) / 2.5;
-            score += lead.heldItem ? 180 : -180;
-            if (isMainCarryUnit(lead)) score += 420;
-            if (lead.heldItem && isHealingItem(lead.heldItem)) score += 320;
-            if ((lead.hp || 100) < CONFIG.LOW_HP_THRESHOLD) score -= 500;
-        }
-
-        return score;
+        return EasyPokelikeStrategyUtils.scoreLegendaryRouteNode({
+            avgHP: context.avgHP,
+            hasFainted: context.hasFainted,
+            aliveCount: alive.length,
+            leadCarryScore: lead ? getPokemonCarryScore(lead) : undefined,
+            leadHasItem: Boolean(lead?.heldItem),
+            leadIsMainCarry: lead ? isMainCarryUnit(lead) : false,
+            leadHasHealingItem: Boolean(lead?.heldItem && isHealingItem(lead.heldItem)),
+            leadHp: lead ? (lead.hp || 100) : 100,
+            prep,
+            config: {
+                criticalHpThreshold: CONFIG.CRITICAL_HP_THRESHOLD,
+                lowHpThreshold: CONFIG.LOW_HP_THRESHOLD,
+                legendaryNodeBaseScore: CONFIG.LEGENDARY_NODE_BASE_SCORE,
+                legendaryNodeRouteBonus: CONFIG.LEGENDARY_NODE_ROUTE_BONUS,
+                legendaryNodeReadyBonus: CONFIG.LEGENDARY_NODE_READY_BONUS,
+                legendaryNodeLowHpPenalty: CONFIG.LEGENDARY_NODE_LOW_HP_PENALTY,
+                legendaryNodeMaxUnderlevelPenalty: CONFIG.LEGENDARY_NODE_MAX_UNDERLEVEL_PENALTY,
+                legendaryNodeUnderlevelPenalty: CONFIG.LEGENDARY_NODE_UNDERLEVEL_PENALTY
+            }
+        }).score;
     }
 
     function isShinyScoutMapNodeType(type) {
@@ -808,129 +807,134 @@
 
         switch (mapNode.type) {
             case 'center':
-                if (hasFainted) score += 5000;
-                else if (avgHP < CONFIG.CRITICAL_HP_THRESHOLD) score += 4000;
-                else if (avgHP < CONFIG.LOW_HP_THRESHOLD) score += 2000;
-                else if (lowHPCount >= 2) score += 1500;
-                else if (centerNeed.fullEnough) score -= CONFIG.CENTER_HEALTHY_PATH_PENALTY;
-                else if (centerNeed.healthyCarryCanSkip) score -= CONFIG.CENTER_STRONG_CARRY_PATH_PENALTY;
-                else if (centerNeed.almostFull) score -= CONFIG.CENTER_ALMOST_HEALTHY_PATH_PENALTY;
-                else if (bossLevelPressure > 0 && avgHP >= CONFIG.CENTER_CARRY_SKIP_AVG_HP_THRESHOLD) {
-                    score -= 650 + bossLevelPressure * 55;
-                }
-                else score -= 250;
+                score += EasyPokelikeStrategyUtils.scoreCenterRouteNode({
+                    avgHP,
+                    hasFainted,
+                    lowHPCount,
+                    bossLevelPressure,
+                    centerNeed,
+                    config: {
+                        criticalHpThreshold: CONFIG.CRITICAL_HP_THRESHOLD,
+                        lowHpThreshold: CONFIG.LOW_HP_THRESHOLD,
+                        centerHealthyPathPenalty: CONFIG.CENTER_HEALTHY_PATH_PENALTY,
+                        centerStrongCarryPathPenalty: CONFIG.CENTER_STRONG_CARRY_PATH_PENALTY,
+                        centerAlmostHealthyPathPenalty: CONFIG.CENTER_ALMOST_HEALTHY_PATH_PENALTY,
+                        centerCarrySkipAvgHpThreshold: CONFIG.CENTER_CARRY_SKIP_AVG_HP_THRESHOLD
+                    }
+                }).score;
                 break;
             case 'buff':
-                score += earlyLevelingPriority ? 360 + prepPressure * 45 : 500;
-                if (bossLevelPressure > 0) score += bossLevelPressure * CONFIG.BOSS_LEVEL_PRESSURE_BUFF_BONUS;
-                if (sinnohTraining.active) {
-                    score += CONFIG.SINNOH_BUFF_NODE_BONUS;
-                    if (sinnohTraining.needsOffense) score += CONFIG.SINNOH_OFFENSE_BUFF_NODE_BONUS;
-                }
+                score += EasyPokelikeStrategyUtils.scoreBuffRouteNode({
+                    earlyLevelingPriority,
+                    prepPressure,
+                    bossLevelPressure,
+                    sinnohTrainingActive: sinnohTraining.active,
+                    sinnohNeedsOffense: sinnohTraining.needsOffense,
+                    config: {
+                        bossLevelPressureBuffBonus: CONFIG.BOSS_LEVEL_PRESSURE_BUFF_BONUS,
+                        sinnohBuffNodeBonus: CONFIG.SINNOH_BUFF_NODE_BONUS,
+                        sinnohOffenseBuffNodeBonus: CONFIG.SINNOH_OFFENSE_BUFF_NODE_BONUS
+                    }
+                }).score;
                 break;
             case 'legendary':
                 score += scoreLegendaryNode(context);
                 break;
             case 'catch':
-                if (shinyRoute.tacticActive) {
-                    if (buildingCoreTeam) score += 980;
-                    else if (needsEarlyRoster) score += earlyLevelingPriority ? 760 : 620;
-                    else if (hasLowLevelForSwap) score += earlyLevelingPriority ? 620 : 520;
-                    else if (shinyRoute.mustTrain) score -= 620 + prepPressure * 45;
-                    else if (shinyRoute.needsTraining) score += 460 - prepPressure * 14;
-                    else if (openTeamSlot) score += 760;
-                    else score += 620;
-                    if (bossLevelPressure > 0) score -= bossLevelPressure * (shinyRoute.mustTrain ? 70 : 28);
-                    if (captureCapReached && !shinyRoute.mustTrain) score += shinyRoute.needsTraining ? 260 : 560;
-                    score += duplicateRouteScore;
-                    if (sinnohTraining.active && getAliveTeam(team).length >= CONFIG.SINNOH_TRAINING_CORE_TEAM_SIZE && !shinyRoute.safeToScout) {
-                        score -= Math.round(CONFIG.SINNOH_CATCH_NODE_PENALTY * 0.45);
+                score += EasyPokelikeStrategyUtils.scoreCatchRouteNode({
+                    nodeType: 'catch',
+                    shinyRoute,
+                    buildingCoreTeam,
+                    needsEarlyRoster,
+                    hasLowLevelForSwap,
+                    earlyLevelingPriority,
+                    openTeamSlot,
+                    captureCapReached,
+                    earlyExpansionClosed,
+                    bossLevelPressure,
+                    prepPressure,
+                    duplicateRouteScore,
+                    sinnohTrainingActive: sinnohTraining.active,
+                    aliveCount: getAliveTeam(team).length,
+                    config: {
+                        earlyOptionalTeamSize: CONFIG.EARLY_OPTIONAL_TEAM_SIZE,
+                        bossLevelPressureCatchPenalty: CONFIG.BOSS_LEVEL_PRESSURE_CATCH_PENALTY,
+                        sinnohCatchNodePenalty: CONFIG.SINNOH_CATCH_NODE_PENALTY,
+                        sinnohGrassNodePenalty: CONFIG.SINNOH_GRASS_NODE_PENALTY,
+                        sinnohTrainingCoreTeamSize: CONFIG.SINNOH_TRAINING_CORE_TEAM_SIZE
                     }
-                    break;
-                }
-                if (earlyExpansionClosed && !hasLowLevelForSwap) score -= 1800 + prepPressure * 80;
-                else if (captureCapReached && !needsEarlyRoster && !hasLowLevelForSwap) score -= 3200;
-                else if (buildingCoreTeam) score += 700;
-                else if (needsEarlyRoster) score += earlyLevelingPriority ? 520 : 380;
-                else if (hasLowLevelForSwap) score += earlyLevelingPriority ? 450 : 350;
-                else if (earlyLevelingPriority) score -= 900 + prepPressure * 55;
-                else if (openTeamSlot) score += 120;
-                else if (getAliveTeam(team).length < CONFIG.EARLY_OPTIONAL_TEAM_SIZE) score += 180;
-                else score -= 450;
-                if (bossLevelPressure > 0) score -= bossLevelPressure * CONFIG.BOSS_LEVEL_PRESSURE_CATCH_PENALTY;
-                score += duplicateRouteScore;
-                if (sinnohTraining.active && getAliveTeam(team).length >= CONFIG.SINNOH_TRAINING_CORE_TEAM_SIZE) {
-                    score -= CONFIG.SINNOH_CATCH_NODE_PENALTY;
-                }
+                }).score;
                 break;
             case 'grass':
-                if (shinyRoute.tacticActive) {
-                    if (buildingCoreTeam) score += 420;
-                    else if (needsEarlyRoster) score += earlyLevelingPriority ? 340 : 240;
-                    else if (hasLowLevelForSwap) score += earlyLevelingPriority ? 300 : 230;
-                    else if (shinyRoute.mustTrain) score -= 440 + prepPressure * 35;
-                    else if (shinyRoute.needsTraining) score += 210 - prepPressure * 10;
-                    else if (openTeamSlot) score += 330;
-                    else score += 280;
-                    if (bossLevelPressure > 0) score -= bossLevelPressure * (shinyRoute.mustTrain ? 50 : 20);
-                    if (captureCapReached && !shinyRoute.mustTrain) score += shinyRoute.needsTraining ? 130 : 320;
-                    score += Math.round(duplicateRouteScore * 0.55);
-                    if (sinnohTraining.active && getAliveTeam(team).length >= CONFIG.SINNOH_TRAINING_CORE_TEAM_SIZE && !shinyRoute.safeToScout) {
-                        score -= Math.round(CONFIG.SINNOH_GRASS_NODE_PENALTY * 0.45);
+                score += EasyPokelikeStrategyUtils.scoreCatchRouteNode({
+                    nodeType: 'grass',
+                    shinyRoute,
+                    buildingCoreTeam,
+                    needsEarlyRoster,
+                    hasLowLevelForSwap,
+                    earlyLevelingPriority,
+                    openTeamSlot,
+                    captureCapReached,
+                    earlyExpansionClosed,
+                    bossLevelPressure,
+                    prepPressure,
+                    duplicateRouteScore,
+                    sinnohTrainingActive: sinnohTraining.active,
+                    aliveCount: getAliveTeam(team).length,
+                    config: {
+                        earlyOptionalTeamSize: CONFIG.EARLY_OPTIONAL_TEAM_SIZE,
+                        bossLevelPressureCatchPenalty: CONFIG.BOSS_LEVEL_PRESSURE_CATCH_PENALTY,
+                        sinnohCatchNodePenalty: CONFIG.SINNOH_CATCH_NODE_PENALTY,
+                        sinnohGrassNodePenalty: CONFIG.SINNOH_GRASS_NODE_PENALTY,
+                        sinnohTrainingCoreTeamSize: CONFIG.SINNOH_TRAINING_CORE_TEAM_SIZE
                     }
-                    break;
-                }
-                if (earlyExpansionClosed && !hasLowLevelForSwap) score -= 1400 + prepPressure * 60;
-                else if (captureCapReached && !needsEarlyRoster && !hasLowLevelForSwap) score -= 2400;
-                else if (buildingCoreTeam) score += 280;
-                else if (needsEarlyRoster) score += earlyLevelingPriority ? 240 : 120;
-                else if (hasLowLevelForSwap) score += earlyLevelingPriority ? 180 : 120;
-                else if (earlyLevelingPriority) score -= 650 + prepPressure * 40;
-                else if (openTeamSlot) score += 40;
-                else score -= 250;
-                if (bossLevelPressure > 0) score -= bossLevelPressure * Math.round(CONFIG.BOSS_LEVEL_PRESSURE_CATCH_PENALTY * 0.7);
-                score += Math.round(duplicateRouteScore * 0.55);
-                if (sinnohTraining.active && getAliveTeam(team).length >= CONFIG.SINNOH_TRAINING_CORE_TEAM_SIZE) {
-                    score -= CONFIG.SINNOH_GRASS_NODE_PENALTY;
-                }
+                }).score;
                 break;
             case 'unknown':
-                if (shinyRoute.tacticActive) {
-                    if (shinyRoute.mustTrain) score -= 480 + prepPressure * 35;
-                    else if (shinyRoute.needsTraining) score += 560 - prepPressure * 12;
-                    else score += captureCapReached ? 980 : 820;
-                    if (bossLevelPressure > 0) score -= bossLevelPressure * (shinyRoute.mustTrain ? 55 : 22);
-                } else {
-                    score += 1;
-                }
+                score += EasyPokelikeStrategyUtils.scoreUnknownRouteNode({
+                    shinyRoute,
+                    captureCapReached,
+                    bossLevelPressure,
+                    prepPressure
+                }).score;
                 break;
             case 'item':
-                if (earlyLevelingPriority) {
-                    score += carryNeedsHealingItem ? 260 : (leadNeedsItem && !buildingCoreTeam ? 120 : -420);
-                } else {
-                    score += carryNeedsHealingItem ? 720 : (leadNeedsItem ? 520 : 260);
-                }
-                if (bossLevelPressure > 0 && !carryNeedsHealingItem && !leadNeedsItem) {
-                    score -= bossLevelPressure * CONFIG.BOSS_LEVEL_PRESSURE_ITEM_PENALTY;
-                }
-                if (sinnohTraining.active) {
-                    score += CONFIG.SINNOH_ITEM_NODE_BONUS;
-                    if (sinnohTraining.needsTm) score += CONFIG.SINNOH_TM_NODE_BONUS;
-                }
+                score += EasyPokelikeStrategyUtils.scoreItemRouteNode({
+                    earlyLevelingPriority,
+                    carryNeedsHealingItem,
+                    leadNeedsItem,
+                    buildingCoreTeam,
+                    bossLevelPressure,
+                    sinnohTrainingActive: sinnohTraining.active,
+                    sinnohNeedsTm: sinnohTraining.needsTm,
+                    config: {
+                        bossLevelPressureItemPenalty: CONFIG.BOSS_LEVEL_PRESSURE_ITEM_PENALTY,
+                        sinnohItemNodeBonus: CONFIG.SINNOH_ITEM_NODE_BONUS,
+                        sinnohTmNodeBonus: CONFIG.SINNOH_TM_NODE_BONUS
+                    }
+                }).score;
                 break;
             case 'trainer': {
-                const baseScore = avgHP > CONFIG.LOW_HP_THRESHOLD ? 820 : 220;
                 const profile = detectNextOpponentProfile(mapNode.element);
                 if (isBossOpponentProfile(profile)) {
                     score += scoreKnownBossNode(profile, context);
                     break;
                 }
                 const matchupScore = (isNodeSpecificOpponentProfile(profile) || isBossOpponentProfile(profile)) ? scoreLeadCandidate(getAliveTeam(team)[0], profile) / 3 : getTrainerMatchupScore(mapNode.src, team);
-                score += baseScore + matchupScore - (leadNeedsItem ? 70 : 0) + (earlyLevelingPriority ? 1150 + prepPressure * 80 : 120);
-                if (bossLevelPressure > 0) score += bossLevelPressure * CONFIG.BOSS_LEVEL_PRESSURE_TRAINER_BONUS;
-                if (sinnohTraining.active) {
-                    score += CONFIG.SINNOH_TRAINER_NODE_BONUS + prepPressure * 70;
-                }
+                score += EasyPokelikeStrategyUtils.scoreTrainerRouteNode({
+                    avgHP,
+                    matchupScore,
+                    leadNeedsItem,
+                    earlyLevelingPriority,
+                    prepPressure,
+                    bossLevelPressure,
+                    sinnohTrainingActive: sinnohTraining.active,
+                    config: {
+                        lowHpThreshold: CONFIG.LOW_HP_THRESHOLD,
+                        bossLevelPressureTrainerBonus: CONFIG.BOSS_LEVEL_PRESSURE_TRAINER_BONUS,
+                        sinnohTrainerNodeBonus: CONFIG.SINNOH_TRAINER_NODE_BONUS
+                    }
+                }).score;
                 break;
             }
             case 'boss': {

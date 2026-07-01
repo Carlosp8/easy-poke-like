@@ -867,6 +867,7 @@
             bestCandidate &&
             (bestCandidate.storyScore || 0) >= CONFIG.STORY_CATCH_PROTECT_SCORE
         );
+        const bestIsBossRelevant = bestCandidate ? isBossRelevantCatchCandidate(bestCandidate, bossTypes) : false;
         const hasVisibleShiny = scoredCards.some(candidate => candidate.isShiny);
         const hasNewVisibleShiny = scoredCards.some(candidate => candidate.isShiny && !candidate.alreadyOwnedShiny);
         const challengeNeedsFirstShiny = Boolean(challengeStrategy.active && challengeStrategy.earlyShinyHunt);
@@ -1010,6 +1011,51 @@
         const rerollReason = getCatchRerollReason(team, bestScore, bestIsShiny, earlyAllowance, scoredCards, opponentProfile);
         if (rerollReason && tryRerollCatchOptions(scoredCards, rerollReason)) {
             return; // Settle and let the next loop score the refreshed choices.
+        }
+
+        const catchDraftDecision = EasyPokelikeStrategyUtils.decideCatchDraftAction({
+            openTeamSlot,
+            bestScore,
+            bestCandidate,
+            hasVisibleShiny,
+            earlyShinyScoutWindow,
+            settledCatchWindow,
+            sinnohTrainingActive: sinnohTraining.active,
+            aliveCount: getAliveTeam(team).length,
+            shouldBuildCoreTeam: shouldBuildCoreTeam(team),
+            earlyExpansionClosed,
+            effectiveCaptureCapReached,
+            shouldPrioritizeTraining: shouldPrioritizeEarlyTraining(team, opponentProfile),
+            hasLowLevelForSwap,
+            teamMaxLevel,
+            earlyAllowance,
+            bestIsPremiumCatch,
+            bestIsExceptional,
+            bestIsDirectCounter,
+            bestIsDuplicatePlan,
+            bestIsSinnohPassivePlan,
+            bestIsChallengePlan,
+            bestIsStoryPlan,
+            bestIsBossRelevant,
+            bestWouldDiluteLevels,
+            config: {
+                earlyNonShinyMinAcceptScore: CONFIG.EARLY_NON_SHINY_MIN_ACCEPT_SCORE,
+                settledCatchMinAcceptScore: CONFIG.SETTLED_CATCH_MIN_ACCEPT_SCORE,
+                sinnohTrainingCoreTeamSize: CONFIG.SINNOH_TRAINING_CORE_TEAM_SIZE,
+                earlyOptionalTeamSize: CONFIG.EARLY_OPTIONAL_TEAM_SIZE,
+                catchRerollMinAcceptScore: CONFIG.CATCH_REROLL_MIN_ACCEPT_SCORE,
+                earlyExceptionalCatchScore: CONFIG.EARLY_EXCEPTIONAL_CATCH_SCORE,
+                earlyLowLevelSwapGap: CONFIG.EARLY_LOW_LEVEL_SWAP_GAP
+            }
+        });
+
+        if (catchDraftDecision.action === 'skip') {
+            const swapLevelText = catchDraftDecision.details.minUsefulSwapLevel
+                ? ` | min useful swap level: ${catchDraftDecision.details.minUsefulSwapLevel}`
+                : '';
+            log('info', 'ðŸ¾', `Skipping catch (${catchDraftDecision.reason}) â€” best: ${bestName || 'unknown'} ${bestScore.toFixed(1)}${swapLevelText}`);
+            recordCatchSkip(catchDraftDecision.reason);
+            return;
         }
 
         if (openTeamSlot &&
