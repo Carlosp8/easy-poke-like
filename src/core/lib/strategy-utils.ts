@@ -364,6 +364,181 @@ export interface UnknownRouteNodeInput {
   prepPressure?: number;
 }
 
+export interface BotTacticRouteBonusInput {
+  tactic?: string;
+  nodeType: string;
+  centerCanSkip?: boolean;
+  earlyExpansionClosed?: boolean;
+  captureCapReached?: boolean;
+  openTeamSlot?: boolean;
+  prepReady?: boolean;
+  prepPressure?: number;
+  runNeedsPower?: boolean;
+  shinyRoute?: ScoutRouteBalance & {
+    canBalancedScout?: boolean;
+  };
+  duplicateCatchesEnabled?: boolean;
+  duplicateNeedsOpeningPair?: boolean;
+  duplicateHasLowLevelNonDuplicate?: boolean;
+  duplicateHasPair?: boolean;
+  config?: {
+    duplicatePriorityRouteBonus?: number;
+  };
+}
+
+export interface ChallengeRouteBonusInput {
+  active?: boolean;
+  nodeType: string;
+  earlyShinyHunt?: boolean;
+  prepPressure?: number;
+  prepReady?: boolean;
+  centerCanSkip?: boolean;
+  carryNeedsItem?: boolean;
+  needsCarryBuff?: boolean;
+  underleveled?: boolean;
+  config?: {
+    shinyScoutPressureLimit?: number;
+    challengeFirstShinyNodeBonus?: number;
+    challengeCarryItemNodeBonus?: number;
+    challengeCarryBuffNodeBonus?: number;
+    challengeTrainerLevelNodeBonus?: number;
+  };
+}
+
+export interface StoryRouteBonusInput {
+  active?: boolean;
+  nodeType: string;
+  needsTeam?: boolean;
+  needsCoverage?: boolean;
+  prepPressure?: number;
+  prepReady?: boolean;
+  weakMemberCount?: number;
+  centerCanSkip?: boolean;
+  config?: {
+    storyRouteTeamBuildBonus?: number;
+    storyRouteCoverageBonus?: number;
+    storyRouteTrainingBonus?: number;
+  };
+}
+
+export interface PriorityTypeScoreInput {
+  types?: unknown;
+  priorityTypes?: string[];
+  minRank?: number;
+  weight?: number;
+}
+
+export interface StatScoreSnapshot {
+  bst?: number;
+  offense?: number;
+  speed?: number;
+  bulk?: number;
+}
+
+export interface ChallengeCatchScoreInput {
+  active?: boolean;
+  name?: string;
+  types?: unknown;
+  attackTypes?: unknown;
+  isShiny?: boolean;
+  alreadyOwnedShiny?: boolean;
+  isLegendary?: boolean;
+  isMainCarry?: boolean;
+  hasShiny?: boolean;
+  earlyShinyHunt?: boolean;
+  targetTypes?: unknown;
+  bossCounterScore?: number;
+  priorityTypeScore?: number;
+  level?: number;
+  prepAvgLevel?: number;
+  stats?: StatScoreSnapshot;
+  config?: {
+    challengeShinyCatchBonus?: number;
+    challengeNonShinyEarlyPenalty?: number;
+    earlyExpansionCounterScore?: number;
+    legendaryCatchMinBst?: number;
+  };
+}
+
+export interface StoryLeagueCoverageInput {
+  active?: boolean;
+  attackTypes?: unknown;
+  types?: unknown;
+  leagueTypes?: unknown;
+  uncoveredLeagueTypes?: unknown;
+  config?: {
+    storyLeagueCoverageBonus?: number;
+  };
+}
+
+export interface StoryCatchScoreInput {
+  active?: boolean;
+  name?: string;
+  types?: unknown;
+  attackTypes?: unknown;
+  isShiny?: boolean;
+  isLegendary?: boolean;
+  isLegendaryName?: boolean;
+  isMainCarry?: boolean;
+  needsTeam?: boolean;
+  needsCoverage?: boolean;
+  currentBossTypes?: unknown;
+  leagueTypes?: unknown;
+  uncoveredLeagueTypes?: unknown;
+  leagueCoverageScore?: number;
+  priorityTypeScore?: number;
+  duplicateCount?: number;
+  stats?: StatScoreSnapshot;
+  config?: {
+    storyMinBstTarget?: number;
+    storyWeakStatPenalty?: number;
+    storyCurrentBossCoverageBonus?: number;
+    storyLeagueCoverageBonus?: number;
+    legendaryCatchMinBst?: number;
+  };
+}
+
+export interface ChallengeItemScoreInput {
+  active?: boolean;
+  itemName?: unknown;
+  isLowValue?: boolean;
+  isUsable?: boolean;
+  faintedCount?: number;
+  prepPressure?: number;
+  hasCarry?: boolean;
+  carryLevel?: number;
+  carryHeldItem?: unknown;
+  carryNeedsItem?: boolean;
+  needsCarryBuff?: boolean;
+  underleveled?: boolean;
+  moveTier?: number;
+  carryNewScore?: number;
+  carryOldScore?: number;
+  isMainCarryPreferredItem?: boolean;
+  isSustainItem?: boolean;
+  isOffenseItem?: boolean;
+  isUtilityItem?: boolean;
+  boostType?: string | null;
+  carryMatchesBoost?: boolean;
+  config?: {
+    challengeCarryMoveTierTarget?: number;
+  };
+}
+
+export interface StoryItemScoreInput {
+  active?: boolean;
+  itemName?: unknown;
+  isLowValue?: boolean;
+  isUsable?: boolean;
+  hasFainted?: boolean;
+  prepPressure?: number;
+  hasCarry?: boolean;
+  carryNewScore?: number;
+  carryOldScore?: number;
+  boostType?: string | null;
+  carryMatchesBoost?: boolean;
+}
+
 export function foldText(text: unknown): string {
   return String(text ?? '')
     .toLowerCase()
@@ -398,6 +573,33 @@ export function normalizeTypeList(types: unknown): PokelikeType[] {
       list.filter((type): type is PokelikeType => typeof type === 'string' && TYPE_SET.has(type)),
     ),
   ];
+}
+
+export function scorePriorityTypes(input: PriorityTypeScoreInput = {}): ScoredDecision {
+  const priority = input.priorityTypes ?? [];
+  const minRank = input.minRank ?? 4;
+  const weight = input.weight ?? 1;
+  const types = normalizeTypeList(input.types);
+  const scoredTypes: string[] = [];
+
+  const score = types.reduce((sum, type) => {
+    const index = priority.indexOf(type);
+    if (index < 0) return sum;
+    scoredTypes.push(type);
+    return sum + Math.max(minRank, priority.length - index) * weight;
+  }, 0);
+
+  return {
+    id: 'priority-types',
+    score,
+    reason: scoredTypes.length > 0 ? scoredTypes.join(',') : 'none',
+    details: {
+      types,
+      scoredTypes,
+      minRank,
+      weight,
+    },
+  };
 }
 
 function getPokemonHpPercent(unit: PokemonUnit | null | undefined): number {
@@ -1120,6 +1322,355 @@ export function scoreUnknownRouteNode(input: UnknownRouteNodeInput = {}): Scored
   };
 }
 
+export function scoreBotTacticRouteBonus(input: BotTacticRouteBonusInput): ScoredDecision {
+  const tactic = input.tactic || 'auto';
+  const type = input.nodeType;
+  const prepPressure = input.prepPressure ?? 0;
+  const captureCapReached = Boolean(input.captureCapReached);
+  const openTeamSlot = Boolean(input.openTeamSlot);
+  const earlyExpansionClosed = Boolean(input.earlyExpansionClosed);
+  const centerCanSkip = Boolean(input.centerCanSkip);
+  const runNeedsPower = Boolean(input.runNeedsPower);
+  const shinyRoute = input.shinyRoute ?? {};
+  const duplicatePriorityRouteBonus = input.config?.duplicatePriorityRouteBonus ?? 1400;
+  let score = 0;
+  let reason = 'auto';
+
+  if (tactic === 'xp') {
+    if (type === 'trainer') {
+      score = 900;
+      reason = 'xp-trainer';
+    } else if (type === 'buff') {
+      score = 180;
+      reason = 'xp-buff';
+    } else if (type === 'catch' || type === 'grass') {
+      score = -500;
+      reason = 'xp-avoid-capture';
+    } else if (type === 'item') {
+      score = -120;
+      reason = 'xp-low-item';
+    } else if (type === 'center' && centerCanSkip) {
+      score = -300;
+      reason = 'xp-skip-center';
+    }
+  } else if (tactic === 'capture') {
+    if (type === 'catch') {
+      score = 850;
+      reason = 'capture-catch';
+    } else if (type === 'grass') {
+      score = 350;
+      reason = 'capture-grass';
+    } else if (type === 'trade') {
+      score = 120;
+      reason = 'capture-trade';
+    } else if (type === 'trainer') {
+      score = -180;
+      reason = 'capture-avoid-trainer';
+    }
+  } else if (tactic === 'shiny') {
+    const settledScoutBonus = !shinyRoute.needsTraining && earlyExpansionClosed ? 1200 : 0;
+    const capScoutBonus = captureCapReached ? 900 : 0;
+    const balancedScoutBonus = shinyRoute.canBalancedScout
+      ? Math.max(420, 980 - prepPressure * 45)
+      : 0;
+
+    if (type === 'catch') {
+      if (shinyRoute.mustTrain) {
+        score = -420 - prepPressure * 35;
+        reason = 'shiny-must-train';
+      } else if (shinyRoute.needsTraining) {
+        score = balancedScoutBonus + capScoutBonus + 180;
+        reason = 'shiny-balanced-catch';
+      } else {
+        score = (captureCapReached ? 5200 : openTeamSlot ? 1850 : 2550) + settledScoutBonus;
+        reason = 'shiny-catch';
+      }
+    } else if (type === 'unknown') {
+      if (shinyRoute.mustTrain) {
+        score = -280 - prepPressure * 30;
+        reason = 'shiny-unknown-must-train';
+      } else if (shinyRoute.needsTraining) {
+        score = Math.round(balancedScoutBonus * 1.05) + capScoutBonus + 240;
+        reason = 'shiny-balanced-unknown';
+      } else {
+        score =
+          (captureCapReached ? 5050 : openTeamSlot ? 1950 : 2450) +
+          Math.round(settledScoutBonus * 0.95);
+        reason = 'shiny-unknown';
+      }
+    } else if (type === 'grass') {
+      if (shinyRoute.mustTrain) {
+        score = -250 - prepPressure * 25;
+        reason = 'shiny-grass-must-train';
+      } else if (shinyRoute.needsTraining) {
+        score = Math.round(balancedScoutBonus * 0.75) + Math.round(capScoutBonus * 0.55) + 40;
+        reason = 'shiny-balanced-grass';
+      } else {
+        score = (captureCapReached ? 3700 : 1350) + Math.round(settledScoutBonus * 0.65);
+        reason = 'shiny-grass';
+      }
+    } else if (type === 'trainer') {
+      score = shinyRoute.needsTraining ? 900 + prepPressure * 120 : 260;
+      reason = 'shiny-trainer';
+    } else if (type === 'buff') {
+      score = shinyRoute.needsTraining ? 540 + prepPressure * 70 : 150;
+      reason = 'shiny-buff';
+    } else if (type === 'item') {
+      score = runNeedsPower ? -140 : -70;
+      reason = 'shiny-item';
+    } else if (type === 'trade') {
+      score = openTeamSlot ? 60 : 20;
+      reason = 'shiny-trade';
+    } else if (type === 'legendary') {
+      score = runNeedsPower ? 80 : 180;
+      reason = 'shiny-legendary';
+    } else if (type === 'center') {
+      score = centerCanSkip ? -260 : 150;
+      reason = 'shiny-center';
+    } else if (type === 'boss') {
+      score = input.prepReady ? 140 : -520;
+      reason = 'shiny-boss';
+    }
+  } else if (tactic === 'boss') {
+    if (type === 'item') {
+      score = 420;
+      reason = 'boss-item';
+    } else if (type === 'buff') {
+      score = 300;
+      reason = 'boss-buff';
+    } else if (type === 'trainer') {
+      score = 220;
+      reason = 'boss-trainer';
+    } else if (type === 'legendary') {
+      score = 260;
+      reason = 'boss-legendary';
+    } else if (type === 'boss') {
+      score = 180;
+      reason = 'boss-boss';
+    } else if (type === 'center') {
+      score = centerCanSkip ? -100 : 400;
+      reason = 'boss-center';
+    } else if ((type === 'catch' || type === 'grass') && earlyExpansionClosed) {
+      score = -200;
+      reason = 'boss-avoid-capture';
+    }
+  } else if (tactic === 'duplicate') {
+    if (!input.duplicateCatchesEnabled) {
+      score = 0;
+      reason = 'duplicate-disabled';
+    } else if (type === 'catch') {
+      if (input.duplicateNeedsOpeningPair) {
+        score = duplicatePriorityRouteBonus;
+        reason = 'duplicate-open-pair';
+      } else {
+        score = input.duplicateHasLowLevelNonDuplicate ? 120 : -420;
+        reason = 'duplicate-catch';
+      }
+    } else if (type === 'grass') {
+      score = -260;
+      reason = 'duplicate-avoid-grass';
+    } else if (type === 'trainer') {
+      score = input.duplicateHasPair ? 620 : 260;
+      reason = 'duplicate-trainer';
+    } else if (type === 'buff') {
+      score = input.duplicateHasPair ? 220 : 80;
+      reason = 'duplicate-buff';
+    } else if (type === 'legendary') {
+      score = input.duplicateHasLowLevelNonDuplicate ? 180 : 80;
+      reason = 'duplicate-legendary';
+    } else if (type === 'trade') {
+      score = input.duplicateHasLowLevelNonDuplicate ? 80 : -80;
+      reason = 'duplicate-trade';
+    }
+  }
+
+  return {
+    id: `route:tactic:${tactic}:${type}`,
+    score,
+    reason,
+    details: {
+      tactic,
+      type,
+      prepPressure,
+    },
+  };
+}
+
+export function scoreChallengeRouteBonus(input: ChallengeRouteBonusInput): ScoredDecision {
+  const type = input.nodeType;
+  const prepPressure = input.prepPressure ?? 0;
+  const prepReady = input.prepReady ?? true;
+  const config = input.config ?? {};
+  const shinyScoutPressureLimit = config.shinyScoutPressureLimit ?? 2;
+  const challengeFirstShinyNodeBonus = config.challengeFirstShinyNodeBonus ?? 2800;
+  const challengeCarryItemNodeBonus = config.challengeCarryItemNodeBonus ?? 1150;
+  const challengeCarryBuffNodeBonus = config.challengeCarryBuffNodeBonus ?? 980;
+  const challengeTrainerLevelNodeBonus = config.challengeTrainerLevelNodeBonus ?? 780;
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (!input.active) {
+    return {
+      id: `route:challenge:${type}`,
+      score: 0,
+      reason: 'inactive',
+      details: { type, prepPressure },
+    };
+  }
+
+  if (input.earlyShinyHunt) {
+    const scoutPressureOk = prepPressure <= shinyScoutPressureLimit;
+    if (type === 'catch') {
+      score += scoutPressureOk ? challengeFirstShinyNodeBonus : 620;
+      reasons.push('early-shiny-catch');
+    }
+    if (type === 'grass') {
+      score += scoutPressureOk ? Math.round(challengeFirstShinyNodeBonus * 0.72) : 420;
+      reasons.push('early-shiny-grass');
+    }
+    if (type === 'unknown') {
+      score += scoutPressureOk ? Math.round(challengeFirstShinyNodeBonus * 0.82) : 500;
+      reasons.push('early-shiny-unknown');
+    }
+  }
+
+  if (input.carryNeedsItem && type === 'item') {
+    score += challengeCarryItemNodeBonus;
+    reasons.push('carry-item');
+  }
+  if (input.needsCarryBuff && type === 'buff') {
+    score += challengeCarryBuffNodeBonus + prepPressure * 55;
+    reasons.push('carry-buff');
+  }
+  if (input.underleveled && type === 'trainer') {
+    score += challengeTrainerLevelNodeBonus + prepPressure * 85;
+    reasons.push('underleveled-trainer');
+  }
+  if (type === 'legendary') {
+    score += prepPressure <= 1 ? 380 : -320;
+    reasons.push(prepPressure <= 1 ? 'legendary-ready' : 'legendary-pressure');
+  }
+
+  if (type === 'center' && input.centerCanSkip) {
+    score -= 520;
+    reasons.push('skip-center');
+  }
+  if (type === 'item' && !input.carryNeedsItem && input.needsCarryBuff) {
+    score -= 120;
+    reasons.push('prefer-buff-over-item');
+  }
+  if ((type === 'catch' || type === 'grass') && !input.earlyShinyHunt && input.underleveled) {
+    score -= 260 + prepPressure * 45;
+    reasons.push('underleveled-avoid-capture');
+  }
+  if (type === 'boss') {
+    score += prepReady ? 260 : -1350 - prepPressure * 180;
+    reasons.push(prepReady ? 'boss-ready' : 'boss-underprepared');
+  }
+
+  return {
+    id: `route:challenge:${type}`,
+    score,
+    reason: reasons.join(',') || 'neutral',
+    details: {
+      type,
+      prepPressure,
+      prepReady,
+    },
+  };
+}
+
+export function scoreStoryRouteBonus(input: StoryRouteBonusInput): ScoredDecision {
+  const type = input.nodeType;
+  const prepPressure = input.prepPressure ?? 0;
+  const prepReady = input.prepReady ?? true;
+  const config = input.config ?? {};
+  const storyRouteTeamBuildBonus = config.storyRouteTeamBuildBonus ?? 900;
+  const storyRouteCoverageBonus = config.storyRouteCoverageBonus ?? 720;
+  const storyRouteTrainingBonus = config.storyRouteTrainingBonus ?? 680;
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (!input.active) {
+    return {
+      id: `route:story:${type}`,
+      score: 0,
+      reason: 'inactive',
+      details: { type, prepPressure },
+    };
+  }
+
+  if (input.needsTeam) {
+    if (type === 'catch') {
+      score += storyRouteTeamBuildBonus;
+      reasons.push('team-catch');
+    }
+    if (type === 'grass') {
+      score += Math.round(storyRouteTeamBuildBonus * 0.55);
+      reasons.push('team-grass');
+    }
+    if (type === 'trade') {
+      score += 260;
+      reasons.push('team-trade');
+    }
+  } else if (input.needsCoverage) {
+    if (type === 'catch') {
+      score += storyRouteCoverageBonus;
+      reasons.push('coverage-catch');
+    }
+    if (type === 'grass') {
+      score += Math.round(storyRouteCoverageBonus * 0.5);
+      reasons.push('coverage-grass');
+    }
+  } else if (type === 'catch' || type === 'grass') {
+    score -= 180;
+    reasons.push('avoid-extra-capture');
+  }
+
+  if (prepPressure > 0) {
+    if (type === 'trainer') {
+      score += storyRouteTrainingBonus + prepPressure * 80;
+      reasons.push('prep-trainer');
+    }
+    if (type === 'buff') {
+      score += 360 + prepPressure * 45;
+      reasons.push('prep-buff');
+    }
+    if (type === 'item') {
+      score += 180;
+      reasons.push('prep-item');
+    }
+  }
+
+  if (type === 'legendary') {
+    score += prepPressure <= 2 ? 520 : -180;
+    reasons.push(prepPressure <= 2 ? 'legendary-ready' : 'legendary-pressure');
+  }
+  if (type === 'item' && (input.weakMemberCount ?? 0) > 0) {
+    score += 160;
+    reasons.push('weak-member-item');
+  }
+  if (type === 'center' && input.centerCanSkip) {
+    score -= 420;
+    reasons.push('skip-center');
+  }
+  if (type === 'boss') {
+    score += prepReady ? 220 : -1050 - prepPressure * 160;
+    reasons.push(prepReady ? 'boss-ready' : 'boss-underprepared');
+  }
+
+  return {
+    id: `route:story:${type}`,
+    score,
+    reason: reasons.join(',') || 'neutral',
+    details: {
+      type,
+      prepPressure,
+      prepReady,
+    },
+  };
+}
+
 export function scoreItemRouteNode(input: ItemRouteNodeInput): ScoredDecision {
   const config = input.config ?? {};
   const bossLevelPressure = Math.max(0, input.bossLevelPressure ?? 0);
@@ -1414,6 +1965,34 @@ export function getDefensiveScoreAgainstAttack(
   }, 0);
 }
 
+export function getDefensiveMatchupScore(
+  defenderTypes: unknown,
+  attackerTypes: unknown,
+  typeChart = TYPE_CHART,
+): number {
+  const attacks = normalizeTypeList(attackerTypes);
+  if (attacks.length === 0) return 0;
+  return Math.min(
+    ...attacks.map((attackType) =>
+      getDefensiveScoreAgainstAttack(defenderTypes, attackType, typeChart),
+    ),
+  );
+}
+
+export function scoreCatchBossCounter(
+  candidateTypes: unknown,
+  attackTypes: unknown,
+  bossTypes: unknown,
+): number {
+  const targetTypes = normalizeTypeList(bossTypes);
+  if (targetTypes.length === 0) return 0;
+  const attacks = normalizeTypeList(attackTypes).length > 0 ? attackTypes : candidateTypes;
+  return (
+    getAttackCoverageScore(attacks, targetTypes) * 2.5 +
+    getDefensiveMatchupScore(candidateTypes, targetTypes) * 2
+  );
+}
+
 export interface CatchDraftInput {
   name: string;
   types?: string[];
@@ -1457,6 +2036,477 @@ export function scoreCatchDraftSignals(candidate: CatchDraftInput): ScoredDecisi
       bossCounterScore,
       types: normalizeTypeList(candidate.types),
       attackTypes: normalizeTypeList(attackTypes),
+    },
+  };
+}
+
+export function scoreChallengeCatchBonus(input: ChallengeCatchScoreInput): ScoredDecision {
+  const config = input.config ?? {};
+  const types = normalizeTypeList(input.types);
+  const attacks = normalizeTypeList(input.attackTypes).length > 0 ? input.attackTypes : types;
+  const targetTypes = normalizeTypeList(input.targetTypes);
+  const stats = input.stats ?? {};
+  const bst = stats.bst ?? 0;
+  const offense = stats.offense ?? 0;
+  const speed = stats.speed ?? 0;
+  const level = input.level ?? 0;
+  const prepAvgLevel = input.prepAvgLevel ?? 0;
+  const challengeShinyCatchBonus = config.challengeShinyCatchBonus ?? 220;
+  const challengeNonShinyEarlyPenalty = config.challengeNonShinyEarlyPenalty ?? 42;
+  const earlyExpansionCounterScore = config.earlyExpansionCounterScore ?? 12;
+  const legendaryCatchMinBst = config.legendaryCatchMinBst ?? 540;
+  const bossCounterScore =
+    input.bossCounterScore ?? scoreCatchBossCounter(types, attacks, targetTypes);
+  const priorityTypeScore = input.priorityTypeScore ?? 0;
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (!input.active) {
+    return {
+      id: `catch:challenge:${foldText(input.name || 'unknown') || 'unknown'}`,
+      score: 0,
+      reason: 'inactive',
+      details: { types, bossCounterScore },
+    };
+  }
+
+  if (input.isShiny) {
+    score += input.hasShiny ? 120 : challengeShinyCatchBonus;
+    score += input.alreadyOwnedShiny ? 18 : 72;
+    score += priorityTypeScore * 0.9;
+    reasons.push(input.hasShiny ? 'repeat-run-shiny' : 'first-run-shiny');
+  } else if (input.earlyShinyHunt) {
+    const runValue =
+      Boolean(input.isLegendary) ||
+      bossCounterScore >= earlyExpansionCounterScore ||
+      bst >= legendaryCatchMinBst;
+    score -= runValue ? 8 : challengeNonShinyEarlyPenalty;
+    reasons.push(runValue ? 'early-run-value' : 'early-non-shiny');
+  }
+
+  if (input.isMainCarry) {
+    score += 78;
+    reasons.push('main-carry');
+  }
+  if (input.isLegendary || bst >= legendaryCatchMinBst) {
+    score += 54;
+    reasons.push('legendary-or-high-bst');
+  }
+  if (bst) score += Math.max(0, bst - 460) / 5;
+  if (offense) score += offense / 9;
+  if (speed) score += speed / 14;
+  if (level && prepAvgLevel && level >= prepAvgLevel - 3) {
+    score += 18;
+    reasons.push('level-ready');
+  }
+  if (level && prepAvgLevel && level < prepAvgLevel - 8) {
+    score -= 18;
+    reasons.push('level-low');
+  }
+
+  if (targetTypes.length > 0) {
+    score += getAttackCoverageScore(attacks, targetTypes) * 4.2;
+    score += getDefensiveMatchupScore(types, targetTypes) * 2.8;
+    reasons.push('target-matchup');
+  }
+
+  score += priorityTypeScore;
+  if (priorityTypeScore) reasons.push('priority-types');
+  if (types.includes('Fairy')) {
+    score += 18;
+    reasons.push('fairy');
+  }
+  if (
+    types.includes('Dragon') ||
+    types.includes('Fire') ||
+    types.includes('Dark') ||
+    types.includes('Ghost')
+  ) {
+    score += 12;
+    reasons.push('power-type');
+  }
+  if (types.includes('Poison') && bst && bst < 500) {
+    score -= 14;
+    reasons.push('low-bst-poison');
+  }
+
+  return {
+    id: `catch:challenge:${foldText(input.name || 'unknown') || 'unknown'}`,
+    score,
+    reason: reasons.join(',') || 'neutral',
+    details: {
+      types,
+      targetTypes,
+      bossCounterScore,
+      priorityTypeScore,
+      bst,
+      offense,
+      speed,
+    },
+  };
+}
+
+export function scoreStoryLeagueCoverage(input: StoryLeagueCoverageInput = {}): ScoredDecision {
+  const types = normalizeTypeList(input.types);
+  const attackTypes = normalizeTypeList(input.attackTypes).length > 0 ? input.attackTypes : types;
+  const defenderTypes = normalizeTypeList(input.leagueTypes);
+  const uncoveredLeagueTypes = normalizeTypeList(input.uncoveredLeagueTypes);
+  const storyLeagueCoverageBonus = input.config?.storyLeagueCoverageBonus ?? 72;
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (!input.active) {
+    return {
+      id: 'catch:story-league-coverage',
+      score: 0,
+      reason: 'inactive',
+      details: { types: normalizeTypeList(types), defenderTypes },
+    };
+  }
+
+  if (defenderTypes.length > 0) {
+    score += getAttackCoverageScore(attackTypes, defenderTypes) * 5.5;
+    score += getDefensiveMatchupScore(types, defenderTypes) * 2.5;
+    reasons.push('league-matchup');
+  }
+  uncoveredLeagueTypes.forEach((type) => {
+    if (getAttackCoverageScore(attackTypes, [type]) > 0) {
+      score += storyLeagueCoverageBonus;
+      reasons.push(`covers-${type}`);
+    }
+  });
+
+  return {
+    id: 'catch:story-league-coverage',
+    score,
+    reason: reasons.join(',') || 'neutral',
+    details: {
+      types,
+      attackTypes: normalizeTypeList(attackTypes),
+      defenderTypes,
+      uncoveredLeagueTypes,
+    },
+  };
+}
+
+export function scoreStoryCatchBonus(input: StoryCatchScoreInput): ScoredDecision {
+  const config = input.config ?? {};
+  const types = normalizeTypeList(input.types);
+  const attacks = normalizeTypeList(input.attackTypes).length > 0 ? input.attackTypes : types;
+  const currentBossTypes = normalizeTypeList(input.currentBossTypes);
+  const stats = input.stats ?? {};
+  const bst = stats.bst ?? 0;
+  const offense = stats.offense ?? 0;
+  const speed = stats.speed ?? 0;
+  const bulk = stats.bulk ?? 0;
+  const storyMinBstTarget = config.storyMinBstTarget ?? 480;
+  const storyWeakStatPenalty = config.storyWeakStatPenalty ?? 34;
+  const storyCurrentBossCoverageBonus = config.storyCurrentBossCoverageBonus ?? 44;
+  const legendaryCatchMinBst = config.legendaryCatchMinBst ?? 540;
+  const leagueCoverageScore =
+    input.leagueCoverageScore ??
+    scoreStoryLeagueCoverage({
+      active: input.active,
+      attackTypes: attacks,
+      types,
+      leagueTypes: input.leagueTypes,
+      uncoveredLeagueTypes: input.uncoveredLeagueTypes,
+      config: {
+        storyLeagueCoverageBonus: config.storyLeagueCoverageBonus,
+      },
+    }).score;
+  const priorityTypeScore = input.priorityTypeScore ?? 0;
+  const duplicateCount = input.duplicateCount ?? 0;
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (!input.active) {
+    return {
+      id: `catch:story:${foldText(input.name || 'unknown') || 'unknown'}`,
+      score: 0,
+      reason: 'inactive',
+      details: { types },
+    };
+  }
+
+  if (input.needsTeam) {
+    score += 34;
+    reasons.push('needs-team');
+  }
+  if (input.isShiny) {
+    score += 18;
+    reasons.push('shiny');
+  }
+  if (input.isLegendary || input.isLegendaryName) {
+    score += 70;
+    reasons.push('legendary');
+  }
+  if (input.isMainCarry) {
+    score += 55;
+    reasons.push('main-carry');
+  }
+  if (bst) score += Math.max(0, bst - 430) / 3.6;
+  if (offense) score += offense / 7.5;
+  if (speed) score += speed / 12;
+  if (bulk) score += bulk / 42;
+  if (bst && bst < storyMinBstTarget && !input.needsTeam) {
+    score -= storyWeakStatPenalty;
+    reasons.push('weak-stats');
+  }
+
+  if (currentBossTypes.length > 0) {
+    score +=
+      (getAttackCoverageScore(attacks, currentBossTypes) * storyCurrentBossCoverageBonus) / 5;
+    score += getDefensiveMatchupScore(types, currentBossTypes) * 3;
+    reasons.push('current-boss');
+  }
+
+  score += leagueCoverageScore;
+  if (leagueCoverageScore) reasons.push('league-coverage');
+  score += priorityTypeScore;
+  if (priorityTypeScore) reasons.push('priority-types');
+
+  if (
+    duplicateCount > 0 &&
+    !input.isLegendary &&
+    !input.isMainCarry &&
+    bst < legendaryCatchMinBst
+  ) {
+    score -= input.needsCoverage ? 24 : 42;
+    reasons.push(input.needsCoverage ? 'coverage-duplicate' : 'duplicate');
+  }
+
+  return {
+    id: `catch:story:${foldText(input.name || 'unknown') || 'unknown'}`,
+    score,
+    reason: reasons.join(',') || 'neutral',
+    details: {
+      types,
+      currentBossTypes,
+      leagueCoverageScore,
+      priorityTypeScore,
+      duplicateCount,
+      bst,
+      offense,
+      speed,
+      bulk,
+    },
+  };
+}
+
+export function scoreChallengeItemBonus(input: ChallengeItemScoreInput): ScoredDecision {
+  const itemName = normalizeItemName(input.itemName);
+  const prepPressure = input.prepPressure ?? 0;
+  const faintedCount = input.faintedCount ?? 0;
+  const moveTier = input.moveTier ?? -1;
+  const challengeCarryMoveTierTarget = input.config?.challengeCarryMoveTierTarget ?? 2;
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (!input.active || !itemName) {
+    return {
+      id: `item:challenge:${itemName || 'unknown'}`,
+      score: 0,
+      reason: 'inactive',
+      details: { item: itemName },
+    };
+  }
+
+  if (input.isLowValue) {
+    return {
+      id: `item:challenge:${itemName}`,
+      score: -220,
+      reason: 'low-value',
+      details: { item: itemName },
+    };
+  }
+
+  if (itemName === 'sacred ash') {
+    score = faintedCount > 0 ? 160 + faintedCount * 50 : -40;
+    return {
+      id: `item:challenge:${itemName}`,
+      score,
+      reason: faintedCount > 0 ? 'revive-fainted' : 'no-fainted',
+      details: { item: itemName, faintedCount },
+    };
+  }
+
+  if (itemName === 'rare candy') {
+    score += 320 + prepPressure * 30;
+    if (input.hasCarry) score += 120 + Math.max(0, 85 - (input.carryLevel || 85)) / 1.8;
+    if (input.underleveled || input.needsCarryBuff) score += 90;
+    reasons.push('rare-candy');
+    if (input.underleveled) reasons.push('underleveled');
+    if (input.needsCarryBuff) reasons.push('carry-buff');
+    return {
+      id: `item:challenge:${itemName}`,
+      score,
+      reason: reasons.join(','),
+      details: { item: itemName, prepPressure, carryLevel: input.carryLevel ?? null },
+    };
+  }
+
+  if (itemName === 'tm normal') {
+    score += 170;
+    if (input.needsCarryBuff) score += 130;
+    if (moveTier >= challengeCarryMoveTierTarget) score -= 80;
+    reasons.push('tm');
+    if (input.needsCarryBuff) reasons.push('carry-buff');
+    if (moveTier >= challengeCarryMoveTierTarget) reasons.push('move-tier-met');
+    return {
+      id: `item:challenge:${itemName}`,
+      score,
+      reason: reasons.join(','),
+      details: { item: itemName, moveTier },
+    };
+  }
+
+  if (itemName === 'moon stone') {
+    score += 165;
+    if (input.hasCarry) score += 45 + Math.max(0, 70 - (input.carryLevel || 70)) / 3;
+    return {
+      id: `item:challenge:${itemName}`,
+      score,
+      reason: 'moon-stone',
+      details: { item: itemName, carryLevel: input.carryLevel ?? null },
+    };
+  }
+
+  if (!input.hasCarry || input.isUsable) {
+    return {
+      id: `item:challenge:${itemName}`,
+      score,
+      reason: input.hasCarry ? 'usable' : 'no-carry',
+      details: { item: itemName },
+    };
+  }
+
+  const improvement = (input.carryNewScore ?? 0) - (input.carryOldScore ?? 0);
+
+  if (input.isMainCarryPreferredItem) {
+    score += 260;
+    reasons.push('preferred-carry-item');
+  }
+  if (input.isSustainItem) {
+    score += 120;
+    reasons.push('sustain');
+  }
+  if (input.isOffenseItem) {
+    score += 105;
+    reasons.push('offense');
+  }
+  if (input.isUtilityItem) {
+    score += 70;
+    reasons.push('utility');
+  }
+  if (input.carryNeedsItem) {
+    score += 90;
+    reasons.push('carry-needs-item');
+  }
+  if (!normalizeItemName(input.carryHeldItem)) {
+    score += 80;
+    reasons.push('empty-slot');
+  }
+  if (improvement > 0) {
+    score += improvement * 1.45;
+    reasons.push('improvement');
+  } else if (input.carryNeedsItem && input.isMainCarryPreferredItem) {
+    score += 40;
+    reasons.push('preferred-rescue');
+  }
+
+  if (input.boostType) {
+    score += input.carryMatchesBoost ? 85 : -110;
+    reasons.push(input.carryMatchesBoost ? 'matching-boost' : 'mismatched-boost');
+  }
+
+  return {
+    id: `item:challenge:${itemName}`,
+    score,
+    reason: reasons.join(',') || 'neutral',
+    details: {
+      item: itemName,
+      prepPressure,
+      improvement,
+      boostType: input.boostType ?? null,
+    },
+  };
+}
+
+export function scoreStoryItemBonus(input: StoryItemScoreInput): ScoredDecision {
+  const itemName = normalizeItemName(input.itemName);
+  const prepPressure = input.prepPressure ?? 0;
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (!input.active || !itemName) {
+    return {
+      id: `item:story:${itemName || 'unknown'}`,
+      score: 0,
+      reason: 'inactive',
+      details: { item: itemName },
+    };
+  }
+
+  if (input.isLowValue) {
+    return {
+      id: `item:story:${itemName}`,
+      score: -180,
+      reason: 'low-value',
+      details: { item: itemName },
+    };
+  }
+
+  if (itemName === 'rare candy') {
+    score += 260 + prepPressure * 24;
+    reasons.push('rare-candy');
+  }
+  if (itemName === 'tm normal') {
+    score += 120;
+    reasons.push('tm');
+  }
+  if (itemName === 'moon stone') {
+    score += 135 + prepPressure * 10;
+    reasons.push('moon-stone');
+  }
+  if (itemName === 'sacred ash') {
+    score += input.hasFainted ? 130 : -30;
+    reasons.push(input.hasFainted ? 'revive-fainted' : 'no-fainted');
+  }
+  if (
+    ['leftovers', 'shell bell', 'choice band', 'choice specs', 'life orb', 'lucky egg'].includes(
+      itemName,
+    )
+  ) {
+    score += 105;
+    reasons.push('premium-held');
+  }
+  if (['expert belt', 'loaded dice', 'power bracer', 'choice scarf'].includes(itemName)) {
+    score += 60;
+    reasons.push('utility-held');
+  }
+
+  if (input.hasCarry && !input.isUsable) {
+    if (input.boostType) {
+      score += input.carryMatchesBoost ? 48 : -55;
+      reasons.push(input.carryMatchesBoost ? 'matching-boost' : 'mismatched-boost');
+    }
+    const improvement = (input.carryNewScore ?? 0) - (input.carryOldScore ?? 0);
+    if ((input.carryNewScore ?? 0) > (input.carryOldScore ?? 0) + 8) {
+      score += 55 + improvement;
+      reasons.push('improvement');
+    }
+  }
+
+  return {
+    id: `item:story:${itemName}`,
+    score,
+    reason: reasons.join(',') || 'neutral',
+    details: {
+      item: itemName,
+      prepPressure,
+      boostType: input.boostType ?? null,
+      improvement: (input.carryNewScore ?? 0) - (input.carryOldScore ?? 0),
     },
   };
 }

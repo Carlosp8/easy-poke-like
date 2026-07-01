@@ -8,6 +8,17 @@ export const catchDecisionConfig = {
   earlyLowLevelSwapGap: 5,
 };
 
+export const catchScoreConfig = {
+  challengeShinyCatchBonus: 220,
+  challengeNonShinyEarlyPenalty: 42,
+  earlyExpansionCounterScore: 12,
+  legendaryCatchMinBst: 540,
+  storyMinBstTarget: 480,
+  storyWeakStatPenalty: 34,
+  storyCurrentBossCoverageBonus: 44,
+  storyLeagueCoverageBonus: 72,
+};
+
 export const baseCatchDecision = {
   openTeamSlot: true,
   bestScore: 45,
@@ -82,5 +93,72 @@ export const catchDecisionCases = {
     earlyAllowance: 'exceptional',
     bestIsPremiumCatch: true,
     bestIsExceptional: true,
+  },
+};
+
+export const challengeCatchScoreCases = {
+  newShinyPriorityType: {
+    active: true,
+    name: 'azumarill',
+    types: ['Water', 'Fairy'],
+    attackTypes: ['Fairy'],
+    isShiny: true,
+    alreadyOwnedShiny: false,
+    hasShiny: false,
+    priorityTypeScore: 30,
+    config: catchScoreConfig,
+  },
+  earlyNonShinyLowValue: {
+    active: true,
+    name: 'garbodor',
+    types: ['Poison'],
+    attackTypes: ['Poison'],
+    earlyShinyHunt: true,
+    bossCounterScore: 0,
+    stats: { bst: 474 },
+    config: catchScoreConfig,
+  },
+  earlyHighBstRunValue: {
+    active: true,
+    name: 'dragonite',
+    types: ['Dragon', 'Flying'],
+    attackTypes: ['Dragon'],
+    earlyShinyHunt: true,
+    bossCounterScore: 0,
+    stats: { bst: 600, offense: 134, speed: 80 },
+    config: catchScoreConfig,
+  },
+};
+
+export const storyCatchScoreCases = {
+  teamNeedsLegendaryMainCarry: {
+    active: true,
+    name: 'dialga',
+    types: ['Steel', 'Dragon'],
+    attackTypes: ['Dragon'],
+    needsTeam: true,
+    isShiny: true,
+    isLegendary: true,
+    isMainCarry: true,
+    priorityTypeScore: 20,
+    config: catchScoreConfig,
+  },
+  leagueCoverageIceCounter: {
+    active: true,
+    attackTypes: ['Ice'],
+    types: ['Water'],
+    leagueTypes: ['Dragon'],
+    uncoveredLeagueTypes: ['Dragon'],
+    config: catchScoreConfig,
+  },
+  settledDuplicatePenalty: {
+    active: true,
+    name: 'raticate',
+    types: ['Normal'],
+    attackTypes: ['Normal'],
+    duplicateCount: 1,
+    needsCoverage: false,
+    stats: { bst: 413 },
+    config: catchScoreConfig,
   },
 };

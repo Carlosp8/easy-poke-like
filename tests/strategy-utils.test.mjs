@@ -6,6 +6,7 @@ import {
   foldText,
   getAttackCoverageScore,
   getCenterNeedStatus,
+  getDefensiveMatchupScore,
   getDefensiveScoreAgainstAttack,
   getEarlyCatchAllowance,
   getItemBoostType,
@@ -16,26 +17,47 @@ import {
   isTypeBoostItemUsefulForTeam,
   normalizeItemName,
   scoreBossRouteNode,
+  scoreBotTacticRouteBonus,
   scoreBuffRouteNode,
+  scoreCatchBossCounter,
   scoreCatchDraftSignals,
   scoreCatchRouteNode,
   scoreCenterRouteNode,
+  scoreChallengeCatchBonus,
+  scoreChallengeRouteBonus,
   scoreHeldItemFit,
   scoreItemRouteNode,
   scoreLegendaryRouteNode,
+  scorePriorityTypes,
   scoreRouteLookahead,
+  scoreChallengeItemBonus,
+  scoreStoryCatchBonus,
+  scoreStoryItemBonus,
+  scoreStoryLeagueCoverage,
+  scoreStoryRouteBonus,
   scoreTrainerRouteNode,
   scoreUnknownRouteNode,
   shouldPrioritizeEarlyTraining,
 } from '../src/core/lib/strategy-utils.ts';
-import { catchDecisionCases } from './fixtures/strategy/catch-decisions.mjs';
+import {
+  challengeCatchScoreCases,
+  catchDecisionCases,
+  storyCatchScoreCases,
+} from './fixtures/strategy/catch-decisions.mjs';
+import {
+  challengeItemScoreCases,
+  storyItemScoreCases,
+} from './fixtures/strategy/item-decisions.mjs';
 import {
   bossRouteCases,
   buffRouteCases,
   catchRouteCases,
   centerRouteCases,
+  challengeRouteCases,
   itemRouteCases,
   legendaryRouteCases,
+  storyRouteCases,
+  tacticRouteCases,
   trainerRouteCases,
   unknownRouteCases,
 } from './fixtures/strategy/route-decisions.mjs';
@@ -51,6 +73,57 @@ test('scores offensive and defensive type matchups with the core weights', () =>
   assert.equal(getAttackCoverageScore(['Electric', 'Normal'], ['Water', 'Flying']), 10);
   assert.equal(getAttackCoverageScore('Normal', 'Ghost'), -12);
   assert.equal(getDefensiveScoreAgainstAttack(['Ghost'], 'Normal'), 8);
+  assert.equal(getDefensiveMatchupScore(['Water'], ['Fire', 'Ground']), 0);
+  assert.equal(scoreCatchBossCounter(['Water'], ['Water'], ['Fire', 'Ground']), 25);
+});
+
+test('scores priority type lists with configurable rank weights', () => {
+  const challengePriority = scorePriorityTypes({
+    types: ['Fairy', 'Electric', 'Poison'],
+    priorityTypes: [
+      'Fairy',
+      'Dragon',
+      'Fire',
+      'Dark',
+      'Ghost',
+      'Water',
+      'Steel',
+      'Grass',
+      'Fighting',
+      'Ground',
+      'Rock',
+      'Electric',
+    ],
+    minRank: 4,
+    weight: 3,
+  });
+  const storyPriority = scorePriorityTypes({
+    types: ['Ice', 'Psychic', 'Poison'],
+    priorityTypes: [
+      'Fairy',
+      'Ice',
+      'Dark',
+      'Ghost',
+      'Dragon',
+      'Ground',
+      'Fighting',
+      'Electric',
+      'Grass',
+      'Water',
+      'Fire',
+      'Steel',
+      'Rock',
+      'Flying',
+      'Psychic',
+    ],
+    minRank: 4,
+    weight: 2.6,
+  });
+
+  assert.equal(challengePriority.score, 48);
+  assert.equal(challengePriority.reason, 'Fairy,Electric');
+  assert.equal(Math.round(storyPriority.score * 10) / 10, 46.8);
+  assert.equal(storyPriority.reason, 'Ice,Psychic');
 });
 
 test('scores catch draft signals for shiny, legendary, duplicate and boss-counter cases', () => {
@@ -71,6 +144,73 @@ test('scores catch draft signals for shiny, legendary, duplicate and boss-counte
   assert.match(scored.reason, /legendary/);
   assert.match(scored.reason, /duplicate-plan/);
   assert.match(scored.reason, /boss-counter/);
+});
+
+test('scores challenge catch bonuses from candidate signals', () => {
+  const shiny = scoreChallengeCatchBonus(challengeCatchScoreCases.newShinyPriorityType);
+  const lowValue = scoreChallengeCatchBonus(challengeCatchScoreCases.earlyNonShinyLowValue);
+  const highBst = scoreChallengeCatchBonus(challengeCatchScoreCases.earlyHighBstRunValue);
+
+  assert.equal(shiny.score, 367);
+  assert.match(shiny.reason, /first-run-shiny/);
+  assert.equal(Math.round(lowValue.score * 10) / 10, -53.2);
+  assert.match(lowValue.reason, /early-non-shiny/);
+  assert.equal(Math.round(highBst.score * 10) / 10, 106.6);
+  assert.match(highBst.reason, /early-run-value/);
+});
+
+test('scores story catch bonuses and league coverage from candidate signals', () => {
+  const legendary = scoreStoryCatchBonus(storyCatchScoreCases.teamNeedsLegendaryMainCarry);
+  const leagueCoverage = scoreStoryLeagueCoverage(storyCatchScoreCases.leagueCoverageIceCounter);
+  const leagueCatch = scoreStoryCatchBonus(storyCatchScoreCases.leagueCoverageIceCounter);
+  const duplicate = scoreStoryCatchBonus(storyCatchScoreCases.settledDuplicatePenalty);
+
+  assert.equal(legendary.score, 197);
+  assert.match(legendary.reason, /legendary/);
+  assert.equal(leagueCoverage.score, 99.5);
+  assert.match(leagueCoverage.reason, /covers-Dragon/);
+  assert.equal(leagueCatch.score, 99.5);
+  assert.equal(duplicate.score, -76);
+  assert.match(duplicate.reason, /duplicate/);
+});
+
+test('scores challenge item bonuses from reusable item signals', () => {
+  const lowValue = scoreChallengeItemBonus(challengeItemScoreCases.lowValueHeldItem);
+  const sacredAsh = scoreChallengeItemBonus(challengeItemScoreCases.sacredAshRevivesTwo);
+  const rareCandy = scoreChallengeItemBonus(challengeItemScoreCases.rareCandyUnderleveledCarry);
+  const tmWeak = scoreChallengeItemBonus(challengeItemScoreCases.tmForWeakCarry);
+  const tmReady = scoreChallengeItemBonus(challengeItemScoreCases.tmAlreadyGood);
+  const upgrade = scoreChallengeItemBonus(challengeItemScoreCases.matchingOffenseUpgrade);
+  const mismatch = scoreChallengeItemBonus(challengeItemScoreCases.mismatchedBoost);
+
+  assert.equal(lowValue.score, -220);
+  assert.equal(sacredAsh.score, 260);
+  assert.equal(Math.round(rareCandy.score * 10) / 10, 628.3);
+  assert.match(rareCandy.reason, /underleveled/);
+  assert.equal(tmWeak.score, 300);
+  assert.equal(tmReady.score, 90);
+  assert.equal(upgrade.score, 672.75);
+  assert.match(upgrade.reason, /improvement/);
+  assert.equal(mismatch.score, -110);
+  assert.match(mismatch.reason, /mismatched-boost/);
+});
+
+test('scores story item bonuses from reusable item signals', () => {
+  const lowValue = scoreStoryItemBonus(storyItemScoreCases.lowValueHeldItem);
+  const rareCandy = scoreStoryItemBonus(storyItemScoreCases.rareCandyWithPrepPressure);
+  const sacredAsh = scoreStoryItemBonus(storyItemScoreCases.sacredAshNoFainted);
+  const premium = scoreStoryItemBonus(storyItemScoreCases.premiumHeldUpgrade);
+  const boost = scoreStoryItemBonus(storyItemScoreCases.matchingBoostUpgrade);
+  const mismatch = scoreStoryItemBonus(storyItemScoreCases.mismatchedBoost);
+
+  assert.equal(lowValue.score, -180);
+  assert.equal(rareCandy.score, 308);
+  assert.equal(sacredAsh.score, -30);
+  assert.equal(premium.score, 195);
+  assert.match(premium.reason, /premium-held/);
+  assert.equal(boost.score, 133);
+  assert.match(boost.reason, /matching-boost/);
+  assert.equal(mismatch.score, -55);
 });
 
 test('scores held item fit for useful, neutral and low-value items', () => {
@@ -294,6 +434,65 @@ test('scores unknown route nodes for shiny scouting pressure', () => {
   assert.match(mustTrain.reason, /shiny-must-train/);
   assert.equal(scoutCap.score, 958);
   assert.match(scoutCap.reason, /capture-cap-scout/);
+});
+
+test('scores bot tactic route bonuses independently from runtime controls', () => {
+  assert.equal(scoreBotTacticRouteBonus(tacticRouteCases.xpTrainer).score, 900);
+  assert.equal(scoreBotTacticRouteBonus(tacticRouteCases.captureGrass).score, 350);
+
+  const shinyCatch = scoreBotTacticRouteBonus(tacticRouteCases.shinyCatchAtCaptureCap);
+  const shinyUnknown = scoreBotTacticRouteBonus(tacticRouteCases.shinyBalancedUnknown);
+  const bossCenter = scoreBotTacticRouteBonus(tacticRouteCases.bossCenterNeeded);
+  const duplicateCatch = scoreBotTacticRouteBonus(tacticRouteCases.duplicateOpeningCatch);
+  const duplicateTrainer = scoreBotTacticRouteBonus(tacticRouteCases.duplicateTrainerWithPair);
+
+  assert.equal(shinyCatch.score, 6400);
+  assert.match(shinyCatch.reason, /shiny-catch/);
+  assert.equal(shinyUnknown.score, 2075);
+  assert.match(shinyUnknown.reason, /shiny-balanced-unknown/);
+  assert.equal(bossCenter.score, 400);
+  assert.equal(duplicateCatch.score, 1400);
+  assert.match(duplicateCatch.reason, /duplicate-open-pair/);
+  assert.equal(duplicateTrainer.score, 620);
+});
+
+test('scores challenge route bonuses from reusable strategy state', () => {
+  const earlyCatch = scoreChallengeRouteBonus(challengeRouteCases.earlyShinyCatchSafe);
+  const unknownPressure = scoreChallengeRouteBonus(challengeRouteCases.earlyShinyUnknownPressured);
+  const buff = scoreChallengeRouteBonus(challengeRouteCases.carryBuffUnderPressure);
+  const trainer = scoreChallengeRouteBonus(challengeRouteCases.underleveledTrainer);
+  const boss = scoreChallengeRouteBonus(challengeRouteCases.bossNotReady);
+  const center = scoreChallengeRouteBonus(challengeRouteCases.centerSkip);
+
+  assert.equal(earlyCatch.score, 2800);
+  assert.match(earlyCatch.reason, /early-shiny-catch/);
+  assert.equal(unknownPressure.score, 500);
+  assert.equal(buff.score, 1145);
+  assert.match(buff.reason, /carry-buff/);
+  assert.equal(trainer.score, 950);
+  assert.equal(boss.score, -1710);
+  assert.match(boss.reason, /boss-underprepared/);
+  assert.equal(center.score, -520);
+});
+
+test('scores story route bonuses from reusable strategy state', () => {
+  const teamCatch = scoreStoryRouteBonus(storyRouteCases.needsTeamCatch);
+  const teamGrass = scoreStoryRouteBonus(storyRouteCases.needsTeamGrass);
+  const coverageGrass = scoreStoryRouteBonus(storyRouteCases.needsCoverageGrass);
+  const settledCatch = scoreStoryRouteBonus(storyRouteCases.settledCatchPenalty);
+  const trainer = scoreStoryRouteBonus(storyRouteCases.prepTrainer);
+  const weakItem = scoreStoryRouteBonus(storyRouteCases.weakItemUnderPrep);
+  const boss = scoreStoryRouteBonus(storyRouteCases.bossNotReady);
+
+  assert.equal(teamCatch.score, 900);
+  assert.match(teamCatch.reason, /team-catch/);
+  assert.equal(teamGrass.score, 495);
+  assert.equal(coverageGrass.score, 360);
+  assert.equal(settledCatch.score, -180);
+  assert.equal(trainer.score, 840);
+  assert.equal(weakItem.score, 340);
+  assert.match(weakItem.reason, /weak-member-item/);
+  assert.equal(boss.score, -1370);
 });
 
 test('scores route lookahead with decayed future value', () => {

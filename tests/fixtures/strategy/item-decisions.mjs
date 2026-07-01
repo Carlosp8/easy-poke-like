@@ -1,0 +1,110 @@
+export const itemScoreConfig = {
+  challengeCarryMoveTierTarget: 2,
+};
+
+export const challengeItemScoreCases = {
+  lowValueHeldItem: {
+    active: true,
+    itemName: 'lagging tail',
+    isLowValue: true,
+    config: itemScoreConfig,
+  },
+  sacredAshRevivesTwo: {
+    active: true,
+    itemName: 'sacred ash',
+    faintedCount: 2,
+    config: itemScoreConfig,
+  },
+  rareCandyUnderleveledCarry: {
+    active: true,
+    itemName: 'rare candy',
+    prepPressure: 3,
+    hasCarry: true,
+    carryLevel: 70,
+    underleveled: true,
+    needsCarryBuff: false,
+    config: itemScoreConfig,
+  },
+  tmForWeakCarry: {
+    active: true,
+    itemName: 'tm normal',
+    needsCarryBuff: true,
+    moveTier: 1,
+    config: itemScoreConfig,
+  },
+  tmAlreadyGood: {
+    active: true,
+    itemName: 'tm normal',
+    needsCarryBuff: false,
+    moveTier: 2,
+    config: itemScoreConfig,
+  },
+  matchingOffenseUpgrade: {
+    active: true,
+    itemName: 'choice specs',
+    hasCarry: true,
+    carryNeedsItem: true,
+    carryHeldItem: '',
+    carryNewScore: 95,
+    carryOldScore: 0,
+    isMainCarryPreferredItem: true,
+    isOffenseItem: true,
+    boostType: null,
+    config: itemScoreConfig,
+  },
+  mismatchedBoost: {
+    active: true,
+    itemName: 'charcoal',
+    hasCarry: true,
+    carryHeldItem: 'leftovers',
+    carryNeedsItem: false,
+    carryNewScore: 25,
+    carryOldScore: 60,
+    boostType: 'Fire',
+    carryMatchesBoost: false,
+    config: itemScoreConfig,
+  },
+};
+
+export const storyItemScoreCases = {
+  lowValueHeldItem: {
+    active: true,
+    itemName: 'focus sash',
+    isLowValue: true,
+  },
+  rareCandyWithPrepPressure: {
+    active: true,
+    itemName: 'rare candy',
+    prepPressure: 2,
+  },
+  sacredAshNoFainted: {
+    active: true,
+    itemName: 'sacred ash',
+    hasFainted: false,
+  },
+  premiumHeldUpgrade: {
+    active: true,
+    itemName: 'leftovers',
+    hasCarry: true,
+    carryNewScore: 80,
+    carryOldScore: 45,
+  },
+  matchingBoostUpgrade: {
+    active: true,
+    itemName: 'mystic water',
+    hasCarry: true,
+    carryNewScore: 70,
+    carryOldScore: 40,
+    boostType: 'Water',
+    carryMatchesBoost: true,
+  },
+  mismatchedBoost: {
+    active: true,
+    itemName: 'charcoal',
+    hasCarry: true,
+    carryNewScore: 30,
+    carryOldScore: 35,
+    boostType: 'Fire',
+    carryMatchesBoost: false,
+  },
+};

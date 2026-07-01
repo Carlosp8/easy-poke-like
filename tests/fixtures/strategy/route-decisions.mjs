@@ -24,6 +24,15 @@ export const routeDecisionConfig = {
   legendaryNodeLowHpPenalty: 2600,
   legendaryNodeMaxUnderlevelPenalty: 1400,
   legendaryNodeUnderlevelPenalty: 850,
+  duplicatePriorityRouteBonus: 1400,
+  shinyScoutPressureLimit: 2,
+  challengeFirstShinyNodeBonus: 2800,
+  challengeCarryItemNodeBonus: 1150,
+  challengeCarryBuffNodeBonus: 980,
+  challengeTrainerLevelNodeBonus: 780,
+  storyRouteTeamBuildBonus: 900,
+  storyRouteCoverageBonus: 720,
+  storyRouteTrainingBonus: 680,
 };
 
 export const centerRouteCases = {
@@ -195,5 +204,148 @@ export const unknownRouteCases = {
     shinyRoute: { tacticActive: true, mustTrain: false, needsTraining: false },
     captureCapReached: true,
     bossLevelPressure: 1,
+  },
+};
+
+export const tacticRouteCases = {
+  xpTrainer: {
+    tactic: 'xp',
+    nodeType: 'trainer',
+  },
+  captureGrass: {
+    tactic: 'capture',
+    nodeType: 'grass',
+  },
+  shinyCatchAtCaptureCap: {
+    tactic: 'shiny',
+    nodeType: 'catch',
+    captureCapReached: true,
+    earlyExpansionClosed: true,
+    shinyRoute: {
+      tacticActive: true,
+      mustTrain: false,
+      needsTraining: false,
+      canBalancedScout: false,
+    },
+  },
+  shinyBalancedUnknown: {
+    tactic: 'shiny',
+    nodeType: 'unknown',
+    captureCapReached: true,
+    prepPressure: 2,
+    shinyRoute: {
+      tacticActive: true,
+      mustTrain: false,
+      needsTraining: true,
+      canBalancedScout: true,
+    },
+  },
+  bossCenterNeeded: {
+    tactic: 'boss',
+    nodeType: 'center',
+    centerCanSkip: false,
+  },
+  duplicateOpeningCatch: {
+    tactic: 'duplicate',
+    nodeType: 'catch',
+    duplicateCatchesEnabled: true,
+    duplicateNeedsOpeningPair: true,
+    config: routeDecisionConfig,
+  },
+  duplicateTrainerWithPair: {
+    tactic: 'duplicate',
+    nodeType: 'trainer',
+    duplicateCatchesEnabled: true,
+    duplicateHasPair: true,
+  },
+};
+
+export const challengeRouteCases = {
+  earlyShinyCatchSafe: {
+    active: true,
+    nodeType: 'catch',
+    earlyShinyHunt: true,
+    prepPressure: 1,
+    config: routeDecisionConfig,
+  },
+  earlyShinyUnknownPressured: {
+    active: true,
+    nodeType: 'unknown',
+    earlyShinyHunt: true,
+    prepPressure: 4,
+    config: routeDecisionConfig,
+  },
+  carryBuffUnderPressure: {
+    active: true,
+    nodeType: 'buff',
+    needsCarryBuff: true,
+    prepPressure: 3,
+    config: routeDecisionConfig,
+  },
+  underleveledTrainer: {
+    active: true,
+    nodeType: 'trainer',
+    underleveled: true,
+    prepPressure: 2,
+    config: routeDecisionConfig,
+  },
+  bossNotReady: {
+    active: true,
+    nodeType: 'boss',
+    prepReady: false,
+    prepPressure: 2,
+    config: routeDecisionConfig,
+  },
+  centerSkip: {
+    active: true,
+    nodeType: 'center',
+    centerCanSkip: true,
+    config: routeDecisionConfig,
+  },
+};
+
+export const storyRouteCases = {
+  needsTeamCatch: {
+    active: true,
+    nodeType: 'catch',
+    needsTeam: true,
+    config: routeDecisionConfig,
+  },
+  needsTeamGrass: {
+    active: true,
+    nodeType: 'grass',
+    needsTeam: true,
+    config: routeDecisionConfig,
+  },
+  needsCoverageGrass: {
+    active: true,
+    nodeType: 'grass',
+    needsCoverage: true,
+    config: routeDecisionConfig,
+  },
+  settledCatchPenalty: {
+    active: true,
+    nodeType: 'catch',
+    config: routeDecisionConfig,
+  },
+  prepTrainer: {
+    active: true,
+    nodeType: 'trainer',
+    prepPressure: 2,
+    config: routeDecisionConfig,
+  },
+  weakItemUnderPrep: {
+    active: true,
+    nodeType: 'item',
+    prepPressure: 2,
+    weakMemberCount: 1,
+    config: routeDecisionConfig,
+  },
+  bossNotReady: {
+    active: true,
+    nodeType: 'boss',
+    prepReady: false,
+    prepPressure: 2,
+    config: routeDecisionConfig,
   },
 };

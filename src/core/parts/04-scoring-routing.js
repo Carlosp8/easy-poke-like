@@ -29,9 +29,7 @@
     }
 
     function getDefensiveMatchupScore(defenderTypes, attackerTypes) {
-        const attacks = normalizeTypeList(attackerTypes);
-        if (attacks.length === 0) return 0;
-        return Math.min(...attacks.map(attackType => getDefensiveScoreAgainstAttack(defenderTypes, attackType)));
+        return EasyPokelikeStrategyUtils.getDefensiveMatchupScore(defenderTypes, attackerTypes);
     }
 
     function getTypeAdvantageScore(attackerTypes, defenderType) {
@@ -683,8 +681,6 @@
 
     function getBotControlTacticNodeBonus(type, context = {}) {
         const tactic = getBotControlTactic();
-        if (tactic === 'auto') return 0;
-
         const team = context.team || [];
         const centerNeed = context.centerNeed || getCenterNeedStatus(team);
         const earlyExpansionClosed = Boolean(context.earlyExpansionClosed);
@@ -693,89 +689,32 @@
         const prepStatus = context.bossPrepStatus || getBossPrepStatus(team);
         const prepPressure = Math.max(0, (prepStatus.avgDeficit || 0) + (prepStatus.leadDeficit || 0));
         const runNeedsPower = prepPressure > 0 || Boolean(context.trainingCore);
+        const duplicateKeys = new Set(getDuplicateGroups(team).map(group => group.key));
+        const teamMaxLevel = Math.max(0, ...team.map(p => p.level || 0));
+        const duplicateHasLowLevelNonDuplicate = !openTeamSlot && team.some(p =>
+            !duplicateKeys.has(getPokemonIdentityKey(p.name)) &&
+            (p.level || 0) < teamMaxLevel - CONFIG.EARLY_LOW_LEVEL_SWAP_GAP
+        );
 
-        if (tactic === 'xp') {
-            if (type === 'trainer') return 900;
-            if (type === 'buff') return 180;
-            if (type === 'catch' || type === 'grass') return -500;
-            if (type === 'item') return -120;
-            if (type === 'center' && centerNeed.canSkipCenter) return -300;
-            return 0;
-        }
-
-        if (tactic === 'capture') {
-            if (type === 'catch') return 850;
-            if (type === 'grass') return 350;
-            if (type === 'trade') return 120;
-            if (type === 'trainer') return -180;
-            return 0;
-        }
-
-        if (tactic === 'shiny') {
-            const shinyBalance = getShinyRouteBalance(context);
-            const settledScoutBonus = !shinyBalance.needsTraining && earlyExpansionClosed ? 1200 : 0;
-            const capScoutBonus = captureCapReached ? 900 : 0;
-            const balancedScoutBonus = shinyBalance.canBalancedScout
-                ? Math.max(420, 980 - prepPressure * 45)
-                : 0;
-            if (type === 'catch') {
-                if (shinyBalance.mustTrain) return -420 - prepPressure * 35;
-                if (shinyBalance.needsTraining) return balancedScoutBonus + capScoutBonus + 180;
-                return (captureCapReached ? 5200 : (openTeamSlot ? 1850 : 2550)) + settledScoutBonus;
+        return EasyPokelikeStrategyUtils.scoreBotTacticRouteBonus({
+            tactic,
+            nodeType: type,
+            centerCanSkip: centerNeed.canSkipCenter,
+            earlyExpansionClosed,
+            captureCapReached,
+            openTeamSlot,
+            prepReady: prepStatus.ready,
+            prepPressure,
+            runNeedsPower,
+            shinyRoute: getShinyRouteBalance(context),
+            duplicateCatchesEnabled: getBotControlDuplicateCatchesEnabled(),
+            duplicateNeedsOpeningPair: shouldPrioritizeOpeningDuplicatePair(team),
+            duplicateHasLowLevelNonDuplicate,
+            duplicateHasPair: hasDuplicatePair(team),
+            config: {
+                duplicatePriorityRouteBonus: CONFIG.DUPLICATE_PRIORITY_ROUTE_BONUS
             }
-            if (type === 'unknown') {
-                if (shinyBalance.mustTrain) return -280 - prepPressure * 30;
-                if (shinyBalance.needsTraining) return Math.round(balancedScoutBonus * 1.05) + capScoutBonus + 240;
-                return (captureCapReached ? 5050 : (openTeamSlot ? 1950 : 2450)) + Math.round(settledScoutBonus * 0.95);
-            }
-            if (type === 'grass') {
-                if (shinyBalance.mustTrain) return -250 - prepPressure * 25;
-                if (shinyBalance.needsTraining) return Math.round(balancedScoutBonus * 0.75) + Math.round(capScoutBonus * 0.55) + 40;
-                return (captureCapReached ? 3700 : 1350) + Math.round(settledScoutBonus * 0.65);
-            }
-            if (type === 'trainer') return shinyBalance.needsTraining ? 900 + prepPressure * 120 : 260;
-            if (type === 'buff') return shinyBalance.needsTraining ? 540 + prepPressure * 70 : 150;
-            if (type === 'item') return runNeedsPower ? -140 : -70;
-            if (type === 'trade') return openTeamSlot ? 60 : 20;
-            if (type === 'legendary') return runNeedsPower ? 80 : 180;
-            if (type === 'center') return centerNeed.canSkipCenter ? -260 : 150;
-            if (type === 'boss') return prepStatus.ready ? 140 : -520;
-            return 0;
-        }
-
-        if (tactic === 'boss') {
-            if (type === 'item') return 420;
-            if (type === 'buff') return 300;
-            if (type === 'trainer') return 220;
-            if (type === 'legendary') return 260;
-            if (type === 'boss') return 180;
-            if (type === 'center') return centerNeed.canSkipCenter ? -100 : 400;
-            if ((type === 'catch' || type === 'grass') && earlyExpansionClosed) return -200;
-            return 0;
-        }
-
-        if (tactic === 'duplicate') {
-            if (!getBotControlDuplicateCatchesEnabled()) return 0;
-            const needsOpeningPair = shouldPrioritizeOpeningDuplicatePair(team);
-            const duplicateKeys = new Set(getDuplicateGroups(team).map(group => group.key));
-            const teamMaxLevel = Math.max(0, ...team.map(p => p.level || 0));
-            const hasLowLevelNonDuplicate = !openTeamSlot && team.some(p =>
-                !duplicateKeys.has(getPokemonIdentityKey(p.name)) &&
-                (p.level || 0) < teamMaxLevel - CONFIG.EARLY_LOW_LEVEL_SWAP_GAP
-            );
-            if (type === 'catch') {
-                if (needsOpeningPair) return CONFIG.DUPLICATE_PRIORITY_ROUTE_BONUS;
-                return hasLowLevelNonDuplicate ? 120 : -420;
-            }
-            if (type === 'grass') return -260;
-            if (type === 'trainer') return hasDuplicatePair(team) ? 620 : 260;
-            if (type === 'buff') return hasDuplicatePair(team) ? 220 : 80;
-            if (type === 'legendary') return hasLowLevelNonDuplicate ? 180 : 80;
-            if (type === 'trade') return hasLowLevelNonDuplicate ? 80 : -80;
-            return 0;
-        }
-
-        return 0;
+        }).score;
     }
 
     function scoreMapNodeImmediate(mapNode, context) {

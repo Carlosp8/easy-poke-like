@@ -1415,12 +1415,12 @@
     }
 
     function getChallengePriorityTypeScore(types = []) {
-        const priority = CONFIG.CHALLENGE_PRIORITY_TYPES || [];
-        return normalizeTypeList(types).reduce((sum, type) => {
-            const index = priority.indexOf(type);
-            if (index < 0) return sum;
-            return sum + Math.max(4, priority.length - index) * 3;
-        }, 0);
+        return EasyPokelikeStrategyUtils.scorePriorityTypes({
+            types,
+            priorityTypes: CONFIG.CHALLENGE_PRIORITY_TYPES || [],
+            minRank: 4,
+            weight: 3
+        }).score;
     }
 
     function getChallengeStrategyContext(team = [], opponentProfile = null) {
@@ -1482,35 +1482,25 @@
 
     function getChallengeStrategyNodeBonus(type, context = {}) {
         const strategy = context.challengeStrategy || getChallengeStrategyContext(context.team || [], context.opponentProfile || null);
-        if (!strategy.active) return 0;
-
         const centerNeed = context.centerNeed || getCenterNeedStatus(context.team || []);
-        const prepReady = strategy.prepStatus?.ready ?? true;
-        let score = 0;
-
-        if (strategy.earlyShinyHunt) {
-            if (type === 'catch') score += strategy.prepPressure <= CONFIG.SHINY_TACTIC_SCOUT_PRESSURE_LIMIT
-                ? CONFIG.CHALLENGE_FIRST_SHINY_NODE_BONUS
-                : 620;
-            if (type === 'grass') score += strategy.prepPressure <= CONFIG.SHINY_TACTIC_SCOUT_PRESSURE_LIMIT
-                ? Math.round(CONFIG.CHALLENGE_FIRST_SHINY_NODE_BONUS * 0.72)
-                : 420;
-            if (type === 'unknown') score += strategy.prepPressure <= CONFIG.SHINY_TACTIC_SCOUT_PRESSURE_LIMIT
-                ? Math.round(CONFIG.CHALLENGE_FIRST_SHINY_NODE_BONUS * 0.82)
-                : 500;
-        }
-
-        if (strategy.carryNeedsItem && type === 'item') score += CONFIG.CHALLENGE_CARRY_ITEM_NODE_BONUS;
-        if (strategy.needsCarryBuff && type === 'buff') score += CONFIG.CHALLENGE_CARRY_BUFF_NODE_BONUS + strategy.prepPressure * 55;
-        if (strategy.underleveled && type === 'trainer') score += CONFIG.CHALLENGE_TRAINER_LEVEL_NODE_BONUS + strategy.prepPressure * 85;
-        if (type === 'legendary') score += strategy.prepPressure <= 1 ? 380 : -320;
-
-        if (type === 'center' && centerNeed.canSkipCenter) score -= 520;
-        if (type === 'item' && !strategy.carryNeedsItem && strategy.needsCarryBuff) score -= 120;
-        if ((type === 'catch' || type === 'grass') && !strategy.earlyShinyHunt && strategy.underleveled) score -= 260 + strategy.prepPressure * 45;
-        if (type === 'boss') score += prepReady ? 260 : -1350 - strategy.prepPressure * 180;
-
-        return score;
+        return EasyPokelikeStrategyUtils.scoreChallengeRouteBonus({
+            active: strategy.active,
+            nodeType: type,
+            earlyShinyHunt: strategy.earlyShinyHunt,
+            prepPressure: strategy.prepPressure,
+            prepReady: strategy.prepStatus?.ready ?? true,
+            centerCanSkip: centerNeed.canSkipCenter,
+            carryNeedsItem: strategy.carryNeedsItem,
+            needsCarryBuff: strategy.needsCarryBuff,
+            underleveled: strategy.underleveled,
+            config: {
+                shinyScoutPressureLimit: CONFIG.SHINY_TACTIC_SCOUT_PRESSURE_LIMIT,
+                challengeFirstShinyNodeBonus: CONFIG.CHALLENGE_FIRST_SHINY_NODE_BONUS,
+                challengeCarryItemNodeBonus: CONFIG.CHALLENGE_CARRY_ITEM_NODE_BONUS,
+                challengeCarryBuffNodeBonus: CONFIG.CHALLENGE_CARRY_BUFF_NODE_BONUS,
+                challengeTrainerLevelNodeBonus: CONFIG.CHALLENGE_TRAINER_LEVEL_NODE_BONUS
+            }
+        }).score;
     }
 
     function scoreChallengeCatchScoreBonus(candidate, team, bossTypes, opponentProfile = null) {
@@ -1526,92 +1516,67 @@
         const offense = Math.max(getPokemonStat(stats, 'atk', 'attack'), getPokemonStat(stats, 'special', 'spa', 'spatk'));
         const speed = getPokemonStat(stats, 'speed', 'spe');
         const targetTypes = normalizeTypeList(bossTypes || strategy.bossTypes);
-        let score = 0;
-
-        if (candidate.isShiny) {
-            score += strategy.hasShiny ? 120 : CONFIG.CHALLENGE_SHINY_CATCH_BONUS;
-            score += candidate.alreadyOwnedShiny ? 18 : 72;
-            score += getChallengePriorityTypeScore(types) * 0.9;
-        } else if (strategy.earlyShinyHunt) {
-            const runValue = candidate.isLegendary ||
-                scoreCatchBossCounter(types, attacks, targetTypes) >= CONFIG.EARLY_EXPANSION_COUNTER_SCORE ||
-                bst >= CONFIG.LEGENDARY_CATCH_MIN_BST;
-            score -= runValue ? 8 : CONFIG.CHALLENGE_NON_SHINY_EARLY_PENALTY;
-        }
-
-        if (isMainCarryName(name)) score += 78;
-        if (candidate.isLegendary || bst >= CONFIG.LEGENDARY_CATCH_MIN_BST) score += 54;
-        if (bst) score += Math.max(0, bst - 460) / 5;
-        if (offense) score += offense / 9;
-        if (speed) score += speed / 14;
-        if (level && strategy.prepStatus?.avgLevel && level >= strategy.prepStatus.avgLevel - 3) score += 18;
-        if (level && strategy.prepStatus?.avgLevel && level < strategy.prepStatus.avgLevel - 8) score -= 18;
-
-        if (targetTypes.length > 0) {
-            score += getAttackCoverageScore(attacks, targetTypes) * 4.2;
-            score += getDefensiveMatchupScore(types, targetTypes) * 2.8;
-        }
-
-        score += getChallengePriorityTypeScore(types);
-        if (types.includes('Fairy')) score += 18;
-        if (types.includes('Dragon') || types.includes('Fire') || types.includes('Dark') || types.includes('Ghost')) score += 12;
-        if (types.includes('Poison') && bst && bst < 500) score -= 14;
-
-        return score;
+        return EasyPokelikeStrategyUtils.scoreChallengeCatchBonus({
+            active: strategy.active,
+            name,
+            types,
+            attackTypes: attacks,
+            isShiny: candidate.isShiny,
+            alreadyOwnedShiny: candidate.alreadyOwnedShiny,
+            isLegendary: candidate.isLegendary,
+            isMainCarry: isMainCarryName(name),
+            hasShiny: strategy.hasShiny,
+            earlyShinyHunt: strategy.earlyShinyHunt,
+            targetTypes,
+            bossCounterScore: scoreCatchBossCounter(types, attacks, targetTypes),
+            priorityTypeScore: getChallengePriorityTypeScore(types),
+            level,
+            prepAvgLevel: strategy.prepStatus?.avgLevel || 0,
+            stats: { bst, offense, speed },
+            config: {
+                challengeShinyCatchBonus: CONFIG.CHALLENGE_SHINY_CATCH_BONUS,
+                challengeNonShinyEarlyPenalty: CONFIG.CHALLENGE_NON_SHINY_EARLY_PENALTY,
+                earlyExpansionCounterScore: CONFIG.EARLY_EXPANSION_COUNTER_SCORE,
+                legendaryCatchMinBst: CONFIG.LEGENDARY_CATCH_MIN_BST
+            }
+        }).score;
     }
 
     function scoreChallengeItemForTeam(itemName, team, bossType = null) {
         itemName = normalizeItemName(itemName);
         const strategy = getChallengeStrategyContext(team || [], bossType);
-        if (!strategy.active || !itemName) return 0;
-
         const carry = strategy.carry;
-        let score = 0;
-
-        if (isLowValueHeldItem(itemName)) return -220;
-        if (itemName === 'sacred ash') {
-            const fainted = (team || []).filter(p => p.isFainted).length;
-            return fainted > 0 ? 160 + fainted * 50 : -40;
-        }
-        if (itemName === 'rare candy') {
-            score += 320 + strategy.prepPressure * 30;
-            if (carry) score += 120 + Math.max(0, 85 - (carry.level || 85)) / 1.8;
-            if (strategy.underleveled || strategy.needsCarryBuff) score += 90;
-            return score;
-        }
-        if (itemName === 'tm normal') {
-            score += 170;
-            if (strategy.needsCarryBuff) score += 130;
-            if (strategy.moveTier >= CONFIG.CHALLENGE_CARRY_MOVE_TIER_TARGET) score -= 80;
-            return score;
-        }
-        if (itemName === 'moon stone') {
-            score += 165;
-            if (carry) score += 45 + Math.max(0, 70 - (carry.level || 70)) / 3;
-            return score;
-        }
-
-        if (!carry || USABLE_ITEMS.has(itemName)) return score;
-
-        const carryNewScore = scoreHeldItemForPokemon(carry, itemName, bossType);
-        const carryOldScore = carry.heldItem ? scoreHeldItemForPokemon(carry, carry.heldItem, bossType) : 0;
-        const improvement = carryNewScore - carryOldScore;
-
-        if (isMainCarryPreferredHeldItem(itemName)) score += 260;
-        if (MAIN_CARRY_SUSTAIN_ITEMS.has(itemName)) score += 120;
-        if (MAIN_CARRY_OFFENSE_ITEMS.has(itemName)) score += 105;
-        if (['lucky egg', 'expert belt', 'loaded dice', 'power bracer'].includes(itemName)) score += 70;
-        if (strategy.carryNeedsItem) score += 90;
-        if (!carry.heldItem) score += 80;
-        if (improvement > 0) score += improvement * 1.45;
-        else if (strategy.carryNeedsItem && isMainCarryPreferredHeldItem(itemName)) score += 40;
-
         const boostType = getItemBoostType(itemName);
-        if (boostType) {
-            score += hasMatchingAttackForItem(carry, itemName) ? 85 : -110;
-        }
+        const isUsable = USABLE_ITEMS.has(itemName);
+        const carryNewScore = carry && !isUsable ? scoreHeldItemForPokemon(carry, itemName, bossType) : 0;
+        const carryOldScore = carry && carry.heldItem && !isUsable ? scoreHeldItemForPokemon(carry, carry.heldItem, bossType) : 0;
 
-        return score;
+        return EasyPokelikeStrategyUtils.scoreChallengeItemBonus({
+            active: strategy.active,
+            itemName,
+            isLowValue: isLowValueHeldItem(itemName),
+            isUsable,
+            faintedCount: (team || []).filter(p => p.isFainted).length,
+            prepPressure: strategy.prepPressure,
+            hasCarry: Boolean(carry),
+            carryLevel: carry?.level || 0,
+            carryHeldItem: carry?.heldItem || '',
+            carryNeedsItem: strategy.carryNeedsItem,
+            needsCarryBuff: strategy.needsCarryBuff,
+            underleveled: strategy.underleveled,
+            moveTier: strategy.moveTier,
+            carryNewScore,
+            carryOldScore,
+            isMainCarryPreferredItem: isMainCarryPreferredHeldItem(itemName),
+            isSustainItem: MAIN_CARRY_SUSTAIN_ITEMS.has(itemName),
+            isOffenseItem: MAIN_CARRY_OFFENSE_ITEMS.has(itemName),
+            isUtilityItem: ['lucky egg', 'expert belt', 'loaded dice', 'power bracer'].includes(itemName),
+            boostType,
+            carryMatchesBoost: Boolean(boostType && carry && hasMatchingAttackForItem(carry, itemName)),
+            config: {
+                challengeCarryMoveTierTarget: CONFIG.CHALLENGE_CARRY_MOVE_TIER_TARGET
+            }
+        }).score;
     }
 
     function scoreChallengePassiveCardPurpose({
@@ -1799,12 +1764,12 @@
     }
 
     function getStoryPriorityTypeScore(types = []) {
-        const priority = CONFIG.STORY_PRIORITY_TYPES || [];
-        return normalizeTypeList(types).reduce((sum, type) => {
-            const index = priority.indexOf(type);
-            if (index < 0) return sum;
-            return sum + Math.max(4, priority.length - index) * 2.6;
-        }, 0);
+        return EasyPokelikeStrategyUtils.scorePriorityTypes({
+            types,
+            priorityTypes: CONFIG.STORY_PRIORITY_TYPES || [],
+            minRank: 4,
+            weight: 2.6
+        }).score;
     }
 
     function getStoryStrategyContext(team = [], opponentProfile = null) {
@@ -1848,19 +1813,16 @@
 
     function scoreStoryLeagueCoverage(attacks = [], types = [], strategy = null) {
         const story = strategy || getStoryStrategyContext();
-        if (!story.active) return 0;
-        const attackTypes = normalizeTypeList(attacks.length ? attacks : types);
-        const defenderTypes = story.leagueTypes || [];
-        let score = 0;
-
-        if (defenderTypes.length > 0) {
-            score += getAttackCoverageScore(attackTypes, defenderTypes) * 5.5;
-            score += getDefensiveMatchupScore(types, defenderTypes) * 2.5;
-        }
-        story.uncoveredLeagueTypes.forEach(type => {
-            if (getAttackCoverageScore(attackTypes, [type]) > 0) score += CONFIG.STORY_LEAGUE_COVERAGE_BONUS;
-        });
-        return score;
+        return EasyPokelikeStrategyUtils.scoreStoryLeagueCoverage({
+            active: story.active,
+            attackTypes: attacks.length ? attacks : types,
+            types,
+            leagueTypes: story.leagueTypes || [],
+            uncoveredLeagueTypes: story.uncoveredLeagueTypes || [],
+            config: {
+                storyLeagueCoverageBonus: CONFIG.STORY_LEAGUE_COVERAGE_BONUS
+            }
+        }).score;
     }
 
     function scoreStoryCatchScoreBonus(candidate, team, bossTypes, opponentProfile = null) {
@@ -1876,91 +1838,78 @@
         const speed = getPokemonStat(stats, 'speed', 'spe');
         const bulk = getPokemonStat(stats, 'hp') + getPokemonStat(stats, 'def') + getPokemonStat(stats, 'spdef', 'spd');
         const currentBossTypes = normalizeTypeList(bossTypes || story.currentBossTypes);
-        let score = 0;
-
-        if (story.needsTeam) score += 34;
-        if (candidate.isShiny) score += 18;
-        if (candidate.isLegendary || isLegendaryPokemonName(name)) score += 70;
-        if (isMainCarryName(name)) score += 55;
-        if (bst) score += Math.max(0, bst - 430) / 3.6;
-        if (offense) score += offense / 7.5;
-        if (speed) score += speed / 12;
-        if (bulk) score += bulk / 42;
-        if (bst && bst < CONFIG.STORY_MIN_BST_TARGET && !story.needsTeam) score -= CONFIG.STORY_WEAK_STAT_PENALTY;
-
-        if (currentBossTypes.length > 0) {
-            score += getAttackCoverageScore(attacks, currentBossTypes) * CONFIG.STORY_CURRENT_BOSS_COVERAGE_BONUS / 5;
-            score += getDefensiveMatchupScore(types, currentBossTypes) * 3;
-        }
-
-        score += scoreStoryLeagueCoverage(attacks, types, story);
-        score += getStoryPriorityTypeScore(types);
 
         const key = getPokemonIdentityKey(name);
         const duplicateCount = (team || []).filter(p => getPokemonIdentityKey(p.name) === key).length;
-        if (duplicateCount > 0 && !candidate.isLegendary && !isMainCarryName(name) && bst < CONFIG.LEGENDARY_CATCH_MIN_BST) {
-            score -= story.needsCoverage ? 24 : 42;
-        }
-
-        return score;
+        return EasyPokelikeStrategyUtils.scoreStoryCatchBonus({
+            active: story.active,
+            name,
+            types,
+            attackTypes: attacks,
+            isShiny: candidate.isShiny,
+            isLegendary: candidate.isLegendary,
+            isLegendaryName: isLegendaryPokemonName(name),
+            isMainCarry: isMainCarryName(name),
+            needsTeam: story.needsTeam,
+            needsCoverage: story.needsCoverage,
+            currentBossTypes,
+            leagueTypes: story.leagueTypes || [],
+            uncoveredLeagueTypes: story.uncoveredLeagueTypes || [],
+            priorityTypeScore: getStoryPriorityTypeScore(types),
+            duplicateCount,
+            stats: { bst, offense, speed, bulk },
+            config: {
+                storyMinBstTarget: CONFIG.STORY_MIN_BST_TARGET,
+                storyWeakStatPenalty: CONFIG.STORY_WEAK_STAT_PENALTY,
+                storyCurrentBossCoverageBonus: CONFIG.STORY_CURRENT_BOSS_COVERAGE_BONUS,
+                storyLeagueCoverageBonus: CONFIG.STORY_LEAGUE_COVERAGE_BONUS,
+                legendaryCatchMinBst: CONFIG.LEGENDARY_CATCH_MIN_BST
+            }
+        }).score;
     }
 
     function scoreStoryItemForTeam(itemName, team, bossType = null) {
         itemName = normalizeItemName(itemName);
         const story = getStoryStrategyContext(team || [], bossType);
-        if (!story.active || !itemName) return 0;
-        if (isLowValueHeldItem(itemName)) return -180;
-
-        let score = 0;
-        if (itemName === 'rare candy') score += 260 + story.prepPressure * 24;
-        if (itemName === 'tm normal') score += 120;
-        if (itemName === 'moon stone') score += 135 + story.prepPressure * 10;
-        if (itemName === 'sacred ash') score += (team || []).some(p => p.isFainted) ? 130 : -30;
-        if (['leftovers', 'shell bell', 'choice band', 'choice specs', 'life orb', 'lucky egg'].includes(itemName)) score += 105;
-        if (['expert belt', 'loaded dice', 'power bracer', 'choice scarf'].includes(itemName)) score += 60;
-
         const carry = story.carry;
-        if (carry && !USABLE_ITEMS.has(itemName)) {
-            const boostType = getItemBoostType(itemName);
-            if (boostType) score += hasMatchingAttackForItem(carry, itemName) ? 48 : -55;
-            const current = carry.heldItem ? scoreHeldItemForPokemon(carry, carry.heldItem, bossType) : 0;
-            const next = scoreHeldItemForPokemon(carry, itemName, bossType);
-            if (next > current + 8) score += 55 + (next - current);
-        }
+        const isUsable = USABLE_ITEMS.has(itemName);
+        const boostType = getItemBoostType(itemName);
+        const carryOldScore = carry && carry.heldItem && !isUsable ? scoreHeldItemForPokemon(carry, carry.heldItem, bossType) : 0;
+        const carryNewScore = carry && !isUsable ? scoreHeldItemForPokemon(carry, itemName, bossType) : 0;
 
-        return score;
+        return EasyPokelikeStrategyUtils.scoreStoryItemBonus({
+            active: story.active,
+            itemName,
+            isLowValue: isLowValueHeldItem(itemName),
+            isUsable,
+            hasFainted: (team || []).some(p => p.isFainted),
+            prepPressure: story.prepPressure,
+            hasCarry: Boolean(carry),
+            carryNewScore,
+            carryOldScore,
+            boostType,
+            carryMatchesBoost: Boolean(boostType && carry && hasMatchingAttackForItem(carry, itemName))
+        }).score;
     }
 
     function getStoryStrategyNodeBonus(type, context = {}) {
         const story = context.storyStrategy || getStoryStrategyContext(context.team || [], context.opponentProfile || null);
-        if (!story.active) return 0;
-
         const centerNeed = context.centerNeed || getCenterNeedStatus(context.team || []);
-        let score = 0;
-
-        if (story.needsTeam) {
-            if (type === 'catch') score += CONFIG.STORY_ROUTE_TEAM_BUILD_BONUS;
-            if (type === 'grass') score += Math.round(CONFIG.STORY_ROUTE_TEAM_BUILD_BONUS * 0.55);
-            if (type === 'trade') score += 260;
-        } else if (story.needsCoverage) {
-            if (type === 'catch') score += CONFIG.STORY_ROUTE_COVERAGE_BONUS;
-            if (type === 'grass') score += Math.round(CONFIG.STORY_ROUTE_COVERAGE_BONUS * 0.5);
-        } else if (type === 'catch' || type === 'grass') {
-            score -= 180;
-        }
-
-        if (story.prepPressure > 0) {
-            if (type === 'trainer') score += CONFIG.STORY_ROUTE_TRAINING_BONUS + story.prepPressure * 80;
-            if (type === 'buff') score += 360 + story.prepPressure * 45;
-            if (type === 'item') score += 180;
-        }
-
-        if (type === 'legendary') score += story.prepPressure <= 2 ? 520 : -180;
-        if (type === 'item' && story.weakMembers.length > 0) score += 160;
-        if (type === 'center' && centerNeed.canSkipCenter) score -= 420;
-        if (type === 'boss') score += story.prepStatus?.ready ? 220 : -1050 - story.prepPressure * 160;
-
-        return score;
+        return EasyPokelikeStrategyUtils.scoreStoryRouteBonus({
+            active: story.active,
+            nodeType: type,
+            needsTeam: story.needsTeam,
+            needsCoverage: story.needsCoverage,
+            prepPressure: story.prepPressure,
+            prepReady: story.prepStatus?.ready ?? true,
+            weakMemberCount: story.weakMembers?.length || 0,
+            centerCanSkip: centerNeed.canSkipCenter,
+            config: {
+                storyRouteTeamBuildBonus: CONFIG.STORY_ROUTE_TEAM_BUILD_BONUS,
+                storyRouteCoverageBonus: CONFIG.STORY_ROUTE_COVERAGE_BONUS,
+                storyRouteTrainingBonus: CONFIG.STORY_ROUTE_TRAINING_BONUS
+            }
+        }).score;
     }
 
     function scoreStoryStarterFit(name, types, isShiny = false) {

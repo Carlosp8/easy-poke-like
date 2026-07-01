@@ -432,10 +432,7 @@
     }
 
     function scoreCatchBossCounter(candidateTypes, attackTypes, bossTypes) {
-        const targetTypes = normalizeTypeList(bossTypes);
-        if (targetTypes.length === 0) return 0;
-        return getAttackCoverageScore(attackTypes || candidateTypes, targetTypes) * 2.5 +
-               getDefensiveMatchupScore(candidateTypes, targetTypes) * 2;
+        return EasyPokelikeStrategyUtils.scoreCatchBossCounter(candidateTypes, attackTypes, bossTypes);
     }
 
     function isBossRelevantCatchCandidate(candidate, bossTypes) {
