@@ -51,6 +51,7 @@ test('builds a Tampermonkey userscript from src modules', async () => {
 });
 
 test('keeps the modular source files available', () => {
+  assert.ok(existsSync(path.join(ROOT_DIR, 'AGENTS.md')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'userscript.meta.js')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'README.md')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'types.d.ts')));
