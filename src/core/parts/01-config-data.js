@@ -5,8 +5,8 @@
     const CONFIG = {
         // --- Product identity ---
         DISPLAY_NAME: 'Easy Pokelike',
-        DISPLAY_VERSION: '9.5',
-        PANEL_TITLE: 'Easy Pokelike 9.5',
+        DISPLAY_VERSION: '10',
+        PANEL_TITLE: 'Easy Pokelike 10',
 
         // --- Timing ---
         LOOP_SPEED_MS: 1000,

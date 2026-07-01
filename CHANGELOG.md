@@ -9,6 +9,13 @@ usuarios.
 
 ## Unreleased
 
+## 10.0.0
+
+### Cambiado
+
+- Version visible del userscript actualizada a `Easy Pokelike 10`.
+- Version de paquete actualizada a `10.0.0`.
+
 ### Arquitectura
 
 - Documentada la frontera entre runtime legacy (`src/core/parts/`) y reglas puras

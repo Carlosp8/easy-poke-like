@@ -95,7 +95,7 @@ Si cambia el bundle o el DOM del juego:
 
 ## UX Del Bot
 
-- Mantener el nombre visible `Easy Pokelike 9.5`.
+- Mantener el nombre visible `Easy Pokelike 10`.
 - Algunos IDs internos conservan `Engine` por compatibilidad con `localStorage`
   y logs historicos; no los renombres sin migracion.
 - El panel debe seguir siendo util en pantallas pequenas y no bloquear acciones
