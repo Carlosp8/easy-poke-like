@@ -46,14 +46,17 @@ Cada nueva regla deberia avanzar hacia:
 2. Consumir mas datos desde `src/data/generated/`.
 3. Crear un modo dry-run/debug que calcule decisiones sin ejecutar clicks.
 4. Formalizar telemetria con eventos tipados.
-5. Documentar releases con cambios de comportamiento, no solo lista tecnica.
+5. Mantener el changelog por release con cambios de comportamiento, no solo
+   lista tecnica.
 
 ## Backlog De Documentacion
 
 - Capturas del panel.
 - Ejemplos de logs reales y como leerlos.
-- Guia de contribucion.
-- Checklist para actualizar tras cambios de Pokelike.
+- Guia de contribucion: cubierta en [Contribucion](contributing.md).
+- Checklist para actualizar tras cambios de Pokelike: cubierta en
+  [Cambios de Pokelike](pokelike-update-checklist.md).
+- Changelog de releases: cubierto en [Changelog](../CHANGELOG.md).
 - Matriz de compatibilidad por version de bundle.
 
 ## No Objetivos Inmediatos

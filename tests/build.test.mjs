@@ -76,8 +76,12 @@ test('keeps the modular source files available', () => {
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'parts', '06-initialization.js')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'data', 'generated', 'bundle-meta.json')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'development.md')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'contributing.md')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'strategy.md')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'troubleshooting.md')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'data-extraction.md')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'pokelike-update-checklist.md')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'roadmap.md')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'CHANGELOG.md')));
+  assert.ok(existsSync(path.join(ROOT_DIR, '.github', 'pull_request_template.md')));
 });

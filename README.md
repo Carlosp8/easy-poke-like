@@ -131,6 +131,25 @@ tests/                      tests de build, datos, extractor, DOM y scoring
 docs/                       documentacion extendida
 ```
 
+### Mapa De `src/core/lib`
+
+`src/core/lib/strategy-utils.ts` es el barrel que expone las utilidades puras al
+core legacy. El build lo empaqueta antes de concatenar `parts/`, por eso los
+archivos legacy acceden a ellas mediante `EasyPokelikeStrategyUtils`.
+
+| Modulo                          | Responsabilidad                                                    |
+| ------------------------------- | ------------------------------------------------------------------ |
+| `text-utils.ts`                 | Normalizacion de texto e items.                                    |
+| `type-matchups.ts`              | Tabla de tipos, cobertura ofensiva/defensiva y prioridad de tipos. |
+| `team-utils.ts`                 | Snapshots de HP, nivel, slots y presion de entrenamiento.          |
+| `strategy/card-scoring.ts`      | Parsing puro de texto de cards, stats, BST y trait preview.        |
+| `strategy/catch-scoring.ts`     | Capturas, reroll/acceptance, traits y cobertura nueva.             |
+| `strategy/item-scoring.ts`      | Items equipables, consumibles, MT y upgrades.                      |
+| `strategy/passive-scoring.ts`   | Pasivas, perfil de equipo y contexto Story/Sinnoh/Challenge.       |
+| `strategy/progress-strategy.ts` | Region, boss prep y progreso Story/Challenge.                      |
+| `strategy/route-scoring.ts`     | Nodos de mapa, lookahead y bonuses por tactica.                    |
+| `strategy/starter-scoring.ts`   | Valoracion de starters para Story/Challenge.                       |
+
 ### Comandos
 
 | Comando                  | Uso                                                   |
@@ -161,10 +180,13 @@ artefacto local o de release, no la fuente de verdad.
 
 ## Documentacion Extendida
 
-| Documento                                      | Contenido                                                    |
-| ---------------------------------------------- | ------------------------------------------------------------ |
-| [Desarrollo](docs/development.md)              | Arquitectura, reglas de edicion, testing y flujo de cambios. |
-| [Estrategia](docs/strategy.md)                 | Como decide rutas, capturas, items, bosses y equipo.         |
-| [Extraccion de datos](docs/data-extraction.md) | Como funciona el extractor y que datos genera.               |
-| [Troubleshooting](docs/troubleshooting.md)     | Problemas frecuentes para usuario y desarrollador.           |
-| [Roadmap tecnico](docs/roadmap.md)             | Mejoras senior recomendadas y orden de ataque.               |
+| Documento                                                | Contenido                                                    |
+| -------------------------------------------------------- | ------------------------------------------------------------ |
+| [Desarrollo](docs/development.md)                        | Arquitectura, reglas de edicion, testing y flujo de cambios. |
+| [Estrategia](docs/strategy.md)                           | Como decide rutas, capturas, items, bosses y equipo.         |
+| [Extraccion de datos](docs/data-extraction.md)           | Como funciona el extractor y que datos genera.               |
+| [Contribucion](docs/contributing.md)                     | Como proponer cambios, tests esperados y checklist local.    |
+| [Cambios de Pokelike](docs/pokelike-update-checklist.md) | Checklist para bundles, DOM y datos nuevos del juego.        |
+| [Changelog](CHANGELOG.md)                                | Cambios visibles por release y notas de compatibilidad.      |
+| [Troubleshooting](docs/troubleshooting.md)               | Problemas frecuentes para usuario y desarrollador.           |
+| [Roadmap tecnico](docs/roadmap.md)                       | Mejoras senior recomendadas y orden de ataque.               |

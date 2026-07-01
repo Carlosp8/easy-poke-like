@@ -12,6 +12,10 @@ toward stronger TypeScript coverage.
 
 For the broader development workflow, refactor rules and testing strategy, see
 [`../../docs/development.md`](../../docs/development.md).
+For contribution expectations, see
+[`../../docs/contributing.md`](../../docs/contributing.md). For game bundle or
+DOM changes, use
+[`../../docs/pokelike-update-checklist.md`](../../docs/pokelike-update-checklist.md).
 
 ## Parts
 
@@ -26,6 +30,22 @@ For the broader development workflow, refactor rules and testing strategy, see
 - `lib/`: pure utilities extracted as the first migration target for stronger
   tests and future module boundaries. The build transpiles these modules into a
   local userscript helper before concatenating the legacy parts.
+
+## Pure Library Modules
+
+`lib/strategy-utils.ts` is the public facade consumed by legacy parts through
+`EasyPokelikeStrategyUtils`.
+
+- `lib/text-utils.ts`: text and item normalization.
+- `lib/type-matchups.ts`: type chart, offensive coverage and defensive matchup.
+- `lib/team-utils.ts`: team HP, level, slot and training-pressure snapshots.
+- `lib/strategy/card-scoring.ts`: card text parsing, stat scoring and trait previews.
+- `lib/strategy/catch-scoring.ts`: catch acceptance, trait synergy and type coverage.
+- `lib/strategy/item-scoring.ts`: held item, consumable and TM scoring.
+- `lib/strategy/passive-scoring.ts`: passive cards and passive team profile snapshots.
+- `lib/strategy/progress-strategy.ts`: region/progress and boss-prep targets.
+- `lib/strategy/route-scoring.ts`: map-node scoring and route lookahead.
+- `lib/strategy/starter-scoring.ts`: starter scoring for story/challenge modes.
 
 ## Editing Rules
 

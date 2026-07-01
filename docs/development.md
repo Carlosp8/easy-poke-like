@@ -22,6 +22,29 @@ scope generado por `scripts/build-userscript.ts`.
 
 El orden lo define `src/core/manifest.json`. Cambiarlo cambia comportamiento.
 
+### Libreria Pura
+
+`src/core/lib/strategy-utils.ts` funciona como fachada publica para el runtime
+legacy. Evita importar desde `parts/`; si una regla nueva no necesita DOM,
+`localStorage` ni estado mutable, deberia vivir aqui:
+
+| Modulo                          | Cuando usarlo                                  |
+| ------------------------------- | ---------------------------------------------- |
+| `text-utils.ts`                 | Normalizar texto, nombres e items.             |
+| `type-matchups.ts`              | Calcular cobertura, resistencias y prioridad.  |
+| `team-utils.ts`                 | Decidir con snapshots de equipo/HP/nivel.      |
+| `strategy/card-scoring.ts`      | Parsear texto de cards y puntuar stats/traits. |
+| `strategy/catch-scoring.ts`     | Decisiones y bonuses de captura.               |
+| `strategy/item-scoring.ts`      | Decisiones de items, MT y upgrades.            |
+| `strategy/passive-scoring.ts`   | Pasivas y perfil estrategico del equipo.       |
+| `strategy/progress-strategy.ts` | Progreso, regiones y targets de boss.          |
+| `strategy/route-scoring.ts`     | Scoring de nodos de mapa y lookahead.          |
+| `strategy/starter-scoring.ts`   | Scoring de starters.                           |
+
+Patron recomendado: `parts/` prepara un snapshot explicito desde DOM/runtime y
+llama a `EasyPokelikeStrategyUtils.*`. La funcion pura devuelve `score`,
+`reason` y `details` cuando la decision necesita trazabilidad.
+
 ## Principios De Cambio
 
 - Mantener `easy-pokelike.user.js` como artefacto generado.
@@ -98,6 +121,16 @@ Para usar un bundle concreto:
 ```bash
 npm run extract:bundle -- bundle.xxxxx.js
 ```
+
+Cuando Pokelike cambie bundle, DOM o datos, usa la
+[checklist de actualizacion](pokelike-update-checklist.md) antes de tocar pesos
+estrategicos.
+
+Para contribuciones recurrentes, sigue la
+[guia de contribucion](contributing.md).
+
+Si el cambio afecta comportamiento visible, compatibilidad o proceso de release,
+actualiza tambien [Changelog](../CHANGELOG.md).
 
 ## Reglas Para Refactorizar El Core
 

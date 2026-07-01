@@ -44,6 +44,11 @@ El scoring de captura considera:
 - soporte Grass/sustain;
 - duplicados si la tactica `Duplicados` esta activa.
 
+Las reglas puras relacionadas viven principalmente en
+`src/core/lib/strategy/catch-scoring.ts`, con soporte de `type-matchups.ts`,
+`team-utils.ts` y `card-scoring.ts`. El runtime prepara datos desde el DOM y
+estas funciones calculan scores, razones y detalles testeables.
+
 En tactica `Shiny`, el bot puede scoutear mas nodos de captura, pero reduce esa
 prioridad si hay demasiada presion de entrenamiento o boss prep.
 
@@ -127,6 +132,10 @@ Pasivas:
 - shiny passive cards;
 - sustain, survival, damage, speed y scaling;
 - contexto de boss, historia, desafio y Sinnoh.
+
+El scoring puro de pasivas vive en `src/core/lib/strategy/passive-scoring.ts`.
+`03-detection-strategy.js` conserva el parsing de cards y equipo visible, pero
+la puntuacion reusable se calcula con snapshots explicitos.
 
 Buffs:
 
