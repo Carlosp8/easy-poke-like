@@ -20,6 +20,8 @@ test('builds a Tampermonkey userscript from src modules', async () => {
   assert.ok(output.includes('(function()'));
   assert.equal(output.includes('\nimport '), false);
   assert.ok(output.includes('var EasyPokelikeStrategyUtils = (() => {'));
+  assert.ok(output.includes("PANEL_TITLE: 'Easy Pokelike 9.5'"));
+  assert.equal(output.includes('<strong>Engine 7</strong>'), false);
   assert.ok(output.includes('return EasyPokelikeStrategyUtils.foldText(text);'));
   assert.ok(
     output.includes('return EasyPokelikeStrategyUtils.normalizeItemName(name, ITEM_TRANSLATIONS);'),
@@ -57,4 +59,9 @@ test('keeps the modular source files available', () => {
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'parts', '00-runtime-hooks.js')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'parts', '06-initialization.js')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'data', 'generated', 'bundle-meta.json')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'development.md')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'strategy.md')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'troubleshooting.md')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'data-extraction.md')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'docs', 'roadmap.md')));
 });

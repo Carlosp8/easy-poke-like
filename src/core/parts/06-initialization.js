@@ -4,7 +4,7 @@
     // Startup is last: all helpers above must be defined before timers begin.
     function printBanner() {
         console.log('%c====================================================', 'color: #00ff88; font-weight: bold');
-        console.log('%c  Easy Pokelike v9.5 - Fusion Engine', 'color: #00ff88; font-weight: bold');
+        console.log(`%c  ${CONFIG.DISPLAY_NAME} v${CONFIG.DISPLAY_VERSION} - Fusion Engine`, 'color: #00ff88; font-weight: bold');
         console.log('%c----------------------------------------------------', 'color: #00ff88; font-weight: bold');
         console.log('%c  Story | Tower | Challenge | Weekly modes', 'color: #88ffaa');
         console.log('%c  Shiny, duplicate, item, MT and route tactics', 'color: #88ffaa');

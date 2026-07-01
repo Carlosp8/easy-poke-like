@@ -303,7 +303,7 @@
         return `
             <div class="e7c-head" data-drag-handle="true">
                 <button class="e7c-icon-btn e7c-play" data-action="pause" data-short="${state.paused ? '>' : '||'}" title="${state.paused ? 'Reanudar' : 'Pausar'}">${state.paused ? 'Play' : 'Pause'}</button>
-                <strong>Engine 7</strong>
+                <strong>${escapeHtml(CONFIG.PANEL_TITLE)}</strong>
                 <button class="e7c-icon-btn" data-action="collapse" title="Plegar">${state.collapsed ? '+' : '-'}</button>
             </div>
             <div class="e7c-body"${state.collapsed ? ' hidden' : ''}>

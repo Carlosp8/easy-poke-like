@@ -3,6 +3,11 @@
 
     // Core configuration and static knowledge tables.
     const CONFIG = {
+        // --- Product identity ---
+        DISPLAY_NAME: 'Easy Pokelike',
+        DISPLAY_VERSION: '9.5',
+        PANEL_TITLE: 'Easy Pokelike 9.5',
+
         // --- Timing ---
         LOOP_SPEED_MS: 1000,
         DRAG_SETTLE_MS: 300,

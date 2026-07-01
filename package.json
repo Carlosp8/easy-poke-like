@@ -6,6 +6,7 @@
   "scripts": {
     "extract:bundle": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/extract-pokelike-bundle.ts",
     "build": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/build-userscript.ts && node --check easy-pokelike.user.js",
+    "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "test": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test",

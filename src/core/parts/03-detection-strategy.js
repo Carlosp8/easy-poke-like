@@ -717,93 +717,54 @@
     }
 
     function getTeamAverageHP(team) {
-        const alive = team.filter(p => !p.isFainted);
-        if (alive.length === 0) return 0;
-        return alive.reduce((sum, p) => sum + p.hp, 0) / alive.length;
+        return EasyPokelikeStrategyUtils.getTeamAverageHP(team);
     }
 
     function getAliveTeam(team) {
-        return team.filter(p => !p.isFainted);
+        return EasyPokelikeStrategyUtils.getAliveTeam(team);
     }
 
     function hasOpenTeamSlot(team) {
-        return (team || []).length < CONFIG.TEAM_TARGET_SIZE;
+        return EasyPokelikeStrategyUtils.hasOpenTeamSlot(team, CONFIG.TEAM_TARGET_SIZE);
     }
 
     function getTeamAverageLevel(team) {
-        const leveled = getAliveTeam(team).filter(p => p.level > 0);
-        if (leveled.length === 0) return 0;
-        return leveled.reduce((sum, p) => sum + p.level, 0) / leveled.length;
+        return EasyPokelikeStrategyUtils.getTeamAverageLevel(team);
     }
 
     function getCenterNeedStatus(team, opponentProfile = null, prepStatus = null) {
-        const alive = getAliveTeam(team || []);
-        const avgHP = getTeamAverageHP(team || []);
-        const lowestHP = alive.length > 0 ? Math.min(...alive.map(p => p.hp || 0)) : 0;
-        const hasFainted = (team || []).some(p => p.isFainted);
-        const lowHPCount = alive.filter(p => (p.hp || 0) < CONFIG.LOW_HP_THRESHOLD).length;
-        const criticalHPCount = alive.filter(p => (p.hp || 0) < CONFIG.CRITICAL_HP_THRESHOLD).length;
-        const fullEnough = alive.length > 0 &&
-                           avgHP >= CONFIG.CENTER_AVOID_FULL_HP_AVG_THRESHOLD &&
-                           lowestHP >= CONFIG.CENTER_AVOID_LOWEST_HP_THRESHOLD;
-        const almostFull = alive.length > 0 &&
-                           avgHP >= CONFIG.CENTER_AVOID_ALMOST_FULL_HP_AVG_THRESHOLD &&
-                           lowestHP >= CONFIG.CENTER_AVOID_LOWEST_HP_THRESHOLD &&
-                           lowHPCount === 0;
         const primaryCarry = getPrimaryCarry(team || []);
-        const carryHP = primaryCarry ? (primaryCarry.hp || 0) : 0;
         const prep = prepStatus || getBossPrepStatus(team || [], opponentProfile);
-        const avgDeficit = prep?.avgDeficit || 0;
-        const leadDeficit = prep?.leadDeficit || 0;
-        const prepPressure = avgDeficit + leadDeficit;
         const carryBossScore = opponentProfile && primaryCarry
             ? scoreLeadCandidate(primaryCarry, opponentProfile, { ignoreHeldItem: true })
             : 0;
         const carryPowerScore = primaryCarry ? getPokemonCarryScore(primaryCarry) : 0;
-        const carryOverpowersBoss = Boolean(
-            primaryCarry &&
-            !primaryCarry.isFainted &&
-            leadDeficit <= 0 &&
-            (
-                avgDeficit <= 3 ||
-                !opponentProfile ||
-                carryBossScore >= CONFIG.CENTER_STRONG_CARRY_SCORE_THRESHOLD ||
-                carryPowerScore >= CONFIG.CENTER_STRONG_CARRY_SCORE_THRESHOLD ||
-                isMainCarryUnit(primaryCarry)
-            )
-        );
-        const healthyCarryCanSkip = Boolean(
-            carryOverpowersBoss &&
-            carryHP >= CONFIG.CENTER_CARRY_SAFE_HP_THRESHOLD &&
-            avgHP >= CONFIG.CENTER_CARRY_SKIP_AVG_HP_THRESHOLD &&
-            lowestHP >= CONFIG.CENTER_CARRY_SKIP_LOWEST_HP_THRESHOLD &&
-            lowHPCount <= 1
-        );
 
-        return {
-            avgHP,
-            lowestHP,
-            hasFainted,
-            lowHPCount,
-            criticalHPCount,
-            fullEnough,
-            almostFull,
-            healthyCarryCanSkip,
-            carry: primaryCarry ? primaryCarry.name : null,
-            carryHP,
+        return EasyPokelikeStrategyUtils.getCenterNeedStatus(team || [], {
+            criticalHpThreshold: CONFIG.CRITICAL_HP_THRESHOLD,
+            lowHpThreshold: CONFIG.LOW_HP_THRESHOLD,
+            fullHpAvgThreshold: CONFIG.CENTER_AVOID_FULL_HP_AVG_THRESHOLD,
+            almostFullHpAvgThreshold: CONFIG.CENTER_AVOID_ALMOST_FULL_HP_AVG_THRESHOLD,
+            lowestHpThreshold: CONFIG.CENTER_AVOID_LOWEST_HP_THRESHOLD,
+            carrySafeHpThreshold: CONFIG.CENTER_CARRY_SAFE_HP_THRESHOLD,
+            carrySkipAvgHpThreshold: CONFIG.CENTER_CARRY_SKIP_AVG_HP_THRESHOLD,
+            carrySkipLowestHpThreshold: CONFIG.CENTER_CARRY_SKIP_LOWEST_HP_THRESHOLD,
+            strongCarryScoreThreshold: CONFIG.CENTER_STRONG_CARRY_SCORE_THRESHOLD,
+            primaryCarry,
+            prepStatus: prep,
+            hasOpponentProfile: Boolean(opponentProfile),
             carryBossScore,
-            prepPressure,
-            canSkipCenter: !hasFainted && criticalHPCount === 0 && (fullEnough || almostFull || healthyCarryCanSkip)
-        };
+            carryPowerScore,
+            isMainCarry: primaryCarry ? isMainCarryUnit(primaryCarry) : false
+        });
     }
 
     function getLeadLevel(team) {
-        const lead = getAliveTeam(team)[0];
-        return lead ? (lead.level || 0) : 0;
+        return EasyPokelikeStrategyUtils.getLeadLevel(team);
     }
 
     function shouldBuildCoreTeam(team) {
-        return getAliveTeam(team).length < CONFIG.EARLY_CORE_TEAM_SIZE;
+        return EasyPokelikeStrategyUtils.shouldBuildCoreTeam(team, CONFIG.EARLY_CORE_TEAM_SIZE);
     }
 
     function getBossPrepTargets(opponentProfile = null) {
@@ -959,18 +920,11 @@
     }
 
     function shouldPrioritizeEarlyTraining(team, opponentProfile = null) {
-        const aliveCount = getAliveTeam(team).length;
-        if (aliveCount < CONFIG.EARLY_CORE_TEAM_SIZE) return false;
-
-        const avgLevel = getTeamAverageLevel(team);
-        const leadLevel = getLeadLevel(team);
         const targets = getBossPrepTargets(opponentProfile);
-        if (avgLevel === 0 && leadLevel === 0) {
-            return aliveCount >= CONFIG.EARLY_OPTIONAL_TEAM_SIZE;
-        }
-
-        return avgLevel < targets.avgLevel ||
-               leadLevel < targets.leadLevel;
+        return EasyPokelikeStrategyUtils.shouldPrioritizeEarlyTraining(team, targets, {
+            coreTeamSize: CONFIG.EARLY_CORE_TEAM_SIZE,
+            optionalTeamSize: CONFIG.EARLY_OPTIONAL_TEAM_SIZE
+        });
     }
 
     function getBossPrepStatus(team, opponentProfile = null) {
@@ -991,11 +945,7 @@
     }
 
     function getProjectedAverageLevelAfterCatch(team, candidateLevel) {
-        const alive = getAliveTeam(team);
-        const leveled = alive.filter(p => p.level > 0);
-        if (!Number.isFinite(candidateLevel) || candidateLevel <= 0 || leveled.length === 0) return null;
-        const total = leveled.reduce((sum, p) => sum + (p.level || 0), 0) + candidateLevel;
-        return total / (leveled.length + 1);
+        return EasyPokelikeStrategyUtils.getProjectedAverageLevelAfterCatch(team, candidateLevel);
     }
 
     function shouldStopEarlyExpansion(team, opponentProfile = null) {
@@ -1008,11 +958,12 @@
     }
 
     function getEarlyCatchAllowance(team, score = 0, isShiny = false) {
-        const aliveCount = getAliveTeam(team).length;
-        if (aliveCount < CONFIG.EARLY_CORE_TEAM_SIZE) return 'core';
-        if (isShiny || score >= CONFIG.EARLY_EXCEPTIONAL_CATCH_SCORE) return 'exceptional';
-        if (aliveCount < CONFIG.EARLY_OPTIONAL_TEAM_SIZE && score >= CONFIG.CATCH_REROLL_MIN_ACCEPT_SCORE) return 'optional';
-        return 'skip';
+        return EasyPokelikeStrategyUtils.getEarlyCatchAllowance(team, score, isShiny, {
+            coreTeamSize: CONFIG.EARLY_CORE_TEAM_SIZE,
+            optionalTeamSize: CONFIG.EARLY_OPTIONAL_TEAM_SIZE,
+            exceptionalScore: CONFIG.EARLY_EXCEPTIONAL_CATCH_SCORE,
+            minAcceptScore: CONFIG.CATCH_REROLL_MIN_ACCEPT_SCORE
+        });
     }
 
     function isEarlyShinyRerollWindow(team = []) {

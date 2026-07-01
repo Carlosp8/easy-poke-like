@@ -10,6 +10,9 @@ JavaScript on their own. The split is organizational, not a module boundary.
 `types.d.ts` defines the shared domain vocabulary used while migrating the core
 toward stronger TypeScript coverage.
 
+For the broader development workflow, refactor rules and testing strategy, see
+[`../../docs/development.md`](../../docs/development.md).
+
 ## Parts
 
 - `00-runtime-hooks.js`: browser safety guards.

@@ -4,8 +4,11 @@ import test from 'node:test';
 import {
   foldText,
   getAttackCoverageScore,
+  getCenterNeedStatus,
   getDefensiveScoreAgainstAttack,
+  getEarlyCatchAllowance,
   getItemBoostType,
+  getProjectedAverageLevelAfterCatch,
   hasMatchingAttackForItem,
   isHealingItem,
   isLowValueHeldItem,
@@ -14,6 +17,7 @@ import {
   scoreCatchDraftSignals,
   scoreHeldItemFit,
   scoreRouteLookahead,
+  shouldPrioritizeEarlyTraining,
 } from '../src/core/lib/strategy-utils.ts';
 
 test('normalizes text and item names without locale-sensitive surprises', () => {
@@ -87,6 +91,65 @@ test('matches type boost items against attack coverage', () => {
   assert.equal(isTypeBoostItemUsefulForTeam('Charcoal', [blastoise]), false);
   assert.equal(isTypeBoostItemUsefulForTeam('Charcoal', [blastoise, charizard]), true);
   assert.equal(isTypeBoostItemUsefulForTeam('Leftovers', [blastoise]), true);
+});
+
+test('decides center visits from team health and carry readiness', () => {
+  const healthyTeam = [
+    { name: 'Lapras', hp: 88, level: 30, types: ['Water', 'Ice'] },
+    { name: 'Charizard', hp: 92, level: 28, types: ['Fire', 'Flying'] },
+  ];
+  const riskyTeam = [
+    { name: 'Lapras', hp: 88, level: 30, types: ['Water', 'Ice'] },
+    { name: 'Charizard', hp: 0, level: 28, isFainted: true, types: ['Fire', 'Flying'] },
+  ];
+
+  const healthyDecision = getCenterNeedStatus(healthyTeam, {
+    primaryCarry: healthyTeam[0],
+    prepStatus: { avgDeficit: 0, leadDeficit: 0 },
+    hasOpponentProfile: true,
+    carryBossScore: 280,
+    carryPowerScore: 240,
+  });
+  const riskyDecision = getCenterNeedStatus(riskyTeam, {
+    primaryCarry: riskyTeam[0],
+    prepStatus: { avgDeficit: 0, leadDeficit: 0 },
+  });
+
+  assert.equal(healthyDecision.canSkipCenter, true);
+  assert.equal(healthyDecision.healthyCarryCanSkip, true);
+  assert.equal(riskyDecision.canSkipCenter, false);
+  assert.equal(riskyDecision.hasFainted, true);
+});
+
+test('decides early training pressure from boss targets', () => {
+  const coreTeam = [
+    { name: 'Lapras', hp: 90, level: 10 },
+    { name: 'Pikachu', hp: 90, level: 11 },
+  ];
+  const readyTeam = [
+    { name: 'Lapras', hp: 90, level: 18 },
+    { name: 'Pikachu', hp: 90, level: 16 },
+  ];
+  const targets = { avgLevel: 14, leadLevel: 15 };
+
+  assert.equal(shouldPrioritizeEarlyTraining(coreTeam, targets), true);
+  assert.equal(shouldPrioritizeEarlyTraining(readyTeam, targets), false);
+});
+
+test('decides early catch allowance and projected level impact', () => {
+  const oneMonTeam = [{ name: 'Lapras', hp: 90, level: 12 }];
+  const optionalTeam = [
+    { name: 'Lapras', hp: 90, level: 12 },
+    { name: 'Pikachu', hp: 90, level: 10 },
+    { name: 'Oddish', hp: 90, level: 9 },
+  ];
+  const fullEnoughTeam = [...optionalTeam, { name: 'Geodude', hp: 90, level: 9 }];
+
+  assert.equal(getEarlyCatchAllowance(oneMonTeam, 0, false), 'core');
+  assert.equal(getEarlyCatchAllowance(optionalTeam, 20, false), 'optional');
+  assert.equal(getEarlyCatchAllowance(fullEnoughTeam, 10, true), 'exceptional');
+  assert.equal(getEarlyCatchAllowance(fullEnoughTeam, 10, false), 'skip');
+  assert.equal(Number(getProjectedAverageLevelAfterCatch(optionalTeam, 12).toFixed(2)), 10.75);
 });
 
 test('scores route lookahead with decayed future value', () => {
