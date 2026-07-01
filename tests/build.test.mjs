@@ -56,6 +56,22 @@ test('keeps the modular source files available', () => {
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'types.d.ts')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'manifest.json')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'strategy-utils.ts')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'strategy', 'catch-scoring.ts')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'strategy', 'card-scoring.ts')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'strategy', 'item-scoring.ts')));
+  assert.ok(
+    existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'strategy', 'progress-strategy.ts')),
+  );
+  assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'strategy', 'route-scoring.ts')));
+  assert.ok(
+    existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'strategy', 'starter-scoring.ts')),
+  );
+  assert.ok(
+    existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'strategy', 'passive-scoring.ts')),
+  );
+  assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'team-utils.ts')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'text-utils.ts')));
+  assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'lib', 'type-matchups.ts')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'parts', '00-runtime-hooks.js')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'core', 'parts', '06-initialization.js')));
   assert.ok(existsSync(path.join(ROOT_DIR, 'src', 'data', 'generated', 'bundle-meta.json')));

@@ -1068,29 +1068,20 @@
 
         // 1. Trait synergy score — prioritize completing trait thresholds
         if (!storyMode) {
-            candidateTypes.forEach(type => {
-                const traitInfo = TRAIT_DATA[type];
-                if (!traitInfo) return;
-                const currentCount = traitCounts[type] || 0;
-                const tierValue = TRAIT_TIER_VALUE[traitInfo.tier] || 1;
-
-                // Near threshold (1 away from activating T1=2, T2=4, T3=6)
-                if (currentCount === 1 || currentCount === 3 || currentCount === 5) {
-                    score += tierValue * 2; // About to unlock next tier!
-                } else if (currentCount === 0) {
-                    score += tierValue * 0.5; // Starting a new synergy
-                } else {
-                    score += tierValue * 0.3; // Adding to existing
-                }
-            });
+            score += EasyPokelikeStrategyUtils.scoreTraitSynergy({
+                types: candidateTypes,
+                traitCounts,
+                traitData: TRAIT_DATA,
+                traitTierValues: TRAIT_TIER_VALUE
+            }).score;
         }
 
         // 2. Type coverage — fill gaps
-        candidateTypes.forEach(type => {
-            if (!teamTypes.includes(type)) {
-                score += coverageWeight;
-            }
-        });
+        score += EasyPokelikeStrategyUtils.scoreNewTypeCoverage({
+            candidateTypes,
+            teamTypes,
+            coverageWeight
+        }).score;
 
         // 3. Boss counter-pick
         if (bossTypes.length > 0) {

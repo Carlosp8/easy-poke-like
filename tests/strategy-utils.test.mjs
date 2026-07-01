@@ -2,20 +2,32 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  buildPassiveTeamProfileSnapshot,
   decideCatchDraftAction,
   foldText,
   getAttackCoverageScore,
+  getChallengeBossPrepTargets,
+  getChallengeMapOrdinal,
   getCenterNeedStatus,
   getDefensiveMatchupScore,
   getDefensiveScoreAgainstAttack,
   getEarlyCatchAllowance,
   getItemBoostType,
   getProjectedAverageLevelAfterCatch,
+  getPokemonBaseStatTotal,
+  getStoryBossPrepTargets,
+  getStoryLeagueBossKeys,
+  getStoryRegionKeyFromLabels,
+  getStatValue,
   hasMatchingAttackForItem,
   isHealingItem,
   isLowValueHeldItem,
   isTypeBoostItemUsefulForTeam,
   normalizeItemName,
+  detectPassiveTextSignals,
+  parseHpSnapshotFromText,
+  parseLevelFromText,
+  parseStatsFromTooltips,
   scoreBossRouteNode,
   scoreBotTacticRouteBonus,
   scoreBuffRouteNode,
@@ -24,17 +36,27 @@ import {
   scoreCatchRouteNode,
   scoreCenterRouteNode,
   scoreChallengeCatchBonus,
+  scoreChallengeItemBonus,
   scoreChallengeRouteBonus,
+  scoreChallengePassiveCardPurpose,
+  scoreChallengeStarterFit,
+  scoreGeneralPassiveCardFit,
   scoreHeldItemFit,
   scoreItemRouteNode,
   scoreLegendaryRouteNode,
+  scoreNewTypeCoverage,
+  scorePokemonStats,
+  scoreSinnohPassiveCardPurpose,
   scorePriorityTypes,
   scoreRouteLookahead,
-  scoreChallengeItemBonus,
   scoreStoryCatchBonus,
   scoreStoryItemBonus,
   scoreStoryLeagueCoverage,
+  scoreStoryPassiveCardPurpose,
   scoreStoryRouteBonus,
+  scoreStoryStarterFit,
+  scoreTraitPreviewRows,
+  scoreTraitSynergy,
   scoreTrainerRouteNode,
   scoreUnknownRouteNode,
   shouldPrioritizeEarlyTraining,
@@ -126,6 +148,61 @@ test('scores priority type lists with configurable rank weights', () => {
   assert.equal(storyPriority.reason, 'Ice,Psychic');
 });
 
+test('derives challenge and story prep targets from progress snapshots', () => {
+  const challengeTargets = {
+    map1: { avgLevel: 14, leadLevel: 17 },
+    map2: { avgLevel: 27, leadLevel: 32 },
+    late: { avgLevel: 66, leadLevel: 72 },
+    final: { avgLevel: 88, leadLevel: 94 },
+  };
+  const storyTargets = {
+    early: { avgLevel: 13, leadLevel: 16 },
+    mid: { avgLevel: 30, leadLevel: 34 },
+    league: { avgLevel: 68, leadLevel: 74 },
+    champion: { avgLevel: 78, leadLevel: 84 },
+  };
+  const leagueFinals = {
+    kanto: ['lorelei', 'bruno', 'agatha', 'lance', 'blue'],
+    sinnoh: ['aaron', 'bertha', 'flint', 'lucian', 'cynthia'],
+  };
+
+  assert.equal(getChallengeMapOrdinal({ reward: 250 }), 3);
+  assert.deepEqual(
+    getChallengeBossPrepTargets({
+      active: true,
+      progress: { mapOrdinal: 2 },
+      isMap2: true,
+      targets: challengeTargets,
+    }),
+    { avgLevel: 27, leadLevel: 32, reason: 'challenge-map2-carry-prep' },
+  );
+  assert.deepEqual(
+    getChallengeBossPrepTargets({
+      active: true,
+      isFinalBoss: true,
+      reward: 410,
+      targets: challengeTargets,
+    }),
+    { avgLevel: 88, leadLevel: 94, reason: 'challenge-final-carry-prep' },
+  );
+
+  assert.equal(
+    getStoryRegionKeyFromLabels({ labels: ['Stage Sinnoh'], mapPreference: 'auto' }),
+    'sinnoh',
+  );
+  assert.deepEqual(getStoryLeagueBossKeys('kanto', leagueFinals), leagueFinals.kanto);
+  assert.deepEqual(
+    getStoryBossPrepTargets({
+      active: true,
+      labels: ['Kanto Pokemon League'],
+      opponentName: 'blue',
+      targets: storyTargets,
+      leagueFinals,
+    }),
+    { avgLevel: 78, leadLevel: 84, reason: 'story-champion-team-prep' },
+  );
+});
+
 test('scores catch draft signals for shiny, legendary, duplicate and boss-counter cases', () => {
   const scored = scoreCatchDraftSignals({
     name: 'Zapdos',
@@ -144,6 +221,29 @@ test('scores catch draft signals for shiny, legendary, duplicate and boss-counte
   assert.match(scored.reason, /legendary/);
   assert.match(scored.reason, /duplicate-plan/);
   assert.match(scored.reason, /boss-counter/);
+});
+
+test('scores catch trait synergy and new type coverage independently', () => {
+  const synergy = scoreTraitSynergy({
+    types: ['Dark', 'Water', 'Bug'],
+    traitCounts: { Dark: 1, Water: 0, Bug: 2 },
+    traitData: {
+      Dark: { tier: 'S' },
+      Water: { tier: 'A' },
+      Bug: { tier: 'B' },
+    },
+    traitTierValues: { S: 10, A: 7, B: 4 },
+  });
+  const coverage = scoreNewTypeCoverage({
+    candidateTypes: ['Dark', 'Water'],
+    teamTypes: ['Water', 'Fire'],
+    coverageWeight: 5,
+  });
+
+  assert.equal(synergy.score, 24.7);
+  assert.match(synergy.reason, /Dark:threshold/);
+  assert.equal(coverage.score, 5);
+  assert.equal(coverage.reason, 'Dark');
 });
 
 test('scores challenge catch bonuses from candidate signals', () => {
@@ -172,6 +272,183 @@ test('scores story catch bonuses and league coverage from candidate signals', ()
   assert.equal(leagueCatch.score, 99.5);
   assert.equal(duplicate.score, -76);
   assert.match(duplicate.reason, /duplicate/);
+});
+
+test('scores challenge and story starter fit from precomputed strategy signals', () => {
+  const challengeStarter = scoreChallengeStarterFit({
+    active: true,
+    name: 'Dialga',
+    types: ['Steel', 'Dragon'],
+    attackTypes: ['Dragon'],
+    bossTypes: ['Dragon'],
+    allowedTypes: ['Steel'],
+    isShiny: true,
+    isMainCarry: true,
+    isLegendary: true,
+    bst: 680,
+    priorityTypeScore: 30,
+    config: { challengeShinyCatchBonus: 220 },
+  });
+  const disallowedStarter = scoreChallengeStarterFit({
+    active: true,
+    name: 'Pikachu',
+    types: ['Electric'],
+    attackTypes: ['Electric'],
+    allowedTypes: ['Fire'],
+    bst: 320,
+  });
+  const storyStarter = scoreStoryStarterFit({
+    active: true,
+    name: 'Lapras',
+    isMainCarry: true,
+    bst: 535,
+    leagueCoverageScore: 72,
+    priorityTypeScore: 18,
+  });
+
+  assert.equal(challengeStarter.score, 632.5);
+  assert.match(challengeStarter.reason, /shiny/);
+  assert.match(challengeStarter.reason, /allowed-type/);
+  assert.equal(disallowedStarter.score, -80);
+  assert.match(disallowedStarter.reason, /disallowed-type/);
+  assert.equal(Math.round(storyStarter.score * 10) / 10, 180);
+  assert.match(storyStarter.reason, /league-coverage/);
+});
+
+test('parses card text snapshots without DOM dependencies', () => {
+  assert.equal(parseLevelFromText('Lapras Nv. 42'), 42);
+  assert.deepEqual(parseHpSnapshotFromText('87 / 120 HP'), {
+    current: 87,
+    max: 120,
+    percent: 73,
+  });
+  assert.deepEqual(
+    parseStatsFromTooltips([
+      'HP: 100',
+      'Atk: 120',
+      'Sp. Atk: 90',
+      'Special Defense: 80',
+      'Speed: 110',
+    ]),
+    { hp: 100, atk: 120, spa: 90, spd: 80, spe: 110 },
+  );
+});
+
+test('scores card stats and trait preview rows without DOM dependencies', () => {
+  const stats = {
+    hp: 100,
+    atk: 120,
+    spa: 90,
+    def: 80,
+    spd: 70,
+    speed: 100,
+  };
+  const statScore = scorePokemonStats({
+    ...stats,
+  });
+  const traitPreviewScore = scoreTraitPreviewRows({
+    rows: [
+      { text: 'new Fire 1/2', className: 'trait-up', types: ['Fire'] },
+      { text: 'Water 2/2', className: '', types: ['Water'] },
+    ],
+    traitData: {
+      Fire: { tier: 'S' },
+      Water: { tier: 'A' },
+    },
+    traitTierValues: { S: 10, A: 7 },
+  });
+
+  assert.equal(getStatValue(stats, 'special', 'spa'), 90);
+  assert.equal(getPokemonBaseStatTotal(stats), 560);
+  assert.equal(Math.round(statScore * 10) / 10, 32.3);
+  assert.equal(traitPreviewScore, 52.6);
+});
+
+test('scores passive card purposes from reusable text and strategy signals', () => {
+  const weakProfile = buildPassiveTeamProfileSnapshot({
+    alive: [{ isShiny: true, types: ['Dark'] }, { types: ['Water'] }],
+    primary: { types: ['Dark'], attackTypes: ['Dark'] },
+    bestBst: 455,
+    primaryBst: 455,
+    hasLegendary: false,
+    hasMainCarry: false,
+    bossTypes: ['Dragon'],
+    teamAttackTypes: ['Dark'],
+    trainingPriority: true,
+    weakCoreBstThreshold: 500,
+    strongCarryBstThreshold: 540,
+  });
+  const signals = detectPassiveTextSignals(
+    'Shiny passive: extra attack, crit damage, speed, heal and level growth',
+  );
+  const storyPassive = scoreStoryPassiveCardPurpose({
+    active: true,
+    passiveTypes: ['Dark'],
+    signals,
+    priorityTypeScore: 30,
+  });
+  const sinnohPassive = scoreSinnohPassiveCardPurpose({
+    active: true,
+    passiveTypes: ['Water', 'Fairy'],
+    signals: {
+      lowersOffense: true,
+      isSurvival: true,
+    },
+    typeScore: 20,
+  });
+  const challengePassive = scoreChallengePassiveCardPurpose({
+    active: true,
+    passiveTypes: ['Fairy'],
+    signals: {
+      isDamage: true,
+      isScaling: true,
+    },
+    isShinyPassive: true,
+    hasShiny: false,
+    underleveled: true,
+    carryTypes: ['Fairy'],
+    traitCounts: { Fairy: 1 },
+    bossTypes: ['Dragon'],
+    priorityTypeScore: 36,
+    config: { challengeCarryBuffNodeBonus: 980 },
+  });
+  const generalPassive = scoreGeneralPassiveCardFit({
+    passiveTypes: ['Dark'],
+    signals: {
+      isCrit: true,
+      isDamage: true,
+    },
+    isShinyPassive: true,
+    avgHP: 60,
+    hasCarry: true,
+    teamTypeCount: 5,
+    traitCounts: { Dark: 2, Bug: 1, Electric: 1 },
+    traitTierValues: { S: 10, A: 7, B: 4, C: 2 },
+    traitData: { Dark: { tier: 'S' } },
+    profile: {
+      hasShiny: true,
+      hasStrongCarry: true,
+      shinyTypes: ['Dark'],
+      primaryTypes: ['Dark'],
+      bossTypes: ['Psychic'],
+      uncoveredBossTypes: ['Psychic'],
+    },
+    teamUserTypes: ['Dark'],
+  });
+
+  assert.equal(weakProfile.weakCore, true);
+  assert.equal(weakProfile.hasShiny, true);
+  assert.equal(weakProfile.hasStrongCarry, false);
+  assert.equal(weakProfile.bossCoveragePoor, true);
+  assert.deepEqual(weakProfile.uncoveredBossTypes, ['Dragon']);
+  assert.equal(storyPassive.score, 116);
+  assert.match(storyPassive.reason, /story/);
+  assert.equal(sinnohPassive.score, 170);
+  assert.match(sinnohPassive.reason, /offense-control/);
+  assert.equal(challengePassive.score, 313);
+  assert.match(challengePassive.reason, /challenge/);
+  assert.equal(generalPassive.score, 325);
+  assert.match(generalPassive.reason, /baseline/);
 });
 
 test('scores challenge item bonuses from reusable item signals', () => {

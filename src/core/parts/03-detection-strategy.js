@@ -252,8 +252,7 @@
     }
 
     function parseLevelText(text) {
-        const match = (text || '').match(/(?:lv|lvl|nivel|nv\.?)\s*(\d+)/i);
-        return match ? Number.parseInt(match[1], 10) : 0;
+        return EasyPokelikeStrategyUtils.parseLevelFromText(text || '');
     }
 
     function getCachedPokemonInfo(name) {
@@ -325,15 +324,7 @@
 
     function parseCardHp(card) {
         const hpText = card?.querySelector('.hp-text')?.innerText || '';
-        const hpMatch = hpText.match(/(\d+)\s*\/\s*(\d+)/);
-        if (!hpMatch) return null;
-        const current = Number.parseInt(hpMatch[1], 10);
-        const max = Number.parseInt(hpMatch[2], 10);
-        return {
-            current,
-            max,
-            percent: max > 0 ? Math.round((current / max) * 100) : 0
-        };
+        return EasyPokelikeStrategyUtils.parseHpSnapshotFromText(hpText);
     }
 
     function parsePokemonInfoFromCard(card, source = 'poke-card') {
@@ -1354,28 +1345,18 @@
     }
 
     function scoreSinnohPassiveCardPurpose({ passiveTypes, text, team, isShinyPassive, isSpeed, isSurvival, isDamage }) {
-        if (!isSinnohTowerRunContext()) return 0;
-
-        const typeScore = scoreSinnohPassivePlanForTypes(passiveTypes, team, { isShiny: isShinyPassive });
-        const lowersOffense = Boolean(
-            text.match(/lower|reduce|decrease|drop|debuff|baj|reduc|dismin|resta/) &&
-            text.match(/atk|attack|ataque|sp\.?\s*atk|special attack|ataque especial|ofens/)
-        );
-        const raisesDefense = Boolean(text.match(/def|defense|defensa|sp\.?\s*def|resist|shield|escudo|armor|armadura/));
-        const types = normalizeTypeList(passiveTypes);
-        let score = typeScore;
-
-        if (isSpeed || text.match(/first|priority|primero|velocidad/)) score += 54;
-        if (lowersOffense) score += 58;
-        if (isSurvival || raisesDefense) score += 36;
-        if (isDamage && types.includes('Dragon')) score += 22;
-        if (types.includes('Rock') && (raisesDefense || isSurvival)) score += 32;
-        if (types.includes('Water') && lowersOffense) score += 34;
-        if (types.includes('Fairy') && lowersOffense) score += 22;
-        if (types.includes('Flying') && isSpeed) score += 20;
-        if (types.length === 0 && !(isSpeed || lowersOffense || raisesDefense || isSurvival)) score -= 14;
-
-        return score;
+        const signals = {
+            ...EasyPokelikeStrategyUtils.detectPassiveTextSignals(text),
+            isSpeed,
+            isSurvival,
+            isDamage
+        };
+        return EasyPokelikeStrategyUtils.scoreSinnohPassiveCardPurpose({
+            active: isSinnohTowerRunContext(),
+            passiveTypes,
+            signals,
+            typeScore: scoreSinnohPassivePlanForTypes(passiveTypes, team, { isShiny: isShinyPassive })
+        }).score;
     }
 
     function isChallengeStrategyActive(mode = activeAutoRunMode) {
@@ -1385,33 +1366,21 @@
     }
 
     function getChallengeMapOrdinal(progress = getTowerProgressContext()) {
-        if (progress.mapOrdinal !== null && progress.mapOrdinal !== undefined) return progress.mapOrdinal;
-        if (progress.reward > 0) return Math.max(1, Math.ceil(progress.reward / 100));
-        return Math.max(1, progress.round || 1);
+        return EasyPokelikeStrategyUtils.getChallengeMapOrdinal(progress);
     }
 
     function getChallengeBossPrepTargets(context = {}) {
-        if (!isChallengeStrategyActive()) return null;
-
-        const targets = CONFIG.CHALLENGE_BOSS_PREP_TARGETS || {};
-        const progress = context.progress || getTowerProgressContext();
-        const mapOrdinal = getChallengeMapOrdinal(progress);
-        let key = 'map1';
-
-        if (context.isFinalBoss || (context.reward || 0) >= 400) key = 'final';
-        else if (context.isBigBoss || (context.reward || 0) >= 300) key = 'big';
-        else if (mapOrdinal >= 5 || (context.round || 1) >= 3) key = 'late';
-        else if (mapOrdinal >= 4) key = 'map4';
-        else if (mapOrdinal >= 3) key = 'map3';
-        else if (mapOrdinal >= 2 || context.isMap2) key = 'map2';
-
-        const target = targets[key] || targets.map1 || null;
-        if (!target) return null;
-        return {
-            avgLevel: target.avgLevel,
-            leadLevel: target.leadLevel,
-            reason: `challenge-${key}-carry-prep`
-        };
+        return EasyPokelikeStrategyUtils.getChallengeBossPrepTargets({
+            active: isChallengeStrategyActive(),
+            progress: context.progress || getTowerProgressContext(),
+            isFinalBoss: context.isFinalBoss,
+            isBigBoss: context.isBigBoss,
+            isMap2: context.isMap2,
+            reward: context.reward,
+            round: context.round,
+            opponentName: context.opponentName,
+            targets: CONFIG.CHALLENGE_BOSS_PREP_TARGETS || {}
+        });
     }
 
     function getChallengePriorityTypeScore(types = []) {
@@ -1593,43 +1562,35 @@
         isMultiHit
     }) {
         const strategy = getChallengeStrategyContext(team || [], opponentProfile);
-        if (!strategy.active) return 0;
+        const signals = {
+            ...EasyPokelikeStrategyUtils.detectPassiveTextSignals(text),
+            isSpeed,
+            isSurvival,
+            isDamage,
+            isSustain,
+            isScaling,
+            isMultiHit
+        };
 
-        const types = normalizeTypeList(passiveTypes || []);
-        const carryTypes = normalizeTypeList([
-            ...(strategy.carry?.types || []),
-            ...getUnitAttackTypes(strategy.carry)
-        ]);
-        const traitCounts = getTeamTraitCounts(team || []);
-        const lowersOffense = Boolean(
-            text.match(/lower|reduce|decrease|drop|debuff|baj|reduc|dismin|resta/) &&
-            text.match(/atk|attack|ataque|sp\.?\s*atk|special attack|ataque especial|ofens/)
-        );
-        const raisesDefense = Boolean(text.match(/def|defense|defensa|sp\.?\s*def|resist|shield|escudo|armor|armadura/));
-        let score = 0;
-
-        if (isShinyPassive) score += strategy.hasShiny ? 48 : 96;
-        if (isDamage || isMultiHit || text.match(/crit|critical|critico/)) score += 42;
-        if (isSpeed || text.match(/first|priority|primero|velocidad/)) score += 44;
-        if (isSustain || isSurvival || raisesDefense || lowersOffense) score += 36;
-        if (isScaling || text.match(/level|lvl|xp|experiencia|nivel|growth|crec/)) score += strategy.underleveled ? 44 : 18;
-        if (strategy.carryNeedsItem && text.match(/item|held|equip|objeto|sujeto/)) score += 38;
-
-        types.forEach(type => {
-            if (carryTypes.includes(type)) score += CONFIG.CHALLENGE_CARRY_BUFF_NODE_BONUS / 28;
-            const count = traitCounts[type] || 0;
-            const nextThreshold = getNextTraitThreshold(count);
-            if (nextThreshold && count + (isShinyPassive ? 2 : 1) >= nextThreshold) score += 20;
-            if (strategy.bossTypes.length > 0 && getAttackCoverageScore([type], strategy.bossTypes) > 0) score += 28;
-            if (strategy.bossTypes.length > 0 && getDefensiveMatchupScore([type], strategy.bossTypes) > 0) score += 12;
-        });
-
-        score += getChallengePriorityTypeScore(types);
-        if (types.length === 0 && !(isDamage || isSpeed || isSustain || isSurvival || isScaling || raisesDefense || lowersOffense)) {
-            score -= 18;
-        }
-
-        return score;
+        return EasyPokelikeStrategyUtils.scoreChallengePassiveCardPurpose({
+            active: strategy.active,
+            passiveTypes,
+            signals,
+            isShinyPassive,
+            hasShiny: strategy.hasShiny,
+            underleveled: strategy.underleveled,
+            carryNeedsItem: strategy.carryNeedsItem,
+            carryTypes: [
+                ...(strategy.carry?.types || []),
+                ...getUnitAttackTypes(strategy.carry)
+            ],
+            traitCounts: getTeamTraitCounts(team || []),
+            bossTypes: strategy.bossTypes,
+            priorityTypeScore: getChallengePriorityTypeScore(passiveTypes || []),
+            config: {
+                challengeCarryBuffNodeBonus: CONFIG.CHALLENGE_CARRY_BUFF_NODE_BONUS
+            }
+        }).score;
     }
 
     function scoreChallengeStarterFit(name, types, isShiny = false) {
@@ -1640,22 +1601,23 @@
         const allowedTypes = normalizeTypeList(activeChallengeContext?.allowedTypes || []);
         const stats = getPokemonBaseStats(name);
         const bst = getPokemonBaseStatTotal(stats);
-        let score = 0;
 
-        if (isShiny) score += CONFIG.CHALLENGE_SHINY_CATCH_BONUS + 80;
-        if (name && isMainCarryName(name)) score += 95;
-        if (name && isLegendaryPokemonName(name)) score += 70;
-        if (bst) score += Math.max(0, bst - 450) / 4;
-        score += getChallengePriorityTypeScore(normalizedTypes) * 1.2;
-        if (allowedTypes.length > 0) {
-            score += normalizedTypes.some(type => allowedTypes.includes(type)) ? 55 : -80;
-        }
-        if (bossTypes.length > 0) {
-            score += getAttackCoverageScore(attackTypes, bossTypes) * 5;
-            score += getDefensiveMatchupScore(normalizedTypes, bossTypes) * 3;
-        }
-
-        return score;
+        return EasyPokelikeStrategyUtils.scoreChallengeStarterFit({
+            active: true,
+            name,
+            types: normalizedTypes,
+            attackTypes,
+            bossTypes,
+            allowedTypes,
+            isShiny,
+            isMainCarry: Boolean(name && isMainCarryName(name)),
+            isLegendary: Boolean(name && isLegendaryPokemonName(name)),
+            bst,
+            priorityTypeScore: getChallengePriorityTypeScore(normalizedTypes),
+            config: {
+                challengeShinyCatchBonus: CONFIG.CHALLENGE_SHINY_CATCH_BONUS
+            }
+        }).score;
     }
 
     function scoreStartingItemChoice(choice, team, opponentProfile = null) {
@@ -1680,29 +1642,16 @@
     }
 
     function getStoryRegionKey(labels = getProgressLabels()) {
-        const text = foldText([
-            ...(labels || []),
-            currentMapKey || '',
-            activeChallengeContext?.target || '',
-            getBotControlMapPreference() || ''
-        ].join(' '));
-        const regionAliases = {
-            kanto: ['kanto'],
-            johto: ['johto'],
-            hoenn: ['hoenn'],
-            sinnoh: ['sinnoh', 'shinnoh'],
-            unova: ['unova', 'teselia']
-        };
-
-        for (const [region, aliases] of Object.entries(regionAliases)) {
-            if (aliases.some(alias => text.includes(alias))) return region;
-        }
-        return '';
+        return EasyPokelikeStrategyUtils.getStoryRegionKeyFromLabels({
+            labels,
+            currentMapKey,
+            activeChallengeTarget: activeChallengeContext?.target || '',
+            mapPreference: getBotControlMapPreference() || ''
+        });
     }
 
     function getStoryLeagueBossKeys(region = getStoryRegionKey()) {
-        if (region && STORY_LEAGUE_FINALS[region]) return STORY_LEAGUE_FINALS[region];
-        return [...new Set(Object.values(STORY_LEAGUE_FINALS).flat())];
+        return EasyPokelikeStrategyUtils.getStoryLeagueBossKeys(region, STORY_LEAGUE_FINALS);
     }
 
     function getBossProfileByKey(key) {
@@ -1734,33 +1683,22 @@
     }
 
     function getStoryBossPrepTargets(context = {}) {
-        if (!isStoryStrategyActive()) return null;
-
-        const targets = CONFIG.STORY_BOSS_PREP_TARGETS || {};
-        const progress = context.progress || getTowerProgressContext();
-        const labelText = progress.labelText || foldText((getProgressLabels() || []).join(' '));
-        const region = getStoryRegionKey();
-        const leagueKeys = getStoryLeagueBossKeys(region).map(foldText);
-        const opponentName = foldText(context.opponentName || '');
-        const isLeagueText = Boolean(labelText.match(/liga|league|elite|alto mando|champion|campeon|final boss|stage final boss/));
-        const isLeagueBoss = opponentName && leagueKeys.includes(opponentName);
-        const championKey = leagueKeys[leagueKeys.length - 1] || '';
-        const isChampion = Boolean(context.isFinalBoss || (opponentName && opponentName === championKey));
-        const reward = context.reward || progress.reward || 0;
-        const round = context.round || progress.round || 1;
-
-        let key = 'early';
-        if (isChampion || reward >= 400) key = 'champion';
-        else if (isLeagueText || isLeagueBoss || reward >= 300) key = 'league';
-        else if (context.isBigBoss || round >= 3 || reward >= 200) key = 'late';
-        else if (context.isMap2 || round >= 2 || reward >= 100) key = 'mid';
-
-        const target = targets[key] || targets.early;
-        return {
-            avgLevel: target.avgLevel,
-            leadLevel: target.leadLevel,
-            reason: `story-${key}-team-prep`
-        };
+        return EasyPokelikeStrategyUtils.getStoryBossPrepTargets({
+            active: isStoryStrategyActive(),
+            progress: context.progress || getTowerProgressContext(),
+            labels: getProgressLabels() || [],
+            currentMapKey,
+            activeChallengeTarget: activeChallengeContext?.target || '',
+            mapPreference: getBotControlMapPreference() || '',
+            isFinalBoss: context.isFinalBoss,
+            isBigBoss: context.isBigBoss,
+            isMap2: context.isMap2,
+            reward: context.reward,
+            round: context.round,
+            opponentName: context.opponentName,
+            targets: CONFIG.STORY_BOSS_PREP_TARGETS || {},
+            leagueFinals: STORY_LEAGUE_FINALS
+        });
     }
 
     function getStoryPriorityTypeScore(types = []) {
@@ -1919,15 +1857,16 @@
         const story = getStoryStrategyContext([], detectNextOpponentProfile());
         const stats = getPokemonBaseStats(name);
         const bst = getPokemonBaseStatTotal(stats);
-        let score = 0;
-
-        if (isShiny) score += 18;
-        if (name && isLegendaryPokemonName(name)) score += 70;
-        if (name && isMainCarryName(name)) score += 60;
-        if (bst) score += Math.max(0, bst - 430) / 3.5;
-        score += scoreStoryLeagueCoverage(attacks, normalizedTypes, story);
-        score += getStoryPriorityTypeScore(normalizedTypes);
-        return score;
+        return EasyPokelikeStrategyUtils.scoreStoryStarterFit({
+            active: true,
+            name,
+            isShiny,
+            isLegendary: Boolean(name && isLegendaryPokemonName(name)),
+            isMainCarry: Boolean(name && isMainCarryName(name)),
+            bst,
+            leagueCoverageScore: scoreStoryLeagueCoverage(attacks, normalizedTypes, story),
+            priorityTypeScore: getStoryPriorityTypeScore(normalizedTypes)
+        }).score;
     }
 
     function getTierScore(itemName) {
@@ -2699,12 +2638,7 @@
     }
 
     function getPokemonStat(stats, ...keys) {
-        if (!stats) return 0;
-        for (const key of keys) {
-            const value = stats[key];
-            if (Number.isFinite(value)) return value;
-        }
-        return 0;
+        return EasyPokelikeStrategyUtils.getStatValue(stats, ...keys);
     }
 
     function isSpecialAttacker(pokemon) {
@@ -3807,76 +3741,38 @@
     function getPassiveTeamProfile(team, opponentProfile = null) {
         const alive = getAliveTeam(team || []);
         const primary = getPrimaryCarry(team);
-        const shinyUnits = alive.filter(p => p.isShiny);
         const bestBst = Math.max(0, ...alive.map(p => getPokemonBaseStatTotal(getPokemonBaseStats(p.name))));
         const primaryBst = primary ? getPokemonBaseStatTotal(getPokemonBaseStats(primary.name)) : 0;
         const hasLegendary = alive.some(p => isLegendaryPokemonName(p.name));
         const hasMainCarry = alive.some(p => isMainCarryUnit(p));
         const bossTypes = opponentProfile ? getOpponentTeamTypes(opponentProfile) : detectBossTypes();
         const teamAttackTypes = normalizeTypeList(alive.flatMap(p => getUnitAttackTypes(p)));
-        const uncoveredBossTypes = bossTypes.filter(type => getAttackCoverageScore(teamAttackTypes, [type]) <= 0);
-        const bossAttackScore = bossTypes.length > 0 ? getAttackCoverageScore(teamAttackTypes, bossTypes) : 0;
         const prepStatus = getBossPrepStatus(team, opponentProfile);
-        const weakCore = alive.length > 0 &&
-                         !hasLegendary &&
-                         !hasMainCarry &&
-                         (!bestBst || bestBst < CONFIG.PASSIVE_WEAK_CORE_BST_THRESHOLD);
-
-        return {
+        const profile = EasyPokelikeStrategyUtils.buildPassiveTeamProfileSnapshot({
             alive,
-            primary,
-            primaryBst,
+            primary: primary ? {
+                types: primary.types || [],
+                attackTypes: getUnitAttackTypes(primary)
+            } : null,
             bestBst,
+            primaryBst,
             hasLegendary,
             hasMainCarry,
-            hasShiny: shinyUnits.length > 0,
-            hasStrongCarry: hasLegendary || hasMainCarry || primaryBst >= CONFIG.LEGENDARY_CATCH_MIN_BST,
-            weakCore,
-            underleveled: shouldPrioritizeEarlyTraining(team, opponentProfile) || (prepStatus.avgDeficit + prepStatus.leadDeficit) > 0,
-            shinyTypes: normalizeTypeList(shinyUnits.flatMap(p => p.types || [])),
-            primaryTypes: normalizeTypeList([...(primary?.types || []), ...getUnitAttackTypes(primary)]),
-            teamAttackTypes,
             bossTypes,
-            uncoveredBossTypes,
-            bossCoveragePoor: bossTypes.length > 0 && (uncoveredBossTypes.length > 0 || bossAttackScore < bossTypes.length * 2.5),
-            prepStatus
-        };
-    }
-
-    function scorePassiveTypeContext(passiveTypes, team, traitCounts, profile) {
-        let score = 0;
-        const alive = profile.alive || [];
-
-        passiveTypes.forEach(type => {
-            const typeUsers = alive.filter(p => {
-                const unitTypes = normalizeTypeList(p.types || []);
-                const attackTypes = getUnitAttackTypes(p);
-                return unitTypes.includes(type) || attackTypes.includes(type);
-            });
-            const hasTeamUser = typeUsers.length > 0 || (traitCounts[type] || 0) > 0;
-            const typeBossScore = profile.bossTypes.length > 0 ? getAttackCoverageScore([type], profile.bossTypes) : 0;
-            const coversUncoveredBossType = profile.uncoveredBossTypes.some(bossType => getAttackCoverageScore([type], [bossType]) > 0);
-
-            if (profile.shinyTypes.includes(type)) {
-                score += CONFIG.PASSIVE_SHINY_TYPE_BONUS + (traitCounts[type] || 0) * 3;
-            }
-            if (profile.primaryTypes.includes(type) && profile.hasStrongCarry) {
-                score += CONFIG.PASSIVE_STRONG_CARRY_TYPE_BONUS;
-            }
-            if (typeBossScore > 0) {
-                score += Math.min(42, CONFIG.PASSIVE_BOSS_COUNTER_BONUS + typeBossScore * 5);
-                if (coversUncoveredBossType) score += CONFIG.PASSIVE_UNCOVERED_BOSS_TYPE_BONUS;
-                if (!hasTeamUser) score -= CONFIG.PASSIVE_OFF_TEAM_TYPE_PENALTY;
-            } else if (!hasTeamUser) {
-                score -= CONFIG.PASSIVE_OFF_TEAM_TYPE_PENALTY;
-            }
-
-            if (profile.weakCore && hasTeamUser && typeBossScore > 0) {
-                score += 10;
-            }
+            teamAttackTypes,
+            trainingPriority: shouldPrioritizeEarlyTraining(team, opponentProfile),
+            prepDeficit: (prepStatus.avgDeficit || 0) + (prepStatus.leadDeficit || 0),
+            weakCoreBstThreshold: CONFIG.PASSIVE_WEAK_CORE_BST_THRESHOLD,
+            strongCarryBstThreshold: CONFIG.LEGENDARY_CATCH_MIN_BST
         });
 
-        return score;
+        return {
+            ...profile,
+            alive,
+            primary,
+            teamAttackTypes,
+            prepStatus
+        };
     }
 
     function scorePassiveCard(card, team, opponentProfile = null) {
@@ -3889,100 +3785,73 @@
         const profile = getPassiveTeamProfile(team, opponentProfile);
         const passiveTypes = detectTypesInText(text);
         const isShinyPassive = isShinyPassiveCard(card, text);
-        const isSustain = Boolean(text.match(/heal|restore|drain|lifesteal|cur|recuper|dren/));
-        const isSurvival = Boolean(text.match(/survive|sturdy|revive|faint|ko|resist|defen|shield|escudo/));
-        const isDamage = Boolean(text.match(/damage|dano|power|move|ataque|golpe|boost|aument/));
-        const isSpeed = Boolean(text.match(/speed|first|lead|priority|velocidad|primero/));
-        const isScaling = Boolean(text.match(/level|lvl|xp|experiencia|nivel|evol|growth|crec/));
-        const isMultiHit = Boolean(text.match(/extra attack|double|twice|ataque extra|doble/));
-        let score = 35;
+        const signals = EasyPokelikeStrategyUtils.detectPassiveTextSignals(text);
 
         if (isStoryStrategyActive()) {
-            let storyScore = 16;
-            if (isDamage || isMultiHit || text.match(/crit|critical|critico/)) storyScore += 28;
-            if (isSpeed) storyScore += 22;
-            if (isSustain || isSurvival) storyScore += 20;
-            if (isScaling) storyScore += 18;
-            storyScore += getStoryPriorityTypeScore(passiveTypes) * 0.4;
-            return storyScore;
+            return EasyPokelikeStrategyUtils.scoreStoryPassiveCardPurpose({
+                active: true,
+                passiveTypes,
+                signals,
+                priorityTypeScore: getStoryPriorityTypeScore(passiveTypes)
+            }).score;
         }
 
-        if (isShinyPassive) score += CONFIG.PASSIVE_SHINY_CARD_BONUS + (profile.hasShiny ? 18 : 0);
-        if (profile.hasShiny && text.match(/shiny|variocolor|brillante/)) score += 22;
-
-        if (isSustain) score += avgHP < 70 ? 38 : 22;
-        if (text.match(/crit|critical|critico/)) score += 18 + (traitCounts.Dark || 0) * 8;
-        if (isSurvival) score += 26;
-        if (isDamage) score += 18;
-        if (isSpeed) score += 14;
-        if (isScaling) score += 18 + (traitCounts.Bug || 0) * 7;
-        if (text.match(/distinct|different|cada tipo|tipos distintos/)) score += getTeamTypes(team).length * 7;
-        if (isMultiHit) score += 18 + (traitCounts.Electric || 0) * 7;
-        if (text.match(/execute|remata|ejecut/)) score += 16 + (traitCounts.Ghost || 0) * 8;
-        if (carry && isSustain) score += 18;
-        if (carry && passiveTypes.includes('Grass')) score += 18 + (traitCounts.Grass || 0) * 6;
-        score += scoreSinnohPassiveCardPurpose({
+        const sinnohScore = scoreSinnohPassiveCardPurpose({
             passiveTypes,
             text,
             team,
             isShinyPassive,
-            isSpeed,
-            isSurvival,
-            isDamage
+            isSpeed: signals.isSpeed,
+            isSurvival: signals.isSurvival,
+            isDamage: signals.isDamage
         });
-        score += scoreChallengePassiveCardPurpose({
+        const challengeScore = scoreChallengePassiveCardPurpose({
             passiveTypes,
             text,
             team,
             opponentProfile,
             isShinyPassive,
-            isSpeed,
-            isSurvival,
-            isDamage,
-            isSustain,
-            isScaling,
-            isMultiHit
+            isSpeed: signals.isSpeed,
+            isSurvival: signals.isSurvival,
+            isDamage: signals.isDamage,
+            isSustain: signals.isSustain,
+            isScaling: signals.isScaling,
+            isMultiHit: signals.isMultiHit
         });
+        const teamUserTypes = normalizeTypeList((profile.alive || []).flatMap(p => [
+            ...(p.types || []),
+            ...getUnitAttackTypes(p)
+        ]));
 
-        if (profile.weakCore) {
-            if (isScaling) score += CONFIG.PASSIVE_WEAK_CORE_SCALING_BONUS;
-            if (isSustain || isSurvival) score += CONFIG.PASSIVE_WEAK_CORE_SURVIVAL_BONUS;
-            if (isDamage || isMultiHit || text.match(/crit|critical|critico/)) score += 12;
-            if (passiveTypes.length === 0 && profile.bossCoveragePoor && (isDamage || isSustain || isSurvival || isScaling)) score += 10;
-        } else if (profile.hasStrongCarry) {
-            if (isSustain || isSpeed || isDamage || isMultiHit) score += 8;
-        }
-
-        if (profile.underleveled && isScaling) score += 16;
-        if (profile.bossCoveragePoor && (isSurvival || isSustain)) score += 8;
-
-        passiveTypes.forEach(type => {
-            const count = traitCounts[type] || 0;
-            const traitInfo = TRAIT_DATA[type];
-            const tierValue = traitInfo ? (TRAIT_TIER_VALUE[traitInfo.tier] || 1) : 1;
-            score += count > 0 ? count * 12 + tierValue : -6;
-        });
-        score += scorePassiveTypeContext(passiveTypes, team, traitCounts, profile);
-
-        return score;
+        return EasyPokelikeStrategyUtils.scoreGeneralPassiveCardFit({
+            passiveTypes,
+            signals,
+            isShinyPassive,
+            avgHP,
+            hasCarry: Boolean(carry),
+            teamTypeCount: getTeamTypes(team).length,
+            traitCounts,
+            traitTierValues: TRAIT_TIER_VALUE,
+            traitData: TRAIT_DATA,
+            profile,
+            teamUserTypes,
+            config: {
+                passiveShinyCardBonus: CONFIG.PASSIVE_SHINY_CARD_BONUS,
+                passiveWeakCoreScalingBonus: CONFIG.PASSIVE_WEAK_CORE_SCALING_BONUS,
+                passiveWeakCoreSurvivalBonus: CONFIG.PASSIVE_WEAK_CORE_SURVIVAL_BONUS,
+                passiveShinyTypeBonus: CONFIG.PASSIVE_SHINY_TYPE_BONUS,
+                passiveStrongCarryTypeBonus: CONFIG.PASSIVE_STRONG_CARRY_TYPE_BONUS,
+                passiveBossCounterBonus: CONFIG.PASSIVE_BOSS_COUNTER_BONUS,
+                passiveUncoveredBossTypeBonus: CONFIG.PASSIVE_UNCOVERED_BOSS_TYPE_BONUS,
+                passiveOffTeamTypePenalty: CONFIG.PASSIVE_OFF_TEAM_TYPE_PENALTY
+            }
+        }).score + sinnohScore + challengeScore;
     }
 
     function parseCardStats(card) {
-        const stats = {};
-        card.querySelectorAll('.stat-row[data-tooltip], [data-tooltip]').forEach(row => {
-            const tooltip = row.getAttribute('data-tooltip') || '';
-            const match = tooltip.match(/(hp|atk|attack|def|defense|spa|sp\.?\s*atk|special attack|special|spd|sp\.?\s*def|special defense|spe|speed)\s*:\s*(\d+)/i);
-            if (!match) return;
-            const key = foldText(match[1]).replace(/\./g, '').replace(/\s+/g, '');
-            const value = Number.parseInt(match[2], 10);
-            if (key === 'hp') stats.hp = value;
-            else if (key === 'atk' || key === 'attack') stats.atk = value;
-            else if (key === 'def' || key === 'defense') stats.def = value;
-            else if (key === 'spa' || key === 'spatk' || key === 'specialattack' || key === 'special') stats.spa = value;
-            else if (key === 'spd' || key === 'spdef' || key === 'specialdefense') stats.spd = value;
-            else if (key === 'spe' || key === 'speed') stats.spe = value;
-        });
-        return stats;
+        const tooltips = Array.from(card.querySelectorAll('.stat-row[data-tooltip], [data-tooltip]'))
+            .map(row => row.getAttribute('data-tooltip') || '');
+        return EasyPokelikeStrategyUtils.parseStatsFromTooltips(tooltips);
     }
 
     function scorePokemonStatsFromCard(card) {
@@ -3990,34 +3859,24 @@
     }
 
     function scorePokemonStats(stats) {
-        if (!stats || Object.keys(stats).length === 0) return 0;
-        const offense = Math.max(stats.atk || 0, stats.special || 0, stats.spa || 0, stats.spatk || 0);
-        const speed = stats.speed || stats.spe || 0;
-        const bulk = (stats.hp || 0) + (stats.def || 0) + (stats.spdef || 0) + (stats.spd || 0);
-        return (offense * 0.35 + speed * 0.25 + bulk * 0.12) / 3;
+        return EasyPokelikeStrategyUtils.scorePokemonStats(stats);
     }
 
     function scoreTraitPreviewFromCard(card) {
-        let score = 0;
-        const rows = card.querySelectorAll('.trait-preview-row, [class*="trait-preview"], [class*="trait"]');
-        rows.forEach(row => {
-            const text = foldText(row.innerText || '');
-            if (!text) return;
-            if (row.className.toString().includes('up') || text.includes('new') || text.includes('nuevo')) score += 12;
-            const countMatch = text.match(/(\d+)\s*\/\s*(\d+)/);
-            if (countMatch) {
-                const current = Number.parseInt(countMatch[1], 10);
-                const needed = Number.parseInt(countMatch[2], 10);
-                const missing = needed - current;
-                if (missing <= 0) score += 18;
-                else if (missing === 1) score += 9;
-            }
-            detectTypesInText(text).forEach(type => {
-                const traitInfo = TRAIT_DATA[type];
-                score += traitInfo ? (TRAIT_TIER_VALUE[traitInfo.tier] || 1) * 0.8 : 1;
+        const rows = Array.from(card.querySelectorAll('.trait-preview-row, [class*="trait-preview"], [class*="trait"]'))
+            .map(row => {
+                const text = foldText(row.innerText || '');
+                return {
+                    text,
+                    className: row.className.toString(),
+                    types: detectTypesInText(text)
+                };
             });
+        return EasyPokelikeStrategyUtils.scoreTraitPreviewRows({
+            rows,
+            traitData: TRAIT_DATA,
+            traitTierValues: TRAIT_TIER_VALUE
         });
-        return score;
     }
 
     // ╔══════════════════════════════════════════════════════════════╗

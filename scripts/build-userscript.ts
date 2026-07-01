@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { transform } from 'esbuild';
+import { build } from 'esbuild';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = path.resolve(SCRIPT_DIR, '..');
@@ -60,15 +60,21 @@ async function readCoreSource(rootDir: string, options: BuildUserscriptOptions):
 }
 
 async function readBrowserStrategyUtils(strategyUtilsPath: string): Promise<string> {
-  const source = await readFile(strategyUtilsPath, 'utf8');
-  const result = await transform(source, {
-    loader: 'ts',
+  const result = await build({
+    entryPoints: [strategyUtilsPath],
+    bundle: true,
+    write: false,
     format: 'iife',
     globalName: 'EasyPokelikeStrategyUtils',
+    platform: 'browser',
     target: 'es2022',
     legalComments: 'none',
   });
-  return result.code.trimEnd();
+  const [output] = result.outputFiles;
+  if (!output) {
+    throw new Error(`Could not bundle strategy utils: ${strategyUtilsPath}`);
+  }
+  return output.text.trimEnd();
 }
 
 function looksLikeWrappedIife(source: string): boolean {

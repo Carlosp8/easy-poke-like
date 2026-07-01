@@ -410,13 +410,7 @@
     }
 
     function getPokemonBaseStatTotal(stats) {
-        if (!stats) return 0;
-        return getPokemonStat(stats, 'hp') +
-               getPokemonStat(stats, 'atk', 'attack') +
-               getPokemonStat(stats, 'def') +
-               getPokemonStat(stats, 'special', 'spa', 'spatk') +
-               getPokemonStat(stats, 'spdef', 'spd') +
-               getPokemonStat(stats, 'speed', 'spe');
+        return EasyPokelikeStrategyUtils.getPokemonBaseStatTotal(stats);
     }
 
     function isPremiumCatchCandidate(cardScore, isShiny, name) {
