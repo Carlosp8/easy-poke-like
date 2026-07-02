@@ -2,6 +2,7 @@
     // ╚══════════════════════════════════════════════════════════════╝
 
     // One handler per visible game screen. Keep side effects local to each handler.
+    /* global activeAutoRunMode: writable, activeChallengeContext: writable, capturesThisMap: writable, catchRerollsThisEncounter: writable, currentRunTelemetry: writable, duplicatePriorityCatchNodesTaken: writable, lastCatchRerollAt: writable, lastCatchRerollSignature: writable, lastLoggedState: writable, lastRunFinalizedAt: writable, lastStateForStuck: writable, lastStuckProgressSignature: writable, sinnohCarryKnownTmTiers: writable, stuckCounter: writable */
     // --- MAP SCREEN (Enhanced Pathfinding) ---
     function handleMapScreen() {
         const team = parseTeamStatus();
@@ -316,7 +317,7 @@
         if (control.disabled || control.getAttribute('aria-disabled') === 'true') return false;
         if (control.classList && control.classList.contains('disabled')) return false;
 
-        const style = window.getComputedStyle(control);
+        const style = globalThis.getComputedStyle(control);
         return style.pointerEvents !== 'none';
     }
 
@@ -975,11 +976,12 @@
             return;
         }
 
-        const scoutTarget = canShinyScoutSafely
-            ? CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER
-            : sinnohTraining.active
-            ? Math.min(CONFIG.SINNOH_CATCH_SCOUT_ATTEMPTS, CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER)
-            : Math.min(CONFIG.CATCH_REROLL_MIN_ATTEMPTS_PER_ENCOUNTER, CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER);
+        let scoutTarget = Math.min(CONFIG.CATCH_REROLL_MIN_ATTEMPTS_PER_ENCOUNTER, CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER);
+        if (canShinyScoutSafely) {
+            scoutTarget = CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER;
+        } else if (sinnohTraining.active) {
+            scoutTarget = Math.min(CONFIG.SINNOH_CATCH_SCOUT_ATTEMPTS, CONFIG.CATCH_REROLL_MAX_ATTEMPTS_PER_ENCOUNTER);
+        }
         const shouldScoutMore = openTeamSlot &&
             allowShinyScoutInStory &&
             catchRerollsThisEncounter < scoutTarget &&
@@ -1114,15 +1116,16 @@
             const canBreakEarlyRosterCap = !earlyExpansionClosed || isExceptional || isPremium || isDirectCounter || isDuplicatePlan || isSinnohPassivePlan || isChallengePlan || isStoryPlan;
 
             if (bestWouldDiluteLevels || !canBreakEarlyRosterCap || (!isPremium && !isBossRelevant && !goodGeneralValue && !shouldAcceptRosterFill && !isExceptional && !isDirectCounter && !isDuplicatePlan && !isSinnohPassivePlan && !isChallengePlan && !isStoryPlan)) {
-                const skipReason = bestWouldDiluteLevels
-                    ? 'would dilute levels'
-                    : earlyExpansionClosed && !isExceptional && !isPremium && !isDirectCounter && !isDuplicatePlan && !isSinnohPassivePlan && !isChallengePlan && !isStoryPlan
-                    ? 'early roster closed'
-                    : effectiveCaptureCapReached
-                    ? 'already caught this map'
-                    : shouldPrioritizeEarlyTraining(team, opponentProfile)
-                        ? 'leveling focus'
-                        : 'no strong boss value';
+                let skipReason = 'no strong boss value';
+                if (bestWouldDiluteLevels) {
+                    skipReason = 'would dilute levels';
+                } else if (earlyExpansionClosed && !isExceptional && !isPremium && !isDirectCounter && !isDuplicatePlan && !isSinnohPassivePlan && !isChallengePlan && !isStoryPlan) {
+                    skipReason = 'early roster closed';
+                } else if (effectiveCaptureCapReached) {
+                    skipReason = 'already caught this map';
+                } else if (shouldPrioritizeEarlyTraining(team, opponentProfile)) {
+                    skipReason = 'leveling focus';
+                }
                 log('info', '🐾', `Skipping catch for ${skipReason} — best: ${bestName || 'unknown'} ${bestScore.toFixed(1)}`);
                 recordCatchSkip(skipReason);
                 return;
@@ -1152,23 +1155,16 @@
         }
 
         if (bestCard) {
-            const catchReason = bestCandidate?.isShiny && !bestCandidate.alreadyOwnedShiny
-                ? 'Catching new shiny target'
-                : bestCandidate?.isShiny
-                ? 'Catching owned shiny target'
-                : bestIsLegendary
-                ? 'Catching legendary/masterball reward'
-                : bestIsDuplicatePlan
-                ? 'Catching duplicate-pair target'
-                : bestIsSinnohPowerPlan
-                ? 'Catching Sinnoh run-power target'
-                : bestIsSinnohPassivePlan
-                ? 'Catching Sinnoh passive-plan target'
-                : bestIsChallengePlan
-                ? 'Catching challenge-plan target'
-                : bestIsStoryPlan
-                ? 'Catching story-league target'
-                : (openTeamSlot ? 'Catching useful open-slot target' : 'Catching Pokemon');
+            const catchReason = getCatchDecisionReason({
+                bestCandidate,
+                bestIsLegendary,
+                bestIsDuplicatePlan,
+                bestIsSinnohPowerPlan,
+                bestIsSinnohPassivePlan,
+                bestIsChallengePlan,
+                bestIsStoryPlan,
+                openTeamSlot
+            });
             ensureRunTelemetry('catch-screen');
             recordRunEvent('catch-decision', {
                 action: 'catch',
@@ -1301,7 +1297,7 @@
     function isSelectablePassiveCard(card) {
         if (!card || !isVisible(card) || isLockedChoice(card)) return false;
         if (card.querySelector('.starting-item-lock, .choice-lock, .item-lock, [data-locked="true"]')) return false;
-        const style = window.getComputedStyle(card);
+        const style = globalThis.getComputedStyle(card);
         if (style.pointerEvents === 'none') return false;
 
         const choices = card.closest('#passive-choices');
@@ -1412,12 +1408,7 @@
         }
 
         let candidates = rows.map((row, rowPosition) => {
-            const rowIndex = Number.parseInt(
-                row.getAttribute('data-idx') ??
-                row.getAttribute('data-team-index') ??
-                row.getAttribute('data-pokemon-index'),
-                10
-            );
+            const rowIndex = Number.parseInt(row.dataset?.idx ?? row.dataset?.teamIndex ?? row.dataset?.pokemonIndex, 10);
             const teamIdx = Number.isNaN(rowIndex) ? rowPosition : rowIndex;
             const unit = team[teamIdx] || parseModalRowUnit(row, teamIdx);
             return {
@@ -2131,13 +2122,13 @@
 
         const modes = CONFIG.AUTO_START_MODES || {};
         if (mode === 'battleTower' || mode === 'resumeBattleTower') {
-            if (Object.prototype.hasOwnProperty.call(modes, mode)) {
+            if (Object.hasOwn(modes, mode)) {
                 return Boolean(modes[mode] || CONFIG.AUTO_START_BATTLE_TOWER);
             }
             return Boolean(CONFIG.AUTO_START_BATTLE_TOWER);
         }
 
-        if (Object.prototype.hasOwnProperty.call(modes, mode)) {
+        if (Object.hasOwn(modes, mode)) {
             return Boolean(modes[mode]);
         }
 
@@ -2208,7 +2199,7 @@
             if (preferred) return preferred;
             log('warn', '🧭', `No visible map/region matched [${preference}]. Falling back to best available.`);
         }
-        return visibleChoices[visibleChoices.length - 1] || null;
+        return visibleChoices.at(-1) || null;
     }
 
     function getStoryLaunchControl() {
@@ -2245,7 +2236,7 @@
     }
 
     function parseProgressRatio(text) {
-        const match = foldText(text || '').match(/(\d+)\s*(?:\/|of|de)\s*(\d+)/);
+        const match = /(\d+)\s*(?:\/|of|de)\s*(\d+)/.exec(foldText(text || ''));
         if (!match) return null;
         const current = Number.parseInt(match[1], 10);
         const total = Number.parseInt(match[2], 10);
@@ -2255,8 +2246,8 @@
 
     function isWeeklyChallengeComplete() {
         try {
-            if (typeof window.isWeeklyBeaten === 'function') {
-                return Boolean(window.isWeeklyBeaten());
+            if (typeof globalThis.isWeeklyBeaten === 'function') {
+                return Boolean(globalThis.isWeeklyBeaten());
             }
         } catch (e) {
             log('debug', '⚔️', `Weekly completion helper failed: ${e.message}`);
@@ -2273,13 +2264,13 @@
         if (ratio) return ratio.current >= ratio.total;
 
         const classText = weeklyCard ? String(weeklyCard.getAttribute('class') || '') : '';
-        return Boolean(classText.match(/done|complete|completed|cleared|chal-weekly-card--d/));
+        return Boolean(/done|complete|completed|cleared|chal-weekly-card--d/.exec(classText));
     }
 
     function isWeeklySubComplete(subId, tile = null) {
         try {
-            if (typeof window.isWeeklySubCleared === 'function') {
-                return Boolean(window.isWeeklySubCleared(subId));
+            if (typeof globalThis.isWeeklySubCleared === 'function') {
+                return Boolean(globalThis.isWeeklySubCleared(subId));
             }
         } catch (e) {
             log('debug', '⚔️', `Weekly sub completion helper failed: ${e.message}`);
@@ -2288,13 +2279,13 @@
         if (!tile) return false;
 
         const classText = String(tile.getAttribute('class') || '');
-        if (classText.match(/done|complete|completed|cleared|weekly-sub--d/)) return true;
+        if (/done|complete|completed|cleared|weekly-sub--d/.exec(classText)) return true;
 
         const text = tile.innerText || '';
         if (text.includes('✓')) return true;
 
         const ctaText = (tile.querySelector('.chal-intro-cta')?.innerText || '').trim();
-        if (ctaText && !ctaText.match(/[▸>]/)) return true;
+        if (ctaText && !/[▸>]/.exec(ctaText)) return true;
 
         return false;
     }
@@ -2306,7 +2297,7 @@
             types = detectTypesInText([
                 tile.innerText || '',
                 tile.getAttribute('class') || '',
-                tile.getAttribute('data-sub') || ''
+                tile.dataset?.sub || ''
             ].join(' '));
         }
         return normalizeTypeList(types);
@@ -2321,25 +2312,25 @@
         const tiles = getWeeklySubTiles();
         if (tiles.length === 0) return null;
 
-        const byId = new Map(tiles.map(tile => [foldText(tile.getAttribute('data-sub') || ''), tile]));
+        const byId = new Map(tiles.map(tile => [foldText(tile.dataset?.sub || ''), tile]));
         const preference = getBotControlMapPreference();
         if (preference) {
             const preferred = tiles.find(tile =>
-                !isWeeklySubComplete(tile.getAttribute('data-sub') || '', tile) &&
+                !isWeeklySubComplete(tile.dataset?.sub || '', tile) &&
                 getChoiceSearchText(tile).includes(preference)
             );
             if (preferred) {
-                return { subId: preferred.getAttribute('data-sub') || preference, tile: preferred };
+                return { subId: preferred.dataset?.sub || preference, tile: preferred };
             }
             log('warn', '⚔️', `Weekly target [${preference}] not visible/incomplete. Falling back to configured order.`);
         }
 
         const orderedIds = [
             ...(CONFIG.WEEKLY_CHALLENGE_ORDER || []),
-            ...tiles.map(tile => tile.getAttribute('data-sub') || '')
+            ...tiles.map(tile => tile.dataset?.sub || '')
         ].map(foldText).filter(Boolean);
 
-        for (const subId of [...new Set(orderedIds)]) {
+        for (const subId of new Set(orderedIds)) {
             const tile = byId.get(subId);
             if (tile && !isWeeklySubComplete(subId, tile)) {
                 return { subId, tile };
@@ -2347,6 +2338,28 @@
         }
 
         return null;
+    }
+
+    function getCatchDecisionReason({
+        bestCandidate,
+        bestIsLegendary,
+        bestIsDuplicatePlan,
+        bestIsSinnohPowerPlan,
+        bestIsSinnohPassivePlan,
+        bestIsChallengePlan,
+        bestIsStoryPlan,
+        openTeamSlot
+    }) {
+        if (bestCandidate?.isShiny) {
+            return bestCandidate.alreadyOwnedShiny ? 'Catching owned shiny target' : 'Catching new shiny target';
+        }
+        if (bestIsLegendary) return 'Catching legendary/masterball reward';
+        if (bestIsDuplicatePlan) return 'Catching duplicate-pair target';
+        if (bestIsSinnohPowerPlan) return 'Catching Sinnoh run-power target';
+        if (bestIsSinnohPassivePlan) return 'Catching Sinnoh passive-plan target';
+        if (bestIsChallengePlan) return 'Catching challenge-plan target';
+        if (bestIsStoryPlan) return 'Catching story-league target';
+        return openTeamSlot ? 'Catching useful open-slot target' : 'Catching Pokemon';
     }
 
     function getStartingItemChoices(root = document) {
@@ -2584,8 +2597,8 @@
             choice.innerText || '',
             choice.title || '',
             choice.getAttribute('aria-label') || '',
-            choice.getAttribute('data-species') || '',
-            choice.getAttribute('data-name') || '',
+            choice.dataset?.species || '',
+            choice.dataset?.name || '',
             choice.getAttribute('class') || '',
             ...imgs.map(img => `${img.alt || ''} ${img.title || ''} ${img.src || ''}`)
         ].join(' '));
@@ -2790,7 +2803,7 @@
                 return `${currentState}:${catchRerollsThisEncounter}:${cards}`;
             }
             return `${currentState}:${document.querySelector('.screen.active')?.innerText?.slice(0, 240) || ''}`;
-        } catch (e) {
+        } catch {
             return currentState;
         }
     }
@@ -3000,7 +3013,7 @@
                 break;
 
             // --- Fallback / transitions ---
-            default:
+            default: {
                 const nextBtn = document.querySelector(
                     '.btn-next, #btn-stage-continue, .choice-skip-btn, ' +
                     '#btn-continue-battle, #btn-auto-battle, ' +
@@ -3010,6 +3023,7 @@
                     triggerRealClick(nextBtn);
                 }
                 break;
+            }
         }
     }
 

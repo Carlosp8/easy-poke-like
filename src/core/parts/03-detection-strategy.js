@@ -2,9 +2,10 @@
     // ╚══════════════════════════════════════════════════════════════╝
 
     // DOM parsing, run context detection and high-level tactical heuristics.
+    /* global activeAutoRunMode: writable, capturesThisMap: writable, currentRunTelemetry: writable, duplicatePriorityCatchNodesTaken: writable, lastRunFinalizedAt: writable, sinnohCarryKnownTmTiers: writable */
     function isVisible(el) {
         if (!el) return false;
-        const style = window.getComputedStyle(el);
+        const style = globalThis.getComputedStyle(el);
         return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
     }
 
@@ -58,7 +59,7 @@
         const button = row.querySelector('button:not([disabled]), .btn:not(.disabled), [role="button"]:not([aria-disabled="true"])');
         if (button && isVisible(button)) return button;
 
-        const style = window.getComputedStyle(row);
+        const style = globalThis.getComputedStyle(row);
         if (style.pointerEvents === 'none') return null;
 
         const opacity = Number.parseFloat(style.opacity);
@@ -533,7 +534,7 @@
 
         // Fallback to URL parsing
         const src = img.src || '';
-        const match = src.match(/\/items\/([^\/\.]+)/);
+        const match = /\/items\/([^/.]+)/.exec(src);
         if (match) {
             return normalizeItemName(match[1]);
         }
@@ -597,7 +598,7 @@
             let name = img.alt || img.title;
             if (!name) {
                 const src = img.src || '';
-                const match = src.match(/\/items\/([^\/\.]+)/);
+                const match = /\/items\/([^/.]+)/.exec(src);
                 if (match) {
                     name = match[1];
                 }
@@ -2573,7 +2574,7 @@
 
     function getPokelikePokedex() {
         if (typeof window === 'undefined') return null;
-        const pokedex = window.__POKEDEX__ || window.__POKEDEX_;
+        const pokedex = globalThis.__POKEDEX__ || globalThis.__POKEDEX_;
         return pokedex && typeof pokedex === 'object' ? pokedex : null;
     }
 
@@ -3565,31 +3566,54 @@
         const lead = team[0] || null;
         const tags = [];
         const labelText = foldText((snapshot?.labels || []).join(' '));
-        const rewardMatch = labelText.match(/\+(\d+)/);
+        const rewardMatch = /\+(\d+)/.exec(labelText);
         const reward = rewardMatch ? Number.parseInt(rewardMatch[1], 10) : 0;
-        const isFinalBoss = Boolean(labelText.match(/stage final boss|final boss|champion|campeon/) || reward >= 400);
+        const isFinalBoss = Boolean(/stage final boss|final boss|champion|campeon/.exec(labelText) || reward >= 400);
         const isBigBoss = isFinalBoss || labelText.includes('big boss');
         const opponentConfidence = snapshot?.opponent?.sourceConfidence || '';
         const isBossLike = isFinalBoss ||
                            isBigBoss ||
                            ['boss-team-db', 'boss-type-map', 'detected-types', 'elite-prep-types'].includes(opponentConfidence) ||
-                           Boolean(labelText.match(/boss|map 2\/2/));
-        const bossTeamTarget = isFinalBoss ? CONFIG.TEAM_TARGET_SIZE : (isBigBoss ? 4 : (isBossLike ? 3 : CONFIG.EARLY_CORE_TEAM_SIZE));
+                           Boolean(/boss|map 2\/2/.exec(labelText));
+        let bossTeamTarget = CONFIG.EARLY_CORE_TEAM_SIZE;
+        if (isFinalBoss) {
+            bossTeamTarget = CONFIG.TEAM_TARGET_SIZE;
+        } else if (isBigBoss) {
+            bossTeamTarget = 4;
+        } else if (isBossLike) {
+            bossTeamTarget = 3;
+        }
         const snapshotTargets = snapshot?.bossPrep?.targets || null;
-        const bossAvgLevelTarget = snapshotTargets?.avgLevel ||
-                                    (isFinalBoss ? CONFIG.R3_BIG_BOSS_MIN_AVG_LEVEL :
-                                    (isBigBoss ? CONFIG.EARLY_BIG_BOSS_MIN_AVG_LEVEL :
-                                    (labelText.includes('map 2/2') ? CONFIG.EARLY_MAP2_MIN_AVG_LEVEL : 0)));
-        const bossLeadLevelTarget = snapshotTargets?.leadLevel ||
-                                     (isFinalBoss ? CONFIG.R3_BIG_BOSS_MIN_LEAD_LEVEL :
-                                     (isBigBoss ? CONFIG.EARLY_BIG_BOSS_MIN_LEAD_LEVEL :
-                                     (labelText.includes('map 2/2') ? CONFIG.EARLY_MAP2_MIN_LEAD_LEVEL : 0)));
+        let bossAvgLevelTarget = snapshotTargets?.avgLevel || 0;
+        if (!bossAvgLevelTarget && isFinalBoss) {
+            bossAvgLevelTarget = CONFIG.R3_BIG_BOSS_MIN_AVG_LEVEL;
+        } else if (!bossAvgLevelTarget && isBigBoss) {
+            bossAvgLevelTarget = CONFIG.EARLY_BIG_BOSS_MIN_AVG_LEVEL;
+        } else if (!bossAvgLevelTarget && labelText.includes('map 2/2')) {
+            bossAvgLevelTarget = CONFIG.EARLY_MAP2_MIN_AVG_LEVEL;
+        }
+        let bossLeadLevelTarget = snapshotTargets?.leadLevel || 0;
+        if (!bossLeadLevelTarget && isFinalBoss) {
+            bossLeadLevelTarget = CONFIG.R3_BIG_BOSS_MIN_LEAD_LEVEL;
+        } else if (!bossLeadLevelTarget && isBigBoss) {
+            bossLeadLevelTarget = CONFIG.EARLY_BIG_BOSS_MIN_LEAD_LEVEL;
+        } else if (!bossLeadLevelTarget && labelText.includes('map 2/2')) {
+            bossLeadLevelTarget = CONFIG.EARLY_MAP2_MIN_LEAD_LEVEL;
+        }
 
         if (result === 'gameover') tags.push('gameover');
         if (team.length === 0) tags.push('no-team-snapshot');
         if (team.length > 0 && alive.length === 0) tags.push('team-wipe');
         if (team.length > 0 && team.length < CONFIG.EARLY_CORE_TEAM_SIZE) tags.push('too-few-pokemon');
-        if (isBossLike && team.length > 0 && team.length < bossTeamTarget) tags.push(isFinalBoss ? 'thin-team-for-final-boss' : (isBigBoss ? 'thin-team-for-big-boss' : 'thin-team-for-boss'));
+        if (isBossLike && team.length > 0 && team.length < bossTeamTarget) {
+            let thinTeamTag = 'thin-team-for-boss';
+            if (isFinalBoss) {
+                thinTeamTag = 'thin-team-for-final-boss';
+            } else if (isBigBoss) {
+                thinTeamTag = 'thin-team-for-big-boss';
+            }
+            tags.push(thinTeamTag);
+        }
         if ((snapshot?.avgLevel || 0) > 0 && snapshot.avgLevel < CONFIG.EARLY_BOSS_MIN_AVG_LEVEL) tags.push('underleveled-team');
         if ((snapshot?.leadLevel || 0) > 0 && snapshot.leadLevel < CONFIG.EARLY_BOSS_MIN_LEAD_LEVEL) tags.push('underleveled-lead');
         if (isBossLike && bossAvgLevelTarget && (snapshot?.avgLevel || 0) > 0 && snapshot.avgLevel < bossAvgLevelTarget) tags.push('boss-underleveled-team');
@@ -3685,8 +3709,8 @@
     }
 
     function exposeRunHistoryHelpers() {
-        if (typeof window === 'undefined') return;
-        window.EngineRunHistory = {
+        if (typeof globalThis.window === 'undefined') return;
+        globalThis.EngineRunHistory = {
             current: () => currentRunTelemetry,
             all: () => getRunHistory(),
             latest: () => getRunHistory().slice(-1)[0] || null,
@@ -3735,8 +3759,8 @@
         const className = typeof card.className === 'string' ? card.className : (card.getAttribute('class') || '');
         const classText = foldText(className);
         return Boolean(
-            classText.match(/shiny|variocolor|brillante/) ||
-            text.match(/shiny|variocolor|brillante|sparkle|destell/) ||
+            /shiny|variocolor|brillante/.exec(classText) ||
+            /shiny|variocolor|brillante|sparkle|destell/.exec(text) ||
             card.querySelector('.shiny, .shiny-star, [class*="shiny"], [data-shiny="true"]')
         );
     }

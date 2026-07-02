@@ -1436,7 +1436,7 @@
         if (imageName) return normalizeItemName(imageName);
 
         const src = img ? (img.src || img.getAttribute('src') || '') : '';
-        const match = src.match(/\/items\/([^\/\.]+)/);
+        const match = /\/items\/([^/.]+)/.exec(src);
         if (match) return normalizeItemName(match[1]);
 
         return normalizeItemName(element.innerText || element.getAttribute?.('aria-label') || element.getAttribute?.('title') || '');
@@ -1448,7 +1448,7 @@
         const itemImage = modal.querySelector('img[src*="items/"]');
         if (itemImage) {
             const src = itemImage.src || itemImage.getAttribute('src') || '';
-            const match = src.match(/\/items\/([^\/\.]+)/);
+            const match = /\/items\/([^/.]+)/.exec(src);
             if (match) candidates.push(match[1]);
             candidates.push(itemImage.alt || '', itemImage.title || '');
         }
