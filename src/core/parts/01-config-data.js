@@ -1172,13 +1172,12 @@
         // --- Gen 2 Steel ---
         'skarmory':['Steel','Flying'],'steelix':['Steel','Ground'],
         // --- Gen 2 Ice ---
-        'sneasel':['Dark','Ice'],'swinub':['Ice','Ground'],'piloswine':['Ice','Ground'],
-        'delibird':['Ice','Flying'],'snorunt':['Ice'],'glalie':['Ice'],
+        'swinub':['Ice','Ground'],'piloswine':['Ice','Ground'],
+        'delibird':['Ice','Flying'],
         // --- Gen 2 Rock ---
         'sudowoodo':['Rock'],'larvitar':['Rock','Ground'],'pupitar':['Rock','Ground'],
         'tyranitar':['Rock','Dark'],
         // --- Gen 2 Dragon ---
-        'kingdra':['Water','Dragon'],
         // --- Gen 2 Fairy ---
         'togepi':['Fairy'],'snubbull':['Fairy'],'granbull':['Fairy'],
         // --- Gen 2 Ground ---
@@ -1410,7 +1409,7 @@
         'roca del rey': 'kings rock', 'roca rey': 'kings rock', 'corona': 'kings rock',
         
         // D-Tier
-        'banda focus': 'focus sash', 'banda de enfoque': 'focus sash', 'cinta de focus': 'focus sash',
+        'banda focus': 'focus sash', 'cinta de focus': 'focus sash',
         'cinta fuerte': 'muscle band',
         'gafas especiales': 'wise glasses', 'gafas de sabio': 'wise glasses',
         'globo helio': 'air balloon', 'globo de helio': 'air balloon',

@@ -3484,8 +3484,11 @@
 
     function makeRunTelemetry(reason = 'auto') {
         const now = new Date();
+        const entropy =
+            globalThis.crypto?.randomUUID?.() ||
+            `${now.getTime()}-${globalThis.performance?.now?.().toFixed(3) || '0'}`;
         return {
-            id: `run-${now.toISOString()}-${Math.floor(Math.random() * 10000)}`,
+            id: `run-${now.toISOString()}-${entropy}`,
             startedAt: now.toISOString(),
             startReason: reason,
             startStats: { ...engineStats },

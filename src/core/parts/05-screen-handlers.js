@@ -530,8 +530,9 @@
             .filter(item => item.rerollButton && !shouldProtect(item))
             .sort((a, b) => a.score - b.score);
 
-        for (const item of sortedCards) {
-            return { button: item.rerollButton, score: item.score, name: item.name || 'unknown' };
+        const rerollCandidate = sortedCards[0];
+        if (rerollCandidate) {
+            return { button: rerollCandidate.rerollButton, score: rerollCandidate.score, name: rerollCandidate.name || 'unknown' };
         }
 
         const catchScope = document.getElementById('catch-screen') || document.getElementById('catch-choices');
@@ -2775,7 +2776,7 @@
                 const mapKey = currentMapKey || getCurrentMapKey() || '';
                 const clickableSignature = getClickableMapNodes()
                     .map(node => getMapNodeClickSignature(node))
-                    .sort()
+                    .sort((left, right) => left.localeCompare(right))
                     .join('|');
                 const teamSignature = parseTeamStatus()
                     .map(unit => `${unit.index}:${getPokemonIdentityKey(unit.name)}:${unit.hp}:${unit.level}:${unit.isFainted ? 'F' : 'A'}`)
