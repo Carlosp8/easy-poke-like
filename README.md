@@ -1,4 +1,4 @@
-# Easy Pokelike 9.5
+# Easy Pokelike 10
 
 Userscript de Tampermonkey para automatizar runs de Pokelike. El motor toma
 decisiones sobre rutas, capturas, items, MT, pasivas, jefes, historia,
@@ -14,7 +14,7 @@ en `src/` y se genera con `npm run build`.
 3. Genera el userscript con `npm run build`.
 4. Crea un nuevo userscript en Tampermonkey.
 5. Pega el contenido de `easy-pokelike.user.js`.
-6. Abre `pokelike.xyz` y confirma que aparece el panel `Easy Pokelike 9.5`.
+6. Abre `pokelike.xyz` y confirma que aparece el panel `Easy Pokelike 10`.
 
 El userscript se ejecuta con:
 
@@ -28,7 +28,7 @@ El userscript se ejecuta con:
 
 | Area            | Estado                        |
 | --------------- | ----------------------------- |
-| Version         | `9.5.0`                       |
+| Version         | `10.0.0`                      |
 | Runtime         | Tampermonkey userscript       |
 | Node requerido  | Node 22 o superior            |
 | Build           | `scripts/build-userscript.ts` |
@@ -38,7 +38,7 @@ El userscript se ejecuta con:
 
 Nota: algunos IDs internos y keys legacy conservan el prefijo `Engine` por
 compatibilidad con estado guardado y logs historicos. El nombre visible del
-producto es `Easy Pokelike 9.5`.
+producto es `Easy Pokelike 10`.
 
 ## Para Usuarios
 

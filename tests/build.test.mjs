@@ -20,7 +20,7 @@ test('builds a Tampermonkey userscript from src modules', async () => {
   assert.ok(output.includes('(function()'));
   assert.equal(output.includes('\nimport '), false);
   assert.ok(output.includes('var EasyPokelikeStrategyUtils = (() => {'));
-  assert.ok(output.includes("PANEL_TITLE: 'Easy Pokelike 9.5'"));
+  assert.ok(output.includes("PANEL_TITLE: 'Easy Pokelike 10'"));
   assert.equal(output.includes('<strong>Engine 7</strong>'), false);
   assert.ok(output.includes('return EasyPokelikeStrategyUtils.foldText(text);'));
   assert.ok(
