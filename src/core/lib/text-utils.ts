@@ -1,5 +1,7 @@
 export function foldText(text: unknown): string {
-  return String(text ?? '')
+  const value =
+    typeof text === 'string' || typeof text === 'number' || typeof text === 'boolean' ? text : '';
+  return String(value)
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -11,7 +13,12 @@ export function normalizeItemName(
   name: unknown,
   translations: Record<string, string> = {},
 ): string {
-  if (!name) return '';
+  if (
+    !name ||
+    (typeof name !== 'string' && typeof name !== 'number' && typeof name !== 'boolean')
+  ) {
+    return '';
+  }
   const clean = String(name).toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
   if (translations[clean]) return translations[clean];
 

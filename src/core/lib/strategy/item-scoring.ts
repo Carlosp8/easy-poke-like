@@ -39,8 +39,7 @@ export type ItemNameCollection = Iterable<string> & {
   has?: (_value: string) => boolean;
 };
 
-export type ItemTypeMatch =
-  ReadonlyMap<string, PokelikeType | string> | Record<string, PokelikeType | string>;
+export type ItemTypeMatch = ReadonlyMap<string, unknown> | Record<string, unknown>;
 
 export interface ItemMatchOptions {
   itemTypeMatch?: ItemTypeMatch;
@@ -88,6 +87,164 @@ export interface StoryItemScoreInput {
   carryMatchesBoost?: boolean;
 }
 
+function inactiveItemDecision(prefix: string, itemName: string): ScoredDecision {
+  return {
+    id: `${prefix}:${itemName || 'unknown'}`,
+    score: 0,
+    reason: 'inactive',
+    details: { item: itemName },
+  };
+}
+
+function lowValueItemDecision(prefix: string, itemName: string, score: number): ScoredDecision {
+  return {
+    id: `${prefix}:${itemName}`,
+    score,
+    reason: 'low-value',
+    details: { item: itemName },
+  };
+}
+
+function scoreChallengeSacredAsh(itemName: string, faintedCount: number): ScoredDecision {
+  const score = faintedCount > 0 ? 160 + faintedCount * 50 : -40;
+  return {
+    id: `item:challenge:${itemName}`,
+    score,
+    reason: faintedCount > 0 ? 'revive-fainted' : 'no-fainted',
+    details: { item: itemName, faintedCount },
+  };
+}
+
+function scoreChallengeRareCandy(
+  input: ChallengeItemScoreInput,
+  itemName: string,
+  prepPressure: number,
+): ScoredDecision {
+  const reasons: string[] = ['rare-candy'];
+  let score = 320 + prepPressure * 30;
+  if (input.hasCarry) score += 120 + Math.max(0, 85 - (input.carryLevel || 85)) / 1.8;
+  if (input.underleveled || input.needsCarryBuff) score += 90;
+  if (input.underleveled) reasons.push('underleveled');
+  if (input.needsCarryBuff) reasons.push('carry-buff');
+  return {
+    id: `item:challenge:${itemName}`,
+    score,
+    reason: reasons.join(','),
+    details: { item: itemName, prepPressure, carryLevel: input.carryLevel ?? null },
+  };
+}
+
+function scoreChallengeTm(
+  input: ChallengeItemScoreInput,
+  itemName: string,
+  moveTier: number,
+  challengeCarryMoveTierTarget: number,
+): ScoredDecision {
+  const reasons: string[] = ['tm'];
+  let score = 170;
+  if (input.needsCarryBuff) {
+    score += 130;
+    reasons.push('carry-buff');
+  }
+  if (moveTier >= challengeCarryMoveTierTarget) {
+    score -= 80;
+    reasons.push('move-tier-met');
+  }
+  return {
+    id: `item:challenge:${itemName}`,
+    score,
+    reason: reasons.join(','),
+    details: { item: itemName, moveTier },
+  };
+}
+
+function scoreChallengeMoonStone(input: ChallengeItemScoreInput, itemName: string): ScoredDecision {
+  let score = 165;
+  if (input.hasCarry) score += 45 + Math.max(0, 70 - (input.carryLevel || 70)) / 3;
+  return {
+    id: `item:challenge:${itemName}`,
+    score,
+    reason: 'moon-stone',
+    details: { item: itemName, carryLevel: input.carryLevel ?? null },
+  };
+}
+
+function scoreChallengeSpecialItem(
+  input: ChallengeItemScoreInput,
+  itemName: string,
+  prepPressure: number,
+  faintedCount: number,
+  moveTier: number,
+  challengeCarryMoveTierTarget: number,
+): ScoredDecision | null {
+  if (itemName === 'sacred ash') return scoreChallengeSacredAsh(itemName, faintedCount);
+  if (itemName === 'rare candy') return scoreChallengeRareCandy(input, itemName, prepPressure);
+  if (itemName === 'tm normal') {
+    return scoreChallengeTm(input, itemName, moveTier, challengeCarryMoveTierTarget);
+  }
+  if (itemName === 'moon stone') return scoreChallengeMoonStone(input, itemName);
+  return null;
+}
+
+function scoreChallengeCarryItem(
+  input: ChallengeItemScoreInput,
+  itemName: string,
+  prepPressure: number,
+): ScoredDecision {
+  const improvement = (input.carryNewScore ?? 0) - (input.carryOldScore ?? 0);
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (input.isMainCarryPreferredItem) {
+    score += 260;
+    reasons.push('preferred-carry-item');
+  }
+  if (input.isSustainItem) {
+    score += 120;
+    reasons.push('sustain');
+  }
+  if (input.isOffenseItem) {
+    score += 105;
+    reasons.push('offense');
+  }
+  if (input.isUtilityItem) {
+    score += 70;
+    reasons.push('utility');
+  }
+  if (input.carryNeedsItem) {
+    score += 90;
+    reasons.push('carry-needs-item');
+  }
+  if (!normalizeItemName(input.carryHeldItem)) {
+    score += 80;
+    reasons.push('empty-slot');
+  }
+  if (improvement > 0) {
+    score += improvement * 1.45;
+    reasons.push('improvement');
+  } else if (input.carryNeedsItem && input.isMainCarryPreferredItem) {
+    score += 40;
+    reasons.push('preferred-rescue');
+  }
+
+  if (input.boostType) {
+    score += input.carryMatchesBoost ? 85 : -110;
+    reasons.push(input.carryMatchesBoost ? 'matching-boost' : 'mismatched-boost');
+  }
+
+  return {
+    id: `item:challenge:${itemName}`,
+    score,
+    reason: reasons.join(',') || 'neutral',
+    details: {
+      item: itemName,
+      prepPressure,
+      improvement,
+      boostType: input.boostType ?? null,
+    },
+  };
+}
+
 function normalizedCollectionHas(items: ItemNameCollection, itemName: unknown): boolean {
   const normalizedItem = normalizeItemName(itemName);
   if (!normalizedItem) return false;
@@ -101,7 +258,7 @@ function normalizedCollectionHas(items: ItemNameCollection, itemName: unknown): 
 
 function isItemTypeMatchMap(
   itemTypeMatch: ItemTypeMatch,
-): itemTypeMatch is ReadonlyMap<string, PokelikeType | string> {
+): itemTypeMatch is ReadonlyMap<string, unknown> {
   const maybeMap = itemTypeMatch as { get?: unknown; entries?: unknown };
   return typeof maybeMap.get === 'function' && typeof maybeMap.entries === 'function';
 }
@@ -119,7 +276,7 @@ function getItemTypeMatchValue(itemName: unknown, itemTypeMatch: ItemTypeMatch):
     return null;
   }
 
-  if (Object.prototype.hasOwnProperty.call(itemTypeMatch, normalizedItem)) {
+  if (Object.hasOwn(itemTypeMatch, normalizedItem)) {
     return itemTypeMatch[normalizedItem];
   }
   for (const [key, value] of Object.entries(itemTypeMatch)) {
@@ -183,208 +340,107 @@ export function scoreChallengeItemBonus(input: ChallengeItemScoreInput): ScoredD
   const faintedCount = input.faintedCount ?? 0;
   const moveTier = input.moveTier ?? -1;
   const challengeCarryMoveTierTarget = input.config?.challengeCarryMoveTierTarget ?? 2;
-  const reasons: string[] = [];
-  let score = 0;
 
   if (!input.active || !itemName) {
-    return {
-      id: `item:challenge:${itemName || 'unknown'}`,
-      score: 0,
-      reason: 'inactive',
-      details: { item: itemName },
-    };
+    return inactiveItemDecision('item:challenge', itemName);
   }
 
   if (input.isLowValue) {
-    return {
-      id: `item:challenge:${itemName}`,
-      score: -220,
-      reason: 'low-value',
-      details: { item: itemName },
-    };
+    return lowValueItemDecision('item:challenge', itemName, -220);
   }
 
-  if (itemName === 'sacred ash') {
-    score = faintedCount > 0 ? 160 + faintedCount * 50 : -40;
-    return {
-      id: `item:challenge:${itemName}`,
-      score,
-      reason: faintedCount > 0 ? 'revive-fainted' : 'no-fainted',
-      details: { item: itemName, faintedCount },
-    };
-  }
-
-  if (itemName === 'rare candy') {
-    score += 320 + prepPressure * 30;
-    if (input.hasCarry) score += 120 + Math.max(0, 85 - (input.carryLevel || 85)) / 1.8;
-    if (input.underleveled || input.needsCarryBuff) score += 90;
-    reasons.push('rare-candy');
-    if (input.underleveled) reasons.push('underleveled');
-    if (input.needsCarryBuff) reasons.push('carry-buff');
-    return {
-      id: `item:challenge:${itemName}`,
-      score,
-      reason: reasons.join(','),
-      details: { item: itemName, prepPressure, carryLevel: input.carryLevel ?? null },
-    };
-  }
-
-  if (itemName === 'tm normal') {
-    score += 170;
-    if (input.needsCarryBuff) score += 130;
-    if (moveTier >= challengeCarryMoveTierTarget) score -= 80;
-    reasons.push('tm');
-    if (input.needsCarryBuff) reasons.push('carry-buff');
-    if (moveTier >= challengeCarryMoveTierTarget) reasons.push('move-tier-met');
-    return {
-      id: `item:challenge:${itemName}`,
-      score,
-      reason: reasons.join(','),
-      details: { item: itemName, moveTier },
-    };
-  }
-
-  if (itemName === 'moon stone') {
-    score += 165;
-    if (input.hasCarry) score += 45 + Math.max(0, 70 - (input.carryLevel || 70)) / 3;
-    return {
-      id: `item:challenge:${itemName}`,
-      score,
-      reason: 'moon-stone',
-      details: { item: itemName, carryLevel: input.carryLevel ?? null },
-    };
-  }
+  const specialItem = scoreChallengeSpecialItem(
+    input,
+    itemName,
+    prepPressure,
+    faintedCount,
+    moveTier,
+    challengeCarryMoveTierTarget,
+  );
+  if (specialItem) return specialItem;
 
   if (!input.hasCarry || input.isUsable) {
     return {
       id: `item:challenge:${itemName}`,
-      score,
+      score: 0,
       reason: input.hasCarry ? 'usable' : 'no-carry',
       details: { item: itemName },
     };
   }
 
-  const improvement = (input.carryNewScore ?? 0) - (input.carryOldScore ?? 0);
+  return scoreChallengeCarryItem(input, itemName, prepPressure);
+}
 
-  if (input.isMainCarryPreferredItem) {
-    score += 260;
-    reasons.push('preferred-carry-item');
-  }
-  if (input.isSustainItem) {
-    score += 120;
-    reasons.push('sustain');
-  }
-  if (input.isOffenseItem) {
-    score += 105;
-    reasons.push('offense');
-  }
-  if (input.isUtilityItem) {
-    score += 70;
-    reasons.push('utility');
-  }
-  if (input.carryNeedsItem) {
-    score += 90;
-    reasons.push('carry-needs-item');
-  }
-  if (!normalizeItemName(input.carryHeldItem)) {
-    score += 80;
-    reasons.push('empty-slot');
-  }
-  if (improvement > 0) {
-    score += improvement * 1.45;
-    reasons.push('improvement');
-  } else if (input.carryNeedsItem && input.isMainCarryPreferredItem) {
-    score += 40;
-    reasons.push('preferred-rescue');
-  }
+function getStoryBaseItemScore(input: StoryItemScoreInput, itemName: string, prepPressure: number) {
+  const reasons: string[] = [];
+  let score = 0;
+  const simpleRules: Array<[boolean, number, string]> = [
+    [itemName === 'rare candy', 260 + prepPressure * 24, 'rare-candy'],
+    [itemName === 'tm normal', 120, 'tm'],
+    [itemName === 'moon stone', 135 + prepPressure * 10, 'moon-stone'],
+    [
+      itemName === 'sacred ash',
+      input.hasFainted ? 130 : -30,
+      input.hasFainted ? 'revive-fainted' : 'no-fainted',
+    ],
+    [
+      ['leftovers', 'shell bell', 'choice band', 'choice specs', 'life orb', 'lucky egg'].includes(
+        itemName,
+      ),
+      105,
+      'premium-held',
+    ],
+    [
+      ['expert belt', 'loaded dice', 'power bracer', 'choice scarf'].includes(itemName),
+      60,
+      'utility-held',
+    ],
+  ];
+
+  simpleRules.forEach(([applies, value, reason]) => {
+    if (!applies) return;
+    score += value;
+    reasons.push(reason);
+  });
+  return { score, reasons };
+}
+
+function addStoryCarryItemScore(
+  input: StoryItemScoreInput,
+  scoreParts: { score: number; reasons: string[] },
+): void {
+  if (!input.hasCarry || input.isUsable) return;
 
   if (input.boostType) {
-    score += input.carryMatchesBoost ? 85 : -110;
-    reasons.push(input.carryMatchesBoost ? 'matching-boost' : 'mismatched-boost');
+    scoreParts.score += input.carryMatchesBoost ? 48 : -55;
+    scoreParts.reasons.push(input.carryMatchesBoost ? 'matching-boost' : 'mismatched-boost');
   }
-
-  return {
-    id: `item:challenge:${itemName}`,
-    score,
-    reason: reasons.join(',') || 'neutral',
-    details: {
-      item: itemName,
-      prepPressure,
-      improvement,
-      boostType: input.boostType ?? null,
-    },
-  };
+  const improvement = (input.carryNewScore ?? 0) - (input.carryOldScore ?? 0);
+  if ((input.carryNewScore ?? 0) > (input.carryOldScore ?? 0) + 8) {
+    scoreParts.score += 55 + improvement;
+    scoreParts.reasons.push('improvement');
+  }
 }
 
 export function scoreStoryItemBonus(input: StoryItemScoreInput): ScoredDecision {
   const itemName = normalizeItemName(input.itemName);
   const prepPressure = input.prepPressure ?? 0;
-  const reasons: string[] = [];
-  let score = 0;
 
   if (!input.active || !itemName) {
-    return {
-      id: `item:story:${itemName || 'unknown'}`,
-      score: 0,
-      reason: 'inactive',
-      details: { item: itemName },
-    };
+    return inactiveItemDecision('item:story', itemName);
   }
 
   if (input.isLowValue) {
-    return {
-      id: `item:story:${itemName}`,
-      score: -180,
-      reason: 'low-value',
-      details: { item: itemName },
-    };
+    return lowValueItemDecision('item:story', itemName, -180);
   }
 
-  if (itemName === 'rare candy') {
-    score += 260 + prepPressure * 24;
-    reasons.push('rare-candy');
-  }
-  if (itemName === 'tm normal') {
-    score += 120;
-    reasons.push('tm');
-  }
-  if (itemName === 'moon stone') {
-    score += 135 + prepPressure * 10;
-    reasons.push('moon-stone');
-  }
-  if (itemName === 'sacred ash') {
-    score += input.hasFainted ? 130 : -30;
-    reasons.push(input.hasFainted ? 'revive-fainted' : 'no-fainted');
-  }
-  if (
-    ['leftovers', 'shell bell', 'choice band', 'choice specs', 'life orb', 'lucky egg'].includes(
-      itemName,
-    )
-  ) {
-    score += 105;
-    reasons.push('premium-held');
-  }
-  if (['expert belt', 'loaded dice', 'power bracer', 'choice scarf'].includes(itemName)) {
-    score += 60;
-    reasons.push('utility-held');
-  }
-
-  if (input.hasCarry && !input.isUsable) {
-    if (input.boostType) {
-      score += input.carryMatchesBoost ? 48 : -55;
-      reasons.push(input.carryMatchesBoost ? 'matching-boost' : 'mismatched-boost');
-    }
-    const improvement = (input.carryNewScore ?? 0) - (input.carryOldScore ?? 0);
-    if ((input.carryNewScore ?? 0) > (input.carryOldScore ?? 0) + 8) {
-      score += 55 + improvement;
-      reasons.push('improvement');
-    }
-  }
+  const scoreParts = getStoryBaseItemScore(input, itemName, prepPressure);
+  addStoryCarryItemScore(input, scoreParts);
 
   return {
     id: `item:story:${itemName}`,
-    score,
-    reason: reasons.join(',') || 'neutral',
+    score: scoreParts.score,
+    reason: scoreParts.reasons.join(',') || 'neutral',
     details: {
       item: itemName,
       prepPressure,

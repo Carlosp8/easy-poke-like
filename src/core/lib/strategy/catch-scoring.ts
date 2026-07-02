@@ -148,6 +148,110 @@ export interface TypeCoverageScoreInput {
   coverageWeight?: number;
 }
 
+interface CatchProtectionFlags {
+  premium: boolean;
+  exceptional: boolean;
+  directCounter: boolean;
+  duplicatePlan: boolean;
+  sinnohPassivePlan: boolean;
+  challengePlan: boolean;
+  storyPlan: boolean;
+  bossRelevant: boolean;
+}
+
+function isProtectedCatchPlan(flags: CatchProtectionFlags): boolean {
+  return (
+    flags.premium ||
+    flags.exceptional ||
+    flags.directCounter ||
+    flags.duplicatePlan ||
+    flags.sinnohPassivePlan ||
+    flags.challengePlan ||
+    flags.storyPlan
+  );
+}
+
+function shouldSkipEarlyNonShinyScout(
+  input: CatchDraftDecisionInput,
+  bestCandidate: CatchDraftDecisionInput['bestCandidate'],
+  bestScore: number,
+  flags: CatchProtectionFlags,
+  config: NonNullable<CatchDraftDecisionInput['config']>,
+): boolean {
+  return Boolean(
+    input.openTeamSlot &&
+    input.earlyShinyScoutWindow &&
+    !input.hasVisibleShiny &&
+    bestCandidate &&
+    bestScore < (config.earlyNonShinyMinAcceptScore ?? 38) &&
+    !flags.premium &&
+    !flags.exceptional &&
+    !flags.directCounter &&
+    !flags.sinnohPassivePlan &&
+    !flags.challengePlan &&
+    !flags.storyPlan,
+  );
+}
+
+function shouldSkipOpenSlotCatch(
+  input: CatchDraftDecisionInput,
+  bestScore: number,
+  flags: CatchProtectionFlags,
+  config: NonNullable<CatchDraftDecisionInput['config']>,
+): string {
+  const fillingEarlyRoster =
+    (input.aliveCount ?? 0) < (config.earlyOptionalTeamSize ?? 4) &&
+    bestScore >= (config.catchRerollMinAcceptScore ?? 18);
+  const goodGeneralValue =
+    !input.earlyExpansionClosed &&
+    !input.shouldPrioritizeTraining &&
+    !input.effectiveCaptureCapReached &&
+    bestScore >= (config.catchRerollMinAcceptScore ?? 18);
+  const shouldAcceptRosterFill =
+    fillingEarlyRoster &&
+    (!input.effectiveCaptureCapReached ||
+      flags.premium ||
+      bestScore >= (config.earlyExceptionalCatchScore ?? 42));
+  const canBreakEarlyRosterCap = !input.earlyExpansionClosed || isProtectedCatchPlan(flags);
+
+  if (
+    !input.bestWouldDiluteLevels &&
+    canBreakEarlyRosterCap &&
+    (flags.premium ||
+      flags.bossRelevant ||
+      goodGeneralValue ||
+      shouldAcceptRosterFill ||
+      isProtectedCatchPlan(flags))
+  ) {
+    return '';
+  }
+  if (input.bestWouldDiluteLevels) return 'would dilute levels';
+  if (input.earlyExpansionClosed && !isProtectedCatchPlan(flags)) return 'early roster closed';
+  if (input.effectiveCaptureCapReached) return 'already caught this map';
+  if (input.shouldPrioritizeTraining) return 'leveling focus';
+  return 'no strong boss value';
+}
+
+function shouldSkipLowLevelReplacement(
+  input: CatchDraftDecisionInput,
+  flags: CatchProtectionFlags,
+  minUsefulSwapLevel: number,
+): boolean {
+  const candidateLevel = input.bestCandidate?.level ?? 0;
+  return Boolean(
+    !input.openTeamSlot &&
+    input.hasLowLevelForSwap &&
+    candidateLevel &&
+    candidateLevel < minUsefulSwapLevel &&
+    !flags.premium &&
+    !flags.exceptional &&
+    !flags.directCounter &&
+    !flags.sinnohPassivePlan &&
+    !flags.challengePlan &&
+    !flags.storyPlan,
+  );
+}
+
 export function scoreTraitSynergy(input: TraitSynergyScoreInput = {}): ScoredDecision {
   const types = normalizeTypeList(input.types);
   const traitCounts = input.traitCounts || {};
@@ -200,22 +304,17 @@ export function decideCatchDraftAction(input: CatchDraftDecisionInput): CatchDra
   const bestCandidate = input.bestCandidate ?? null;
   const config = input.config ?? {};
   const bestScore = Number.isFinite(input.bestScore) ? input.bestScore : -999;
-  const bestIsPremiumCatch = Boolean(input.bestIsPremiumCatch);
-  const bestIsExceptional = Boolean(input.bestIsExceptional);
-  const bestIsDirectCounter = Boolean(input.bestIsDirectCounter);
-  const bestIsDuplicatePlan = Boolean(input.bestIsDuplicatePlan);
-  const bestIsSinnohPassivePlan = Boolean(input.bestIsSinnohPassivePlan);
-  const bestIsChallengePlan = Boolean(input.bestIsChallengePlan);
-  const bestIsStoryPlan = Boolean(input.bestIsStoryPlan);
-  const bestIsBossRelevant = Boolean(input.bestIsBossRelevant);
-  const protectedPlan =
-    bestIsPremiumCatch ||
-    bestIsExceptional ||
-    bestIsDirectCounter ||
-    bestIsDuplicatePlan ||
-    bestIsSinnohPassivePlan ||
-    bestIsChallengePlan ||
-    bestIsStoryPlan;
+  const flags: CatchProtectionFlags = {
+    premium: Boolean(input.bestIsPremiumCatch),
+    exceptional: Boolean(input.bestIsExceptional),
+    directCounter: Boolean(input.bestIsDirectCounter),
+    duplicatePlan: Boolean(input.bestIsDuplicatePlan),
+    sinnohPassivePlan: Boolean(input.bestIsSinnohPassivePlan),
+    challengePlan: Boolean(input.bestIsChallengePlan),
+    storyPlan: Boolean(input.bestIsStoryPlan),
+    bossRelevant: Boolean(input.bestIsBossRelevant),
+  };
+  const protectedPlan = isProtectedCatchPlan(flags);
 
   const skip = (reason: string, details: CatchDraftDecision['details'] = {}) => ({
     action: 'skip' as const,
@@ -223,19 +322,7 @@ export function decideCatchDraftAction(input: CatchDraftDecisionInput): CatchDra
     details,
   });
 
-  if (
-    input.openTeamSlot &&
-    input.earlyShinyScoutWindow &&
-    !input.hasVisibleShiny &&
-    bestCandidate &&
-    bestScore < (config.earlyNonShinyMinAcceptScore ?? 38) &&
-    !bestIsPremiumCatch &&
-    !bestIsExceptional &&
-    !bestIsDirectCounter &&
-    !bestIsSinnohPassivePlan &&
-    !bestIsChallengePlan &&
-    !bestIsStoryPlan
-  ) {
+  if (shouldSkipEarlyNonShinyScout(input, bestCandidate, bestScore, flags, config)) {
     return skip('early-non-shiny-low-value');
   }
 
@@ -252,71 +339,19 @@ export function decideCatchDraftAction(input: CatchDraftDecisionInput): CatchDra
   if (
     input.sinnohTrainingActive &&
     (input.aliveCount ?? 0) >= (config.sinnohTrainingCoreTeamSize ?? 2) &&
-    !bestIsPremiumCatch &&
-    !bestIsExceptional &&
-    !bestIsDirectCounter &&
-    !bestIsSinnohPassivePlan &&
-    !bestIsChallengePlan &&
-    !bestIsStoryPlan
+    !flags.premium &&
+    !flags.exceptional &&
+    !flags.directCounter &&
+    !flags.sinnohPassivePlan &&
+    !flags.challengePlan &&
+    !flags.storyPlan
   ) {
     return skip('sinnoh-carry-training');
   }
 
   if (input.openTeamSlot && bestCandidate && !input.shouldBuildCoreTeam) {
-    const fillingEarlyRoster =
-      (input.aliveCount ?? 0) < (config.earlyOptionalTeamSize ?? 4) &&
-      bestScore >= (config.catchRerollMinAcceptScore ?? 18);
-    const goodGeneralValue =
-      !input.earlyExpansionClosed &&
-      !input.shouldPrioritizeTraining &&
-      !input.effectiveCaptureCapReached &&
-      bestScore >= (config.catchRerollMinAcceptScore ?? 18);
-    const shouldAcceptRosterFill =
-      fillingEarlyRoster &&
-      (!input.effectiveCaptureCapReached ||
-        bestIsPremiumCatch ||
-        bestScore >= (config.earlyExceptionalCatchScore ?? 42));
-    const canBreakEarlyRosterCap =
-      !input.earlyExpansionClosed ||
-      bestIsExceptional ||
-      bestIsPremiumCatch ||
-      bestIsDirectCounter ||
-      bestIsDuplicatePlan ||
-      bestIsSinnohPassivePlan ||
-      bestIsChallengePlan ||
-      bestIsStoryPlan;
-
-    if (
-      input.bestWouldDiluteLevels ||
-      !canBreakEarlyRosterCap ||
-      (!bestIsPremiumCatch &&
-        !bestIsBossRelevant &&
-        !goodGeneralValue &&
-        !shouldAcceptRosterFill &&
-        !bestIsExceptional &&
-        !bestIsDirectCounter &&
-        !bestIsDuplicatePlan &&
-        !bestIsSinnohPassivePlan &&
-        !bestIsChallengePlan &&
-        !bestIsStoryPlan)
-    ) {
-      if (input.bestWouldDiluteLevels) return skip('would dilute levels');
-      if (
-        input.earlyExpansionClosed &&
-        !bestIsExceptional &&
-        !bestIsPremiumCatch &&
-        !bestIsDirectCounter &&
-        !bestIsDuplicatePlan &&
-        !bestIsSinnohPassivePlan &&
-        !bestIsChallengePlan &&
-        !bestIsStoryPlan
-      ) {
-        return skip('early roster closed');
-      }
-      if (input.effectiveCaptureCapReached) return skip('already caught this map');
-      if (input.shouldPrioritizeTraining) return skip('leveling focus');
-      return skip('no strong boss value');
-    }
+    const skipReason = shouldSkipOpenSlotCatch(input, bestScore, flags, config);
+    if (skipReason) return skip(skipReason);
   }
 
   if (!input.openTeamSlot && input.hasLowLevelForSwap && bestCandidate?.level) {
@@ -324,15 +359,7 @@ export function decideCatchDraftAction(input: CatchDraftDecisionInput): CatchDra
       1,
       (input.teamMaxLevel ?? 0) - (config.earlyLowLevelSwapGap ?? 5),
     );
-    if (
-      bestCandidate.level < minUsefulSwapLevel &&
-      !bestIsPremiumCatch &&
-      !bestIsExceptional &&
-      !bestIsDirectCounter &&
-      !bestIsSinnohPassivePlan &&
-      !bestIsChallengePlan &&
-      !bestIsStoryPlan
-    ) {
+    if (shouldSkipLowLevelReplacement(input, flags, minUsefulSwapLevel)) {
       return skip('replacement-too-low-level', { minUsefulSwapLevel });
     }
   }
@@ -341,10 +368,10 @@ export function decideCatchDraftAction(input: CatchDraftDecisionInput): CatchDra
     !input.openTeamSlot &&
     input.earlyAllowance === 'skip' &&
     !input.hasLowLevelForSwap &&
-    !bestIsPremiumCatch &&
-    !bestIsSinnohPassivePlan &&
-    !bestIsChallengePlan &&
-    !bestIsStoryPlan
+    !flags.premium &&
+    !flags.sinnohPassivePlan &&
+    !flags.challengePlan &&
+    !flags.storyPlan
   ) {
     return skip('xp-focus');
   }
@@ -353,10 +380,10 @@ export function decideCatchDraftAction(input: CatchDraftDecisionInput): CatchDra
     !input.openTeamSlot &&
     bestScore < 2 &&
     !input.hasLowLevelForSwap &&
-    !bestIsPremiumCatch &&
-    !bestIsSinnohPassivePlan &&
-    !bestIsChallengePlan &&
-    !bestIsStoryPlan
+    !flags.premium &&
+    !flags.sinnohPassivePlan &&
+    !flags.challengePlan &&
+    !flags.storyPlan
   ) {
     return skip('weak-candidate');
   }
@@ -392,7 +419,7 @@ export function scoreCatchDraftSignals(candidate: CatchDraftInput): ScoredDecisi
   }
 
   return {
-    id: foldText(candidate.name).replace(/\s+/g, '-'),
+    id: foldText(candidate.name).replaceAll(/\s+/g, '-'),
     score,
     reason: reasons.join(',') || 'baseline',
     details: {
@@ -401,6 +428,104 @@ export function scoreCatchDraftSignals(candidate: CatchDraftInput): ScoredDecisi
       attackTypes: normalizeTypeList(attackTypes),
     },
   };
+}
+
+function addChallengeShinyScore(
+  input: ChallengeCatchScoreInput,
+  scoreParts: { score: number; reasons: string[] },
+  values: {
+    priorityTypeScore: number;
+    challengeShinyCatchBonus: number;
+    challengeNonShinyEarlyPenalty: number;
+    earlyExpansionCounterScore: number;
+    legendaryCatchMinBst: number;
+    bossCounterScore: number;
+    bst: number;
+  },
+): void {
+  if (input.isShiny) {
+    scoreParts.score += input.hasShiny ? 120 : values.challengeShinyCatchBonus;
+    scoreParts.score += input.alreadyOwnedShiny ? 18 : 72;
+    scoreParts.score += values.priorityTypeScore * 0.9;
+    scoreParts.reasons.push(input.hasShiny ? 'repeat-run-shiny' : 'first-run-shiny');
+    return;
+  }
+
+  if (!input.earlyShinyHunt) return;
+  const runValue =
+    Boolean(input.isLegendary) ||
+    values.bossCounterScore >= values.earlyExpansionCounterScore ||
+    values.bst >= values.legendaryCatchMinBst;
+  scoreParts.score -= runValue ? 8 : values.challengeNonShinyEarlyPenalty;
+  scoreParts.reasons.push(runValue ? 'early-run-value' : 'early-non-shiny');
+}
+
+function addChallengeCatchStats(
+  input: ChallengeCatchScoreInput,
+  scoreParts: { score: number; reasons: string[] },
+  values: {
+    bst: number;
+    offense: number;
+    speed: number;
+    level: number;
+    prepAvgLevel: number;
+    legendaryCatchMinBst: number;
+  },
+): void {
+  if (input.isMainCarry) {
+    scoreParts.score += 78;
+    scoreParts.reasons.push('main-carry');
+  }
+  if (input.isLegendary || values.bst >= values.legendaryCatchMinBst) {
+    scoreParts.score += 54;
+    scoreParts.reasons.push('legendary-or-high-bst');
+  }
+  if (values.bst) scoreParts.score += Math.max(0, values.bst - 460) / 5;
+  if (values.offense) scoreParts.score += values.offense / 9;
+  if (values.speed) scoreParts.score += values.speed / 14;
+  if (values.level && values.prepAvgLevel && values.level >= values.prepAvgLevel - 3) {
+    scoreParts.score += 18;
+    scoreParts.reasons.push('level-ready');
+  }
+  if (values.level && values.prepAvgLevel && values.level < values.prepAvgLevel - 8) {
+    scoreParts.score -= 18;
+    scoreParts.reasons.push('level-low');
+  }
+}
+
+function addChallengeCatchTypeScore(
+  scoreParts: { score: number; reasons: string[] },
+  types: string[],
+  attacks: unknown,
+  targetTypes: string[],
+  priorityTypeScore: number,
+  bst: number,
+): void {
+  if (targetTypes.length > 0) {
+    scoreParts.score += getAttackCoverageScore(attacks, targetTypes) * 4.2;
+    scoreParts.score += getDefensiveMatchupScore(types, targetTypes) * 2.8;
+    scoreParts.reasons.push('target-matchup');
+  }
+
+  scoreParts.score += priorityTypeScore;
+  if (priorityTypeScore) scoreParts.reasons.push('priority-types');
+  if (types.includes('Fairy')) {
+    scoreParts.score += 18;
+    scoreParts.reasons.push('fairy');
+  }
+  if (
+    types.includes('Dragon') ||
+    types.includes('Fire') ||
+    types.includes('Dark') ||
+    types.includes('Ghost')
+  ) {
+    scoreParts.score += 12;
+    scoreParts.reasons.push('power-type');
+  }
+  if (types.includes('Poison') && bst && bst < 500) {
+    scoreParts.score -= 14;
+    scoreParts.reasons.push('low-bst-poison');
+  }
 }
 
 export function scoreChallengeCatchBonus(input: ChallengeCatchScoreInput): ScoredDecision {
@@ -421,8 +546,7 @@ export function scoreChallengeCatchBonus(input: ChallengeCatchScoreInput): Score
   const bossCounterScore =
     input.bossCounterScore ?? scoreCatchBossCounter(types, attacks, targetTypes);
   const priorityTypeScore = input.priorityTypeScore ?? 0;
-  const reasons: string[] = [];
-  let score = 0;
+  const scoreParts = { score: 0, reasons: [] as string[] };
 
   if (!input.active) {
     return {
@@ -433,70 +557,29 @@ export function scoreChallengeCatchBonus(input: ChallengeCatchScoreInput): Score
     };
   }
 
-  if (input.isShiny) {
-    score += input.hasShiny ? 120 : challengeShinyCatchBonus;
-    score += input.alreadyOwnedShiny ? 18 : 72;
-    score += priorityTypeScore * 0.9;
-    reasons.push(input.hasShiny ? 'repeat-run-shiny' : 'first-run-shiny');
-  } else if (input.earlyShinyHunt) {
-    const runValue =
-      Boolean(input.isLegendary) ||
-      bossCounterScore >= earlyExpansionCounterScore ||
-      bst >= legendaryCatchMinBst;
-    score -= runValue ? 8 : challengeNonShinyEarlyPenalty;
-    reasons.push(runValue ? 'early-run-value' : 'early-non-shiny');
-  }
-
-  if (input.isMainCarry) {
-    score += 78;
-    reasons.push('main-carry');
-  }
-  if (input.isLegendary || bst >= legendaryCatchMinBst) {
-    score += 54;
-    reasons.push('legendary-or-high-bst');
-  }
-  if (bst) score += Math.max(0, bst - 460) / 5;
-  if (offense) score += offense / 9;
-  if (speed) score += speed / 14;
-  if (level && prepAvgLevel && level >= prepAvgLevel - 3) {
-    score += 18;
-    reasons.push('level-ready');
-  }
-  if (level && prepAvgLevel && level < prepAvgLevel - 8) {
-    score -= 18;
-    reasons.push('level-low');
-  }
-
-  if (targetTypes.length > 0) {
-    score += getAttackCoverageScore(attacks, targetTypes) * 4.2;
-    score += getDefensiveMatchupScore(types, targetTypes) * 2.8;
-    reasons.push('target-matchup');
-  }
-
-  score += priorityTypeScore;
-  if (priorityTypeScore) reasons.push('priority-types');
-  if (types.includes('Fairy')) {
-    score += 18;
-    reasons.push('fairy');
-  }
-  if (
-    types.includes('Dragon') ||
-    types.includes('Fire') ||
-    types.includes('Dark') ||
-    types.includes('Ghost')
-  ) {
-    score += 12;
-    reasons.push('power-type');
-  }
-  if (types.includes('Poison') && bst && bst < 500) {
-    score -= 14;
-    reasons.push('low-bst-poison');
-  }
+  addChallengeShinyScore(input, scoreParts, {
+    priorityTypeScore,
+    challengeShinyCatchBonus,
+    challengeNonShinyEarlyPenalty,
+    earlyExpansionCounterScore,
+    legendaryCatchMinBst,
+    bossCounterScore,
+    bst,
+  });
+  addChallengeCatchStats(input, scoreParts, {
+    bst,
+    offense,
+    speed,
+    level,
+    prepAvgLevel,
+    legendaryCatchMinBst,
+  });
+  addChallengeCatchTypeScore(scoreParts, types, attacks, targetTypes, priorityTypeScore, bst);
 
   return {
     id: `catch:challenge:${foldText(input.name || 'unknown') || 'unknown'}`,
-    score,
-    reason: reasons.join(',') || 'neutral',
+    score: scoreParts.score,
+    reason: scoreParts.reasons.join(',') || 'neutral',
     details: {
       types,
       targetTypes,
@@ -552,6 +635,93 @@ export function scoreStoryLeagueCoverage(input: StoryLeagueCoverageInput = {}): 
   };
 }
 
+function addStoryCatchIdentityScore(
+  input: StoryCatchScoreInput,
+  scoreParts: { score: number; reasons: string[] },
+): void {
+  if (input.needsTeam) {
+    scoreParts.score += 34;
+    scoreParts.reasons.push('needs-team');
+  }
+  if (input.isShiny) {
+    scoreParts.score += 18;
+    scoreParts.reasons.push('shiny');
+  }
+  if (input.isLegendary || input.isLegendaryName) {
+    scoreParts.score += 70;
+    scoreParts.reasons.push('legendary');
+  }
+  if (input.isMainCarry) {
+    scoreParts.score += 55;
+    scoreParts.reasons.push('main-carry');
+  }
+}
+
+function addStoryCatchStats(
+  input: StoryCatchScoreInput,
+  scoreParts: { score: number; reasons: string[] },
+  values: {
+    bst: number;
+    offense: number;
+    speed: number;
+    bulk: number;
+    storyMinBstTarget: number;
+    storyWeakStatPenalty: number;
+  },
+): void {
+  if (values.bst) scoreParts.score += Math.max(0, values.bst - 430) / 3.6;
+  if (values.offense) scoreParts.score += values.offense / 7.5;
+  if (values.speed) scoreParts.score += values.speed / 12;
+  if (values.bulk) scoreParts.score += values.bulk / 42;
+  if (values.bst && values.bst < values.storyMinBstTarget && !input.needsTeam) {
+    scoreParts.score -= values.storyWeakStatPenalty;
+    scoreParts.reasons.push('weak-stats');
+  }
+}
+
+function addStoryCatchMatchups(
+  scoreParts: { score: number; reasons: string[] },
+  values: {
+    attacks: unknown;
+    types: string[];
+    currentBossTypes: string[];
+    storyCurrentBossCoverageBonus: number;
+    leagueCoverageScore: number;
+    priorityTypeScore: number;
+  },
+): void {
+  if (values.currentBossTypes.length > 0) {
+    scoreParts.score +=
+      (getAttackCoverageScore(values.attacks, values.currentBossTypes) *
+        values.storyCurrentBossCoverageBonus) /
+      5;
+    scoreParts.score += getDefensiveMatchupScore(values.types, values.currentBossTypes) * 3;
+    scoreParts.reasons.push('current-boss');
+  }
+
+  scoreParts.score += values.leagueCoverageScore;
+  if (values.leagueCoverageScore) scoreParts.reasons.push('league-coverage');
+  scoreParts.score += values.priorityTypeScore;
+  if (values.priorityTypeScore) scoreParts.reasons.push('priority-types');
+}
+
+function addStoryDuplicatePenalty(
+  input: StoryCatchScoreInput,
+  scoreParts: { score: number; reasons: string[] },
+  values: { duplicateCount: number; bst: number; legendaryCatchMinBst: number },
+): void {
+  if (
+    values.duplicateCount <= 0 ||
+    input.isLegendary ||
+    input.isMainCarry ||
+    values.bst >= values.legendaryCatchMinBst
+  ) {
+    return;
+  }
+  scoreParts.score -= input.needsCoverage ? 24 : 42;
+  scoreParts.reasons.push(input.needsCoverage ? 'coverage-duplicate' : 'duplicate');
+}
+
 export function scoreStoryCatchBonus(input: StoryCatchScoreInput): ScoredDecision {
   const config = input.config ?? {};
   const types = normalizeTypeList(input.types);
@@ -580,8 +750,7 @@ export function scoreStoryCatchBonus(input: StoryCatchScoreInput): ScoredDecisio
     }).score;
   const priorityTypeScore = input.priorityTypeScore ?? 0;
   const duplicateCount = input.duplicateCount ?? 0;
-  const reasons: string[] = [];
-  let score = 0;
+  const scoreParts = { score: 0, reasons: [] as string[] };
 
   if (!input.active) {
     return {
@@ -592,57 +761,33 @@ export function scoreStoryCatchBonus(input: StoryCatchScoreInput): ScoredDecisio
     };
   }
 
-  if (input.needsTeam) {
-    score += 34;
-    reasons.push('needs-team');
-  }
-  if (input.isShiny) {
-    score += 18;
-    reasons.push('shiny');
-  }
-  if (input.isLegendary || input.isLegendaryName) {
-    score += 70;
-    reasons.push('legendary');
-  }
-  if (input.isMainCarry) {
-    score += 55;
-    reasons.push('main-carry');
-  }
-  if (bst) score += Math.max(0, bst - 430) / 3.6;
-  if (offense) score += offense / 7.5;
-  if (speed) score += speed / 12;
-  if (bulk) score += bulk / 42;
-  if (bst && bst < storyMinBstTarget && !input.needsTeam) {
-    score -= storyWeakStatPenalty;
-    reasons.push('weak-stats');
-  }
-
-  if (currentBossTypes.length > 0) {
-    score +=
-      (getAttackCoverageScore(attacks, currentBossTypes) * storyCurrentBossCoverageBonus) / 5;
-    score += getDefensiveMatchupScore(types, currentBossTypes) * 3;
-    reasons.push('current-boss');
-  }
-
-  score += leagueCoverageScore;
-  if (leagueCoverageScore) reasons.push('league-coverage');
-  score += priorityTypeScore;
-  if (priorityTypeScore) reasons.push('priority-types');
-
-  if (
-    duplicateCount > 0 &&
-    !input.isLegendary &&
-    !input.isMainCarry &&
-    bst < legendaryCatchMinBst
-  ) {
-    score -= input.needsCoverage ? 24 : 42;
-    reasons.push(input.needsCoverage ? 'coverage-duplicate' : 'duplicate');
-  }
+  addStoryCatchIdentityScore(input, scoreParts);
+  addStoryCatchStats(input, scoreParts, {
+    bst,
+    offense,
+    speed,
+    bulk,
+    storyMinBstTarget,
+    storyWeakStatPenalty,
+  });
+  addStoryCatchMatchups(scoreParts, {
+    attacks,
+    types,
+    currentBossTypes,
+    storyCurrentBossCoverageBonus,
+    leagueCoverageScore,
+    priorityTypeScore,
+  });
+  addStoryDuplicatePenalty(input, scoreParts, {
+    duplicateCount,
+    bst,
+    legendaryCatchMinBst,
+  });
 
   return {
     id: `catch:story:${foldText(input.name || 'unknown') || 'unknown'}`,
-    score,
-    reason: reasons.join(',') || 'neutral',
+    score: scoreParts.score,
+    reason: scoreParts.reasons.join(',') || 'neutral',
     details: {
       types,
       currentBossTypes,

@@ -181,25 +181,24 @@ export function buildPassiveTeamProfileSnapshot(
 
 export function detectPassiveTextSignals(text: string): PassiveTextSignals {
   const folded = foldText(text);
+  const has = (pattern: RegExp) => pattern.exec(folded) !== null;
   return {
-    isSustain: Boolean(folded.match(/heal|restore|drain|lifesteal|cur|recuper|dren/)),
-    isSurvival: Boolean(folded.match(/survive|sturdy|revive|faint|ko|resist|defen|shield|escudo/)),
-    isDamage: Boolean(folded.match(/damage|dano|power|move|ataque|golpe|boost|aument/)),
-    isSpeed: Boolean(folded.match(/speed|first|lead|priority|velocidad|primero/)),
-    isScaling: Boolean(folded.match(/level|lvl|xp|experiencia|nivel|evol|growth|crec/)),
-    isMultiHit: Boolean(folded.match(/extra attack|double|twice|ataque extra|doble/)),
-    isCrit: Boolean(folded.match(/crit|critical|critico/)),
-    isExecute: Boolean(folded.match(/execute|remata|ejecut/)),
-    isDistinctTypes: Boolean(folded.match(/distinct|different|cada tipo|tipos distintos/)),
+    isSustain: has(/heal|restore|drain|lifesteal|cur|recuper|dren/),
+    isSurvival: has(/survive|sturdy|revive|faint|ko|resist|defen|shield|escudo/),
+    isDamage: has(/damage|dano|power|move|ataque|golpe|boost|aument/),
+    isSpeed: has(/speed|first|lead|priority|velocidad|primero/),
+    isScaling: has(/level|lvl|xp|experiencia|nivel|evol|growth|crec/),
+    isMultiHit: has(/extra attack|double|twice|ataque extra|doble/),
+    isCrit: has(/crit|critical|critico/),
+    isExecute: has(/execute|remata|ejecut/),
+    isDistinctTypes: has(/distinct|different|cada tipo|tipos distintos/),
     lowersOffense: Boolean(
-      folded.match(/lower|reduce|decrease|drop|debuff|baj|reduc|dismin|resta/) &&
-      folded.match(/atk|attack|ataque|sp\.?\s*atk|special attack|ataque especial|ofens/),
+      has(/lower|reduce|decrease|drop|debuff|baj|reduc|dismin|resta/) &&
+      has(/atk|attack|ataque|sp\.?\s*atk|special attack|ataque especial|ofens/),
     ),
-    raisesDefense: Boolean(
-      folded.match(/def|defense|defensa|sp\.?\s*def|resist|shield|escudo|armor|armadura/),
-    ),
-    mentionsShiny: Boolean(folded.match(/shiny|variocolor|brillante/)),
-    mentionsItem: Boolean(folded.match(/item|held|equip|objeto|sujeto/)),
+    raisesDefense: has(/def|defense|defensa|sp\.?\s*def|resist|shield|escudo|armor|armadura/),
+    mentionsShiny: has(/shiny|variocolor|brillante/),
+    mentionsItem: has(/item|held|equip|objeto|sujeto/),
   };
 }
 
@@ -383,6 +382,62 @@ export function scoreChallengePassiveCardPurpose(
   };
 }
 
+function scoreSinglePassiveTypeContext(input: {
+  type: string;
+  traitCounts: Record<string, number>;
+  profile: PassiveProfileSnapshot;
+  shinyTypes: string[];
+  primaryTypes: string[];
+  bossTypes: string[];
+  uncoveredBossTypes: string[];
+  teamUserTypes: string[];
+  config: Required<
+    Pick<
+      PassiveScoreConfig,
+      | 'passiveShinyTypeBonus'
+      | 'passiveStrongCarryTypeBonus'
+      | 'passiveBossCounterBonus'
+      | 'passiveUncoveredBossTypeBonus'
+      | 'passiveOffTeamTypePenalty'
+    >
+  >;
+}): RouteScoreParts {
+  const reasons: string[] = [];
+  let score = 0;
+  const hasTeamUser =
+    input.teamUserTypes.includes(input.type) || (input.traitCounts[input.type] || 0) > 0;
+  const typeBossScore =
+    input.bossTypes.length > 0 ? getAttackCoverageScore([input.type], input.bossTypes) : 0;
+  const coversUncoveredBossType = input.uncoveredBossTypes.some(
+    (bossType) => getAttackCoverageScore([input.type], [bossType]) > 0,
+  );
+
+  if (input.shinyTypes.includes(input.type)) {
+    score += input.config.passiveShinyTypeBonus + (input.traitCounts[input.type] || 0) * 3;
+    reasons.push('shiny-type');
+  }
+  if (input.primaryTypes.includes(input.type) && input.profile.hasStrongCarry) {
+    score += input.config.passiveStrongCarryTypeBonus;
+    reasons.push('carry-type');
+  }
+  if (typeBossScore > 0) {
+    score += Math.min(42, input.config.passiveBossCounterBonus + typeBossScore * 5);
+    reasons.push('boss-counter');
+    if (coversUncoveredBossType) score += input.config.passiveUncoveredBossTypeBonus;
+    if (!hasTeamUser) score -= input.config.passiveOffTeamTypePenalty;
+  } else if (!hasTeamUser) {
+    score -= input.config.passiveOffTeamTypePenalty;
+    reasons.push('off-team-type');
+  }
+
+  if (input.profile.weakCore && hasTeamUser && typeBossScore > 0) {
+    score += 10;
+    reasons.push('weak-core-counter');
+  }
+
+  return { score, reasons };
+}
+
 export function scorePassiveTypeContext(input: PassiveTypeContextInput): ScoredDecision {
   const passiveTypes = normalizeTypeList(input.passiveTypes);
   const traitCounts = input.traitCounts || {};
@@ -401,34 +456,25 @@ export function scorePassiveTypeContext(input: PassiveTypeContextInput): ScoredD
   let score = 0;
 
   passiveTypes.forEach((type) => {
-    const hasTeamUser = teamUserTypes.includes(type) || (traitCounts[type] || 0) > 0;
-    const typeBossScore = bossTypes.length > 0 ? getAttackCoverageScore([type], bossTypes) : 0;
-    const coversUncoveredBossType = uncoveredBossTypes.some(
-      (bossType) => getAttackCoverageScore([type], [bossType]) > 0,
-    );
-
-    if (shinyTypes.includes(type)) {
-      score += passiveShinyTypeBonus + (traitCounts[type] || 0) * 3;
-      reasons.push('shiny-type');
-    }
-    if (primaryTypes.includes(type) && profile.hasStrongCarry) {
-      score += passiveStrongCarryTypeBonus;
-      reasons.push('carry-type');
-    }
-    if (typeBossScore > 0) {
-      score += Math.min(42, passiveBossCounterBonus + typeBossScore * 5);
-      reasons.push('boss-counter');
-      if (coversUncoveredBossType) score += passiveUncoveredBossTypeBonus;
-      if (!hasTeamUser) score -= passiveOffTeamTypePenalty;
-    } else if (!hasTeamUser) {
-      score -= passiveOffTeamTypePenalty;
-      reasons.push('off-team-type');
-    }
-
-    if (profile.weakCore && hasTeamUser && typeBossScore > 0) {
-      score += 10;
-      reasons.push('weak-core-counter');
-    }
+    const typeScore = scoreSinglePassiveTypeContext({
+      type,
+      traitCounts,
+      profile,
+      shinyTypes,
+      primaryTypes,
+      bossTypes,
+      uncoveredBossTypes,
+      teamUserTypes,
+      config: {
+        passiveShinyTypeBonus,
+        passiveStrongCarryTypeBonus,
+        passiveBossCounterBonus,
+        passiveUncoveredBossTypeBonus,
+        passiveOffTeamTypePenalty,
+      },
+    });
+    score += typeScore.score;
+    reasons.push(...typeScore.reasons);
   });
 
   return {
@@ -437,6 +483,79 @@ export function scorePassiveTypeContext(input: PassiveTypeContextInput): ScoredD
     reason: reasons.join(',') || 'neutral',
     details: { passiveTypes },
   };
+}
+
+interface RouteScoreParts {
+  score: number;
+  reasons: string[];
+}
+
+function addGeneralPassiveSignalScore(
+  input: GeneralPassiveCardScoreInput,
+  parts: RouteScoreParts,
+  signals: PassiveTextSignals,
+  traitCounts: Record<string, number>,
+  passiveTypes: string[],
+): void {
+  if (signals.isSustain) parts.score += (input.avgHP ?? 100) < 70 ? 38 : 22;
+  if (signals.isCrit) parts.score += 18 + (traitCounts.Dark || 0) * 8;
+  if (signals.isSurvival) parts.score += 26;
+  if (signals.isDamage) parts.score += 18;
+  if (signals.isSpeed) parts.score += 14;
+  if (signals.isScaling) parts.score += 18 + (traitCounts.Bug || 0) * 7;
+  if (signals.isDistinctTypes) parts.score += (input.teamTypeCount || 0) * 7;
+  if (signals.isMultiHit) parts.score += 18 + (traitCounts.Electric || 0) * 7;
+  if (signals.isExecute) parts.score += 16 + (traitCounts.Ghost || 0) * 8;
+  if (input.hasCarry && signals.isSustain) parts.score += 18;
+  if (input.hasCarry && passiveTypes.includes('Grass')) {
+    parts.score += 18 + (traitCounts.Grass || 0) * 6;
+  }
+}
+
+function addGeneralPassiveProfileScore(
+  profile: PassiveProfileSnapshot,
+  parts: RouteScoreParts,
+  signals: PassiveTextSignals,
+  passiveTypes: string[],
+  config: Required<
+    Pick<PassiveScoreConfig, 'passiveWeakCoreScalingBonus' | 'passiveWeakCoreSurvivalBonus'>
+  >,
+): void {
+  if (profile.weakCore) {
+    if (signals.isScaling) parts.score += config.passiveWeakCoreScalingBonus;
+    if (signals.isSustain || signals.isSurvival) parts.score += config.passiveWeakCoreSurvivalBonus;
+    if (signals.isDamage || signals.isMultiHit || signals.isCrit) parts.score += 12;
+    if (
+      passiveTypes.length === 0 &&
+      profile.bossCoveragePoor &&
+      (signals.isDamage || signals.isSustain || signals.isSurvival || signals.isScaling)
+    ) {
+      parts.score += 10;
+    }
+    return;
+  }
+
+  if (
+    profile.hasStrongCarry &&
+    (signals.isSustain || signals.isSpeed || signals.isDamage || signals.isMultiHit)
+  ) {
+    parts.score += 8;
+  }
+}
+
+function addGeneralPassiveTypeScore(
+  parts: RouteScoreParts,
+  passiveTypes: string[],
+  traitCounts: Record<string, number>,
+  traitData: Record<string, TraitInfo>,
+  traitTierValues: Record<string, number>,
+): void {
+  passiveTypes.forEach((type) => {
+    const count = traitCounts[type] || 0;
+    const traitInfo = traitData[type];
+    const tierValue = traitInfo ? traitTierValues[traitInfo.tier || ''] || 1 : 1;
+    parts.score += count > 0 ? count * 12 + tierValue : -6;
+  });
 }
 
 export function scoreGeneralPassiveCardFit(input: GeneralPassiveCardScoreInput): ScoredDecision {
@@ -450,51 +569,23 @@ export function scoreGeneralPassiveCardFit(input: GeneralPassiveCardScoreInput):
   const passiveWeakCoreScalingBonus = input.config?.passiveWeakCoreScalingBonus ?? 28;
   const passiveWeakCoreSurvivalBonus = input.config?.passiveWeakCoreSurvivalBonus ?? 20;
   const reasons: string[] = ['baseline'];
-  let score = 35;
+  const parts = { score: 35, reasons };
 
   if (input.isShinyPassive) {
-    score += passiveShinyCardBonus + (profile.hasShiny ? 18 : 0);
+    parts.score += passiveShinyCardBonus + (profile.hasShiny ? 18 : 0);
     reasons.push('shiny-passive');
   }
-  if (profile.hasShiny && signals.mentionsShiny) score += 22;
-  if (signals.isSustain) score += (input.avgHP ?? 100) < 70 ? 38 : 22;
-  if (signals.isCrit) score += 18 + (traitCounts.Dark || 0) * 8;
-  if (signals.isSurvival) score += 26;
-  if (signals.isDamage) score += 18;
-  if (signals.isSpeed) score += 14;
-  if (signals.isScaling) score += 18 + (traitCounts.Bug || 0) * 7;
-  if (signals.isDistinctTypes) score += (input.teamTypeCount || 0) * 7;
-  if (signals.isMultiHit) score += 18 + (traitCounts.Electric || 0) * 7;
-  if (signals.isExecute) score += 16 + (traitCounts.Ghost || 0) * 8;
-  if (input.hasCarry && signals.isSustain) score += 18;
-  if (input.hasCarry && passiveTypes.includes('Grass')) score += 18 + (traitCounts.Grass || 0) * 6;
-
-  if (profile.weakCore) {
-    if (signals.isScaling) score += passiveWeakCoreScalingBonus;
-    if (signals.isSustain || signals.isSurvival) score += passiveWeakCoreSurvivalBonus;
-    if (signals.isDamage || signals.isMultiHit || signals.isCrit) score += 12;
-    if (
-      passiveTypes.length === 0 &&
-      profile.bossCoveragePoor &&
-      (signals.isDamage || signals.isSustain || signals.isSurvival || signals.isScaling)
-    ) {
-      score += 10;
-    }
-  } else if (profile.hasStrongCarry) {
-    if (signals.isSustain || signals.isSpeed || signals.isDamage || signals.isMultiHit) score += 8;
-  }
-
-  if (profile.underleveled && signals.isScaling) score += 16;
-  if (profile.bossCoveragePoor && (signals.isSurvival || signals.isSustain)) score += 8;
-
-  passiveTypes.forEach((type) => {
-    const count = traitCounts[type] || 0;
-    const traitInfo = traitData[type];
-    const tierValue = traitInfo ? traitTierValues[traitInfo.tier || ''] || 1 : 1;
-    score += count > 0 ? count * 12 + tierValue : -6;
+  if (profile.hasShiny && signals.mentionsShiny) parts.score += 22;
+  addGeneralPassiveSignalScore(input, parts, signals, traitCounts, passiveTypes);
+  addGeneralPassiveProfileScore(profile, parts, signals, passiveTypes, {
+    passiveWeakCoreScalingBonus,
+    passiveWeakCoreSurvivalBonus,
   });
+  if (profile.underleveled && signals.isScaling) parts.score += 16;
+  if (profile.bossCoveragePoor && (signals.isSurvival || signals.isSustain)) parts.score += 8;
+  addGeneralPassiveTypeScore(parts, passiveTypes, traitCounts, traitData, traitTierValues);
 
-  score += scorePassiveTypeContext({
+  parts.score += scorePassiveTypeContext({
     passiveTypes,
     traitCounts,
     traitTierValues,
@@ -506,7 +597,7 @@ export function scoreGeneralPassiveCardFit(input: GeneralPassiveCardScoreInput):
 
   return {
     id: 'passive:general',
-    score,
+    score: parts.score,
     reason: reasons.join(','),
     details: { passiveTypes },
   };

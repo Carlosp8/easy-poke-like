@@ -1541,7 +1541,7 @@
             isOffenseItem: MAIN_CARRY_OFFENSE_ITEMS.has(itemName),
             isUtilityItem: ['lucky egg', 'expert belt', 'loaded dice', 'power bracer'].includes(itemName),
             boostType,
-            carryMatchesBoost: Boolean(boostType && carry && hasMatchingAttackForItem(carry, itemName)),
+            carryMatchesBoost: Boolean(boostType && hasMatchingAttackForItem(carry, itemName)),
             config: {
                 challengeCarryMoveTierTarget: CONFIG.CHALLENGE_CARRY_MOVE_TIER_TARGET
             }
@@ -1826,7 +1826,7 @@
             carryNewScore,
             carryOldScore,
             boostType,
-            carryMatchesBoost: Boolean(boostType && carry && hasMatchingAttackForItem(carry, itemName))
+            carryMatchesBoost: Boolean(boostType && hasMatchingAttackForItem(carry, itemName))
         }).score;
     }
 
@@ -3853,7 +3853,7 @@
 
     function parseCardStats(card) {
         const tooltips = Array.from(card.querySelectorAll('.stat-row[data-tooltip], [data-tooltip]'))
-            .map(row => row.getAttribute('data-tooltip') || '');
+            .map(row => row.dataset?.tooltip || '');
         return EasyPokelikeStrategyUtils.parseStatsFromTooltips(tooltips);
     }
 

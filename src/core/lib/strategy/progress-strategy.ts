@@ -119,10 +119,10 @@ export function getStoryBossPrepTargets(input: StoryBossPrepInput = {}) {
   const leagueKeys = getStoryLeagueBossKeys(region, input.leagueFinals || {}).map(foldText);
   const opponentName = foldText(input.opponentName || '');
   const isLeagueText = Boolean(
-    labelText.match(/liga|league|elite|alto mando|champion|campeon|final boss|stage final boss/),
+    /liga|league|elite|alto mando|champion|campeon|final boss|stage final boss/.exec(labelText),
   );
   const isLeagueBoss = Boolean(opponentName && leagueKeys.includes(opponentName));
-  const championKey = leagueKeys[leagueKeys.length - 1] || '';
+  const championKey = leagueKeys.at(-1) || '';
   const isChampion = Boolean(input.isFinalBoss || (opponentName && opponentName === championKey));
   const reward = input.reward || progress.reward || 0;
   const round = input.round || progress.round || 1;

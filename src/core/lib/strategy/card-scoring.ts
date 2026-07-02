@@ -32,12 +32,12 @@ export interface CardHpSnapshot {
 }
 
 export function parseLevelFromText(text: string): number {
-  const match = (text || '').match(/(?:lv|lvl|nivel|nv\.?)\s*(\d+)/i);
+  const match = /(?:lv|lvl|nivel|nv\.?)\s*(\d+)/i.exec(text || '');
   return match ? Number.parseInt(match[1], 10) : 0;
 }
 
 export function parseHpSnapshotFromText(text: string): CardHpSnapshot | null {
-  const hpMatch = (text || '').match(/(\d+)\s*\/\s*(\d+)/);
+  const hpMatch = /(\d+)\s*\/\s*(\d+)/.exec(text || '');
   if (!hpMatch) return null;
   const current = Number.parseInt(hpMatch[1], 10);
   const max = Number.parseInt(hpMatch[2], 10);
@@ -51,17 +51,16 @@ export function parseHpSnapshotFromText(text: string): CardHpSnapshot | null {
 export function parseStatsFromTooltips(tooltips: string[] = []): PokemonStatsLike {
   const stats: PokemonStatsLike = {};
   (tooltips || []).forEach((tooltip) => {
-    const match = (tooltip || '').match(
-      /(hp|atk|attack|def|defense|spa|sp\.?\s*atk|special attack|special|spd|sp\.?\s*def|special defense|spe|speed)\s*:\s*(\d+)/i,
-    );
-    if (!match) return;
-    const key = match[1]
+    const [rawKey = '', rawValue = ''] = (tooltip || '').split(':', 2);
+    const valueMatch = /^\s*(\d+)/.exec(rawValue);
+    if (!rawKey || !valueMatch) return;
+    const key = rawKey
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .replace(/\./g, '')
       .replace(/\s+/g, '');
-    const value = Number.parseInt(match[2], 10);
+    const value = Number.parseInt(valueMatch[1], 10);
     if (key === 'hp') stats.hp = value;
     else if (key === 'atk' || key === 'attack') stats.atk = value;
     else if (key === 'def' || key === 'defense') stats.def = value;
@@ -121,7 +120,7 @@ export function scoreTraitPreviewRows(input: TraitPreviewScoreInput = {}): numbe
     if (!text) return;
     if ((row.className || '').includes('up') || text.includes('new') || text.includes('nuevo'))
       score += 12;
-    const countMatch = text.match(/(\d+)\s*\/\s*(\d+)/);
+    const countMatch = /(\d+)\s*\/\s*(\d+)/.exec(text);
     if (countMatch) {
       const current = Number.parseInt(countMatch[1], 10);
       const needed = Number.parseInt(countMatch[2], 10);

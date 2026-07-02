@@ -102,7 +102,12 @@ export interface PriorityTypeScoreInput {
 }
 
 export function normalizeTypeList(types: unknown): PokelikeType[] {
-  const list = Array.isArray(types) ? types : types ? [types] : [];
+  let list: unknown[] = [];
+  if (Array.isArray(types)) {
+    list = types;
+  } else if (types) {
+    list = [types];
+  }
   return [
     ...new Set(
       list.filter((type): type is PokelikeType => typeof type === 'string' && TYPE_SET.has(type)),
@@ -211,7 +216,10 @@ export function scoreCatchBossCounter(
 ): number {
   const targetTypes = normalizeTypeList(bossTypes);
   if (targetTypes.length === 0) return 0;
-  const attacks = normalizeTypeList(attackTypes).length > 0 ? attackTypes : candidateTypes;
+  let attacks = attackTypes;
+  if (normalizeTypeList(attacks).length === 0) {
+    attacks = candidateTypes;
+  }
   return (
     getAttackCoverageScore(attacks, targetTypes) * 2.5 +
     getDefensiveMatchupScore(candidateTypes, targetTypes) * 2

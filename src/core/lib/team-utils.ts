@@ -89,7 +89,7 @@ export function shouldBuildCoreTeam(team: PokemonUnit[] = [], coreTeamSize = 2):
 }
 
 export function shouldPrioritizeEarlyTraining(
-  team: PokemonUnit[] = [],
+  team: PokemonUnit[],
   targets: BossPrepTargets,
   config: TrainingPriorityConfig = {},
 ): boolean {
@@ -108,7 +108,7 @@ export function shouldPrioritizeEarlyTraining(
 }
 
 export function getProjectedAverageLevelAfterCatch(
-  team: PokemonUnit[] = [],
+  team: PokemonUnit[],
   candidateLevel: number,
 ): number | null {
   const leveled = getAliveTeam(team).filter((unit) => (unit.level || 0) > 0);
